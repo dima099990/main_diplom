@@ -1,0 +1,155 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block content %}
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg">
+    <div class="hero-orb hero-orb--1"></div>
+    <div class="hero-orb hero-orb--2"></div>
+  </div>
+  <div class="container hero-grid">
+    <div class="hero-text" data-animate>
+      <div class="hero-badge">⚡ Ремонт в день обращения</div>
+      <h1>Ремонт телефонов<br><span class="accent">быстро</span> и <span class="accent">надёжно</span></h1>
+      <p class="hero-sub">Гарантия <strong>{{ site.warranty_days }} дней</strong> на все виды работ.<br>{{ site.working_hours }}</p>
+      <div class="hero-actions">
+        <a href="{{ site.telegram_bot_link }}" target="_blank" class="btn btn-lg">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248l-2.018 9.51c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.337 14.53l-2.948-.924c-.64-.203-.654-.64.136-.948l11.527-4.445c.533-.194 1 .13.51 2.035z"/></svg>
+          Написать в Telegram
+        </a>
+        <a href="tel:{{ site.phone }}" class="btn btn-outline btn-lg">{{ site.phone }}</a>
+      </div>
+    </div>
+
+    <div class="hero-form card" data-animate data-delay="150">
+      <h3>Оставить заявку</h3>
+      <p class="form-sub">Перезвоним в течение 15 минут</p>
+      <form action="{% url 'contact_request' %}" method="post" class="contact-form" id="heroForm">
+        {% csrf_token %}
+        <input type="text" name="name" placeholder="Ваше имя" required>
+        <input type="text" name="phone" placeholder="Телефон или Telegram" required>
+        <textarea name="message" placeholder="Что случилось с устройством?" rows="3"></textarea>
+        <button type="submit" class="btn btn-lg" style="width:100%">Отправить заявку</button>
+      </form>
+      <div class="form-success" id="formSuccess" style="display:none">
+        <div class="success-icon">✓</div>
+        <p>Заявка принята! Ожидайте звонка.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<section class="stats">
+  <div class="container stats-grid">
+    <div class="stat-item">
+      <span class="stat-num">9+</span>
+      <span class="stat-label">лет работы</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-num">15 000+</span>
+      <span class="stat-label">ремонтов</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-num">{{ site.warranty_days }}</span>
+      <span class="stat-label">дней гарантии</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-num">4.9★</span>
+      <span class="stat-label">средняя оценка</span>
+    </div>
+  </div>
+</section>
+
+<!-- POPULAR SERVICES -->
+{% if popular_services %}
+<section class="section services-preview">
+  <div class="container">
+    <div class="section-head">
+      <h2>Популярные услуги</h2>
+      <a href="{% url 'prices' %}" class="link-more">Весь прайс-лист →</a>
+    </div>
+    <div class="services-grid">
+      {% for svc in popular_services %}
+      <div class="service-card">
+        <div class="service-card__cat">{{ svc.category.icon }} {{ svc.category.name }}</div>
+        <div class="service-card__name">{{ svc.name }}</div>
+        {% if svc.description %}<div class="service-card__desc">{{ svc.description }}</div>{% endif %}
+        <div class="service-card__footer">
+          <span class="service-card__price">{{ svc.price_display }}</span>
+          <span class="service-card__time">⏱ {{ svc.duration }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- WHY US -->
+<section class="section why-us">
+  <div class="container">
+    <h2>Почему выбирают нас</h2>
+    <div class="why-grid">
+      <div class="why-card">
+        <div class="why-icon">🔧</div>
+        <h3>Оригинальные запчасти</h3>
+        <p>Используем только сертифицированные комплектующие от проверенных поставщиков</p>
+      </div>
+      <div class="why-card">
+        <div class="why-icon">⚡</div>
+        <h3>Быстрый ремонт</h3>
+        <p>Большинство поломок устраняем в день обращения — прямо при вас</p>
+      </div>
+      <div class="why-card">
+        <div class="why-icon">🛡</div>
+        <h3>Гарантия {{ site.warranty_days }} дней</h3>
+        <p>На все виды работ и установленные запчасти — письменно</p>
+      </div>
+      <div class="why-card">
+        <div class="why-icon">💳</div>
+        <h3>Удобная оплата</h3>
+        <p>Наличные, карта, перевод — оплачивайте как удобно вам</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- REVIEWS -->
+{% if reviews %}
+<section class="section reviews-section">
+  <div class="container">
+    <h2>Отзывы клиентов</h2>
+    <div class="reviews-grid">
+      {% for review in reviews %}
+      <div class="review-card">
+        <div class="review-rating">{% for i in "12345" %}{% if forloop.counter <= review.rating %}★{% else %}☆{% endif %}{% endfor %}</div>
+        <p class="review-text">{{ review.text }}</p>
+        <div class="review-author">
+          <strong>{{ review.author }}</strong>
+          {% if review.device %}<span>{{ review.device }}</span>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- CTA BOTTOM -->
+<section class="cta-section">
+  <div class="container cta-inner">
+    <div>
+      <h2>Есть проблема с телефоном?</h2>
+      <p>Напишите нам — диагностика бесплатная</p>
+    </div>
+    <div class="cta-actions">
+      <a href="{{ site.telegram_bot_link }}" target="_blank" class="btn btn-lg">Написать в Telegram</a>
+      <a href="tel:{{ site.phone }}" class="btn btn-outline btn-lg">{{ site.phone }}</a>
+    </div>
+  </div>
+</section>
+
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends 'crm/base.html' %}
+{% block title %}{% if part %}Редактировать запчасть{% else %}Новая запчасть{% endblock %}
+{% block page_title %}{% if part %}Редактировать запчасть{% else %}Новая запчасть{% endif %}{% endblock %}
+{% block content %}
+<div class="breadcrumb"><a href="{% url 'crm:part_list' %}">Запчасти</a><span>›</span>{% if part %}{{ part.name }}{% else %}Новая{% endif %}</div>
+<div class="card" style="max-width:700px;margin-top:16px">
+  <form method="post">{% csrf_token %}
+    <div class="form-grid">
+      <div class="form-group"><label class="form-label">Название *</label><input name="name" class="form-control" value="{{ part.name|default:'' }}" required></div>
+      <div class="form-group"><label class="form-label">Артикул</label><input name="sku" class="form-control" value="{{ part.sku|default:'' }}"></div>
+      <div class="form-group"><label class="form-label">Марка</label>
+        <select name="brand" id="id_part_brand" class="form-control">
+          <option value="">— не указана —</option>
+          {% for b in brands %}<option value="{{ b.id }}" {% if part.brand_id == b.id %}selected{% endif %}>{{ b.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Модель</label>
+        <select name="phone_model" id="id_part_model" class="form-control">
+          <option value="">— все модели —</option>
+          {% for m in phone_models %}<option value="{{ m.id }}" {% if part.phone_model_id == m.id %}selected{% endif %}>{{ m }}</option>{% endfor %}
+        </select>
+      </div>
+      {% if not part %}
+      <div class="form-group"><label class="form-label">Начальный остаток</label><input name="quantity" type="number" class="form-control" value="0" min="0"></div>
+      {% endif %}
+      <div class="form-group"><label class="form-label">Мин. остаток (предупреждение)</label><input name="min_quantity" type="number" class="form-control" value="{{ part.min_quantity|default:1 }}" min="0"></div>
+      <div class="form-group"><label class="form-label">Закупочная цена (₽)</label><input name="purchase_price" type="number" class="form-control" value="{{ part.purchase_price|default:0 }}" step="0.01"></div>
+      <div class="form-group"><label class="form-label">Цена списания (₽)</label><input name="sale_price" type="number" class="form-control" value="{{ part.sale_price|default:0 }}" step="0.01"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Примечания</label><textarea name="notes" class="form-control" rows="2">{{ part.notes|default:'' }}</textarea></div>
+    <div style="display:flex;gap:8px">
+      <button type="submit" class="btn btn-primary">💾 Сохранить</button>
+      <a href="{% url 'crm:part_list' %}" class="btn btn-secondary">Отмена</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

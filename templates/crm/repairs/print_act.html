@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Акт приёма — {{ repair.order_number }}</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Times New Roman', serif; font-size: 12pt; color: #000; background: #fff; }
+.page { max-width: 210mm; margin: 0 auto; padding: 15mm 15mm 20mm; }
+h1 { font-size: 16pt; text-align: center; margin-bottom: 4px; }
+.subtitle { text-align: center; font-size: 11pt; margin-bottom: 16px; color: #444; }
+.header { display: flex; justify-content: space-between; margin-bottom: 16px; font-size: 11pt; }
+.info-block { margin-bottom: 14px; }
+.info-block h3 { font-size: 12pt; border-bottom: 1px solid #000; padding-bottom: 3px; margin-bottom: 8px; }
+.info-row { display: flex; gap: 8px; margin-bottom: 5px; font-size: 11pt; }
+.info-row .label { font-weight: bold; min-width: 130px; flex-shrink: 0; }
+.condition-table { width: 100%; border-collapse: collapse; font-size: 10pt; margin-bottom: 14px; }
+.condition-table th, .condition-table td { border: 1px solid #000; padding: 4px 7px; text-align: left; }
+.condition-table th { background: #f0f0f0; font-weight: bold; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.services-table { width: 100%; border-collapse: collapse; font-size: 11pt; margin-bottom: 14px; }
+.services-table th, .services-table td { border: 1px solid #000; padding: 5px 8px; }
+.services-table th { background: #f0f0f0; }
+.sign-block { margin-top: 20px; }
+.sign-row { display: flex; justify-content: space-between; margin-top: 28px; }
+.sign-field { flex: 1; border-bottom: 1px solid #000; min-width: 160px; margin: 0 8px; padding-bottom: 2px; }
+.sign-labels { display: flex; justify-content: space-between; font-size: 10pt; color: #444; }
+.notice { background: #f5f5f5; border: 1px solid #ccc; padding: 10px; margin-bottom: 14px; font-size: 10pt; }
+.ok-sym { color: #166534; font-weight: bold; }
+.bad-sym { color: #991b1b; font-weight: bold; }
+.na-sym { color: #6b7280; }
+@media print {
+  body { font-size: 11pt; }
+  .page { padding: 10mm; }
+  .no-print { display: none !important; }
+}
+</style>
+</head>
+<body onload="window.print()">
+<div class="no-print" style="background:#222;color:#fff;padding:10px 20px;text-align:center">
+  <button onclick="window.print()" style="background:#f24a47;color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:14px;margin-right:12px">🖨 Печать</button>
+  <button onclick="window.close()" style="background:#444;color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:14px">✕ Закрыть</button>
+</div>
+<div class="page">
+  <h1>АКТ ПРИЁМА УСТРОЙСТВА В РЕМОНТ</h1>
+  <p class="subtitle">{{ site.company_name }} | {{ site.address }} | {{ site.phone }}</p>
+
+  <div class="header">
+    <div><strong>Заказ №:</strong> {{ repair.order_number }}</div>
+    <div><strong>Дата:</strong> {{ print_date|date:"d.m.Y H:i" }}</div>
+    <div><strong>Мастер:</strong> {{ repair.assigned_to.get_full_name|default:repair.created_by.get_full_name|default:"—" }}</div>
+  </div>
+
+  <div class="two-col">
+    <div class="info-block">
+      <h3>Клиент</h3>
+      <div class="info-row"><span class="label">ФИО:</span><span>{{ repair.customer.name }}</span></div>
+      <div class="info-row"><span class="label">Телефон:</span><span>{{ repair.customer.phone }}</span></div>
+      {% if repair.customer.email %}<div class="info-row"><span class="label">Email:</span><span>{{ repair.customer.email }}</span></div>{% endif %}
+    </div>
+    <div class="info-block">
+      <h3>Устройство</h3>
+      <div class="info-row"><span class="label">Марка / модель:</span><span>{{ repair.phone_model }}</span></div>
+      {% if repair.imei %}<div class="info-row"><span class="label">IMEI:</span><span>{{ repair.imei }}</span></div>{% endif %}
+      <div class="info-row"><span class="label">Пароль:</span><span>{% if repair.device_password %}{{ repair.device_password }}{% else %}не предоставлен{% endif %}</span></div>
+    </div>
+  </div>
+
+  {% if repair.appearance %}
+  <div class="info-block">
+    <h3>Внешний вид / комплектация</h3>
+    <p style="font-size:11pt">{{ repair.appearance }}</p>
+  </div>
+  {% endif %}
+
+  {% if repair.complaint %}
+  <div class="info-block">
+    <h3>Жалоба клиента</h3>
+    <p style="font-size:11pt">{{ repair.complaint }}</p>
+  </div>
+  {% endif %}
+
+  {% if condition %}
+  <div class="info-block">
+    <h3>Проверка функционала при приёмке</h3>
+    <table class="condition-table">
+      <thead><tr><th width="40%">Функция</th><th>Состояние</th><th width="40%">Функция</th><th>Состояние</th></tr></thead>
+      <tbody>
+      {% with items=condition.get_items %}
+      {% for i in "0123456789" %}{% endfor %}
+      {% for item in items %}
+      {% if forloop.counter|divisibleby:2 %}
+      {% else %}
+      <tr>
+        <td>{{ item.label }}</td>
+        <td>
+          {% if item.state == 'ok' %}<span class="ok-sym">✓ Работает</span>
+          {% elif item.state == 'broken' %}<span class="bad-sym">✗ Не работает</span>
+          {% else %}<span class="na-sym">— Не проверено</span>{% endif %}
+        </td>
+      {% endif %}
+      {% if forloop.counter|divisibleby:2 %}
+        <td>{{ item.label }}</td>
+        <td>
+          {% if item.state == 'ok' %}<span class="ok-sym">✓ Работает</span>
+          {% elif item.state == 'broken' %}<span class="bad-sym">✗ Не работает</span>
+          {% else %}<span class="na-sym">— Не проверено</span>{% endif %}
+        </td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+      {% endwith %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if services %}
+  <div class="info-block">
+    <h3>Планируемые работы</h3>
+    <table class="services-table">
+      <thead><tr><th>Работа</th><th>Стоимость</th></tr></thead>
+      <tbody>
+      {% for s in services %}
+      <tr><td>{{ s.name }}</td><td>{{ s.price|floatformat:0 }} ₽</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if repair.estimated_cost %}
+  <div class="info-row" style="font-size:12pt;font-weight:bold;margin-bottom:14px">
+    <span class="label">Предв. стоимость:</span><span>{{ repair.estimated_cost|floatformat:0 }} ₽</span>
+  </div>
+  {% endif %}
+
+  <div class="notice">
+    <strong>Гарантия на выполненные работы: {{ repair.warranty_days }} дней</strong><br>
+    Сервисный центр не несёт ответственности за данные на устройстве. Устройство хранится в сервисе не более 30 дней с момента готовности.
+  </div>
+
+  <div class="sign-block">
+    <div class="sign-row">
+      <div style="flex:1">Клиент передал:<br><div class="sign-field">&nbsp;</div></div>
+      <div style="width:40px"></div>
+      <div style="flex:1">Мастер принял:<br><div class="sign-field">&nbsp;</div></div>
+    </div>
+    <div class="sign-labels" style="margin-top:4px">
+      <span>_______________________</span><span style="margin-left:auto">_______________________</span>
+    </div>
+    <div class="sign-labels"><span>(подпись клиента / дата)</span><span style="margin-left:auto">(подпись мастера / дата)</span></div>
+  </div>
+</div>
+</body>
+</html>

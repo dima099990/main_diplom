@@ -1,0 +1,74 @@
+{% extends 'crm/base.html' %}
+{% block title %}Новый ремонт{% endblock %}
+{% block page_title %}Новый ремонт{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><div class="breadcrumb"><a href="{% url 'crm:repair_list' %}">Ремонты</a><span>›</span>Новый</div><h1>Создать заказ на ремонт</h1></div>
+</div>
+<form method="post">{% csrf_token %}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+<div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="form-section"><h3>👤 Клиент</h3>
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">ФИО *</label><input name="customer_name" class="form-control" required></div>
+        <div class="form-group"><label class="form-label">Телефон *</label><input name="customer_phone" class="form-control" required placeholder="+7 (999) 000-00-00"></div>
+        <div class="form-group"><label class="form-label">Email</label><input name="customer_email" type="email" class="form-control"></div>
+      </div>
+    </div>
+    <div class="form-section"><h3>📱 Устройство</h3>
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">Марка *</label>
+          <select name="brand" id="id_brand" class="form-control" required>
+            <option value="">— выберите марку —</option>
+            {% for b in brands %}<option value="{{ b.id }}">{{ b.icon }} {{ b.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Модель *</label>
+          <select name="phone_model" id="id_phone_model" class="form-control" required>
+            <option value="">— сначала выберите марку —</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">IMEI</label><input name="imei" class="form-control" placeholder="15 цифр"></div>
+        <div class="form-group"><label class="form-label">Пароль устройства</label><input name="device_password" class="form-control"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Внешний вид / комплектация</label><textarea name="appearance" class="form-control" rows="2" placeholder="Царапины, сколы..."></textarea></div>
+      <div class="form-group"><label class="form-label">Жалоба клиента</label><textarea name="complaint" class="form-control" rows="2" placeholder="Что не работает..."></textarea></div>
+    </div>
+    <div><h3 style="color:#fff;font-weight:700;margin-bottom:16px">👨‍🔧 Назначение</h3>
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">Исполнитель</label>
+          <select name="assigned_to" class="form-control"><option value="">— не назначен —</option>
+            {% for emp in employees %}<option value="{{ emp.id }}">{{ emp.get_full_name|default:emp.username }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Предв. стоимость (₽)</label><input name="estimated_cost" type="number" class="form-control" value="0"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Внутренние заметки</label><textarea name="notes" class="form-control" rows="2"></textarea></div>
+    </div>
+  </div>
+</div>
+<div class="card">
+  <h3 style="color:#fff;font-weight:700;margin-bottom:6px">✅ Проверка функционала при приёмке</h3>
+  <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">✓ работает &nbsp; ✗ не работает &nbsp; ? не проверено</p>
+  <div class="condition-grid">
+  {% for field_name, label in condition_items %}
+  <div class="condition-item">
+    <label>{{ label }}</label>
+    <div class="condition-radios">
+      {% for val, display in condition_states %}
+      <input type="radio" name="cond_{{ field_name }}" value="{{ val }}" id="cond_{{ field_name }}_{{ val }}" class="cond-radio" {% if val == 'na' %}checked{% endif %}>
+      <label for="cond_{{ field_name }}_{{ val }}" class="cond-label">{% if val == 'ok' %}✓{% elif val == 'broken' %}✗{% else %}?{% endif %}</label>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+  </div>
+</div>
+</div>
+<div style="margin-top:20px;display:flex;gap:12px">
+  <button type="submit" class="btn btn-primary btn-lg">✅ Создать заказ</button>
+  <a href="{% url 'crm:repair_list' %}" class="btn btn-secondary btn-lg">Отмена</a>
+</div>
+</form>
+{% endblock %}

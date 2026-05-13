@@ -1,0 +1,29 @@
+{% extends 'crm/base.html' %}
+{% block title %}Клиенты{% endblock %}
+{% block page_title %}Клиенты{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Клиенты</h1></div>
+  <a href="{% url 'crm:customer_create' %}" class="btn btn-primary">➕ Добавить клиента</a>
+</div>
+<div class="filter-bar">
+  <form method="get" style="display:flex;gap:8px">
+    <input type="text" name="q" value="{{ q }}" placeholder="Поиск по имени / телефону...">
+    <button type="submit" class="btn btn-secondary btn-sm">Найти</button>
+  </form>
+</div>
+<div class="card"><div class="table-wrap"><table>
+  <thead><tr><th>Имя</th><th>Телефон</th><th>Email</th><th>Ремонтов</th><th>Добавлен</th></tr></thead>
+  <tbody>
+  {% for c in customers %}
+  <tr onclick="location.href='{% url 'crm:customer_detail' c.pk %}'" style="cursor:pointer">
+    <td class="td-name">{{ c.name }}</td><td>{{ c.phone }}</td>
+    <td class="text-muted">{{ c.email|default:"—" }}</td>
+    <td>{{ c.repair_count }}</td>
+    <td class="text-muted">{{ c.created_at|date:"d.m.Y" }}</td>
+  </tr>
+  {% empty %}<tr><td colspan="5"><div class="empty-state"><div class="icon">👥</div><p>Клиентов пока нет</p></div></td></tr>
+  {% endfor %}
+  </tbody>
+</table></div></div>
+{% endblock %}

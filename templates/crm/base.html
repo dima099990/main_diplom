@@ -1,0 +1,131 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}CRM{% endblock %} — {{ site.company_name }}</title>
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'crm/css/crm.css' %}">
+{% block extra_css %}{% endblock %}
+</head>
+<body>
+<div class="crm-layout">
+
+  <!-- SIDEBAR -->
+  <aside class="crm-sidebar" id="crmSidebar">
+    <div class="sidebar-logo"><span>●</span>{{ site.company_name }} <small style="font-size:11px;color:var(--text-muted);font-weight:400">CRM</small></div>
+
+    <div class="sidebar-section">
+      <a href="{% url 'crm:dashboard' %}" class="sidebar-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+        <span class="icon">🏠</span> Дашборд
+      </a>
+      <a href="{% url 'crm:search' %}" class="sidebar-link {% if request.resolver_match.url_name == 'search' %}active{% endif %}">
+        <span class="icon">🔍</span> Поиск клиента
+      </a>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Ремонты</div>
+      <a href="{% url 'crm:repair_create' %}" class="sidebar-link {% if request.resolver_match.url_name == 'repair_create' %}active{% endif %}">
+        <span class="icon">➕</span> Новый ремонт
+      </a>
+      <a href="{% url 'crm:repair_list' %}" class="sidebar-link {% if 'repair' in request.resolver_match.url_name and request.resolver_match.url_name != 'repair_create' %}active{% endif %}">
+        <span class="icon">🔧</span> Все ремонты
+      </a>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Продажи</div>
+      <a href="{% url 'crm:sale_create' %}" class="sidebar-link">
+        <span class="icon">➕</span> Новая продажа
+      </a>
+      <a href="{% url 'crm:sale_list' %}" class="sidebar-link {% if 'sale' in request.resolver_match.url_name %}active{% endif %}">
+        <span class="icon">🛍</span> Продажи
+      </a>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Клиенты</div>
+      <a href="{% url 'crm:customer_list' %}" class="sidebar-link {% if 'customer' in request.resolver_match.url_name %}active{% endif %}">
+        <span class="icon">👥</span> Клиенты
+      </a>
+      {% if role in "admin,manager" %}
+      <a href="{% url 'crm:call_request_list' %}" class="sidebar-link {% if 'call_request' in request.resolver_match.url_name %}active{% endif %}">
+        <span class="icon">📞</span> Заявки на обзвон
+        {% if call_req_count %}<span class="sidebar-badge">{{ call_req_count }}</span>{% endif %}
+      </a>
+      {% endif %}
+    </div>
+
+    {% if role in "admin,manager" %}
+    <div class="sidebar-section">
+      <div class="sidebar-label">Склад</div>
+      <a href="{% url 'crm:part_list' %}" class="sidebar-link {% if 'part' in request.resolver_match.url_name %}active{% endif %}">
+        <span class="icon">🔩</span> Запчасти
+      </a>
+      <a href="{% url 'crm:accessory_list' %}" class="sidebar-link {% if 'accessory' in request.resolver_match.url_name %}active{% endif %}">
+        <span class="icon">📦</span> Аксессуары
+      </a>
+      <a href="{% url 'crm:stock_movements' %}" class="sidebar-link {% if request.resolver_match.url_name == 'stock_movements' %}active{% endif %}">
+        <span class="icon">📊</span> История движений
+      </a>
+    </div>
+    {% endif %}
+
+    {% if role == "admin" %}
+    <div class="sidebar-section">
+      <div class="sidebar-label">Администрирование</div>
+      <a href="{% url 'crm:user_list' %}" class="sidebar-link {% if 'user' in request.resolver_match.url_name %}active{% endif %}">
+        <span class="icon">👨‍💼</span> Сотрудники
+      </a>
+      <a href="/admin/" class="sidebar-link" target="_blank">
+        <span class="icon">⚙️</span> Настройки сайта
+      </a>
+    </div>
+    {% endif %}
+
+    <div class="sidebar-section">
+      <a href="/" class="sidebar-link" target="_blank">
+        <span class="icon">🌐</span> Открыть сайт
+      </a>
+    </div>
+
+    <div class="sidebar-user">
+      <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
+      {{ user_role_display }}
+      <br><a href="{% url 'crm:logout' %}">Выйти →</a>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="crm-main">
+    <header class="crm-topbar">
+      <div style="display:flex;align-items:center;gap:16px">
+        <button id="sidebarToggle" style="display:none;background:none;border:none;color:var(--text);font-size:20px;cursor:pointer">☰</button>
+        <span class="topbar-title">{% block page_title %}{% endblock %}</span>
+      </div>
+      <form action="{% url 'crm:search' %}" method="get" class="topbar-search">
+        <input type="text" name="q" placeholder="🔍 Поиск по телефону / имени..." value="{{ request.GET.q }}">
+      </form>
+    </header>
+
+    <!-- Messages -->
+    {% if messages %}
+    <div class="messages-wrap">
+      {% for msg in messages %}
+      <div class="toast toast-{{ msg.tags }}">{{ msg }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="crm-content">
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+</div>
+
+<script src="{% static 'crm/js/crm.js' %}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

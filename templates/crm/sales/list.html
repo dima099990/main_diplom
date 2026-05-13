@@ -1,0 +1,26 @@
+{% extends 'crm/base.html' %}
+{% block title %}Продажи{% endblock %}
+{% block page_title %}Продажи{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Продажи аксессуаров</h1></div>
+  <a href="{% url 'crm:sale_create' %}" class="btn btn-primary">➕ Новая продажа</a>
+</div>
+<div class="card"><div class="table-wrap"><table>
+  <thead><tr><th>Номер</th><th>Покупатель</th><th>Телефон</th><th>Итого</th><th>Статус</th><th>Сотрудник</th><th>Дата</th></tr></thead>
+  <tbody>
+  {% for s in sales %}
+  <tr onclick="location.href='{% url 'crm:sale_detail' s.pk %}'" style="cursor:pointer">
+    <td class="td-name">{{ s.order_number }}</td>
+    <td>{{ s.customer_name|default:"—" }}</td>
+    <td>{{ s.customer_phone|default:"—" }}</td>
+    <td class="price-tag">{{ s.total|floatformat:0 }} ₽</td>
+    <td>{% if s.is_finalized %}<span class="badge badge-done">Завершена</span>{% else %}<span class="badge badge-new">Черновик</span>{% endif %}</td>
+    <td>{{ s.created_by.get_full_name|default:s.created_by.username }}</td>
+    <td class="text-muted">{{ s.created_at|date:"d.m.Y H:i" }}</td>
+  </tr>
+  {% empty %}<tr><td colspan="7"><div class="empty-state"><div class="icon">🛍</div><p>Продаж нет</p></div></td></tr>
+  {% endfor %}
+  </tbody>
+</table></div></div>
+{% endblock %}

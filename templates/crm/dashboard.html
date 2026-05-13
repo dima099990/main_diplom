@@ -1,0 +1,104 @@
+{% extends 'crm/base.html' %}
+{% block title %}Дашборд{% endblock %}
+{% block page_title %}Дашборд{% endblock %}
+{% block content %}
+{% if role in "admin,manager" %}
+<div class="stat-cards">
+  <div class="stat-card stat-card--blue">
+    <div class="stat-card__num">{{ total_repairs }}</div>
+    <div class="stat-card__label">Всего ремонтов</div>
+  </div>
+  <div class="stat-card stat-card--yellow">
+    <div class="stat-card__num">{{ active_repairs }}</div>
+    <div class="stat-card__label">В работе сейчас</div>
+  </div>
+  <div class="stat-card stat-card--green">
+    <div class="stat-card__num">{{ done_today }}</div>
+    <div class="stat-card__label">Готово сегодня</div>
+  </div>
+  <div class="stat-card stat-card--red">
+    <div class="stat-card__num">{{ call_requests }}</div>
+    <div class="stat-card__label">Необработанных заявок</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 340px;gap:20px">
+<div class="card">
+  <div class="card-title">Последние ремонты
+    <a href="{% url 'crm:repair_list' %}" class="btn btn-secondary btn-sm">Все →</a>
+  </div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Номер</th><th>Клиент</th><th>Устройство</th><th>Статус</th><th>Стоимость</th></tr></thead>
+    <tbody>
+    {% for r in recent_repairs %}
+    <tr onclick="location.href='{% url 'crm:repair_detail' r.pk %}'" style="cursor:pointer">
+      <td class="td-name">{{ r.order_number }}</td>
+      <td>{{ r.customer.name }}<br><small>{{ r.customer.phone }}</small></td>
+      <td>{{ r.phone_model }}</td>
+      <td><span class="badge badge-{{ r.status }}">{{ r.get_status_display }}</span></td>
+      <td class="price-tag">{% if r.final_cost %}{{ r.final_cost|floatformat:0 }} ₽{% else %}—{% endif %}</td>
+    </tr>
+    {% empty %}<tr><td colspan="5" class="text-muted" style="text-align:center">Ремонтов пока нет</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+<div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">Быстрые действия</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <a href="{% url 'crm:repair_create' %}" class="btn btn-primary">➕ Новый ремонт</a>
+      <a href="{% url 'crm:sale_create' %}" class="btn btn-secondary">🛍 Продажа аксессуаров</a>
+      <a href="{% url 'crm:customer_list' %}" class="btn btn-secondary">🔍 Поиск клиента</a>
+      <a href="{% url 'crm:call_request_list' %}" class="btn btn-secondary">📞 Заявки на обзвон {% if call_requests %}<span class="sidebar-badge">{{ call_requests }}</span>{% endif %}</a>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Недавние продажи</div>
+    {% for s in recent_sales %}
+    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">
+      <a href="{% url 'crm:sale_detail' s.pk %}">{{ s.order_number }}</a>
+      <span class="price-tag">{{ s.total|floatformat:0 }} ₽</span>
+    </div>
+    {% empty %}<div class="text-muted" style="font-size:13px">Продаж нет</div>{% endfor %}
+  </div>
+</div>
+</div>
+
+{% else %}
+<!-- Employee dashboard -->
+<div class="stat-cards">
+  <div class="stat-card stat-card--blue"><div class="stat-card__num">{{ my_repairs|length }}</div><div class="stat-card__label">Мои активные ремонты</div></div>
+  <div class="stat-card stat-card--green"><div class="stat-card__num">{{ my_done_today }}</div><div class="stat-card__label">Завершено сегодня</div></div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 280px;gap:20px">
+<div class="card">
+  <div class="card-title">Мои ремонты</div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Номер</th><th>Клиент</th><th>Устройство</th><th>Статус</th></tr></thead>
+    <tbody>
+    {% for r in my_repairs %}
+    <tr onclick="location.href='{% url 'crm:repair_detail' r.pk %}'" style="cursor:pointer">
+      <td class="td-name">{{ r.order_number }}</td>
+      <td>{{ r.customer.name }}</td>
+      <td>{{ r.phone_model }}</td>
+      <td><span class="badge badge-{{ r.status }}">{{ r.get_status_display }}</span></td>
+    </tr>
+    {% empty %}<tr><td colspan="4" class="text-muted" style="text-align:center">Нет активных ремонтов</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+<div class="card">
+  <div class="card-title">Действия</div>
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <a href="{% url 'crm:repair_create' %}" class="btn btn-primary">➕ Новый ремонт</a>
+    <a href="{% url 'crm:sale_create' %}" class="btn btn-secondary">🛍 Продажа</a>
+    <a href="{% url 'crm:search' %}" class="btn btn-secondary">🔍 Поиск клиента</a>
+  </div>
+</div>
+</div>
+{% endif %}
+{% endblock %}

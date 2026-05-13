@@ -1,0 +1,199 @@
+{% extends 'crm/base.html' %}
+{% block title %}{{ repair.order_number }}{% endblock %}
+{% block page_title %}{{ repair.order_number }}{% endblock %}
+{% block content %}
+<div class="breadcrumb"><a href="{% url 'crm:repair_list' %}">Ремонты</a><span>›</span>{{ repair.order_number }}</div>
+
+<div class="repair-header">
+  <div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+      <span class="repair-number">{{ repair.order_number }}</span>
+      <span class="badge badge-{{ repair.status }}" style="font-size:13px">{{ repair.get_status_display }}</span>
+    </div>
+    <div class="repair-info">
+      <div class="repair-info-item"><div class="ilabel">Клиент</div><div class="ivalue">{{ repair.customer.name }}</div></div>
+      <div class="repair-info-item"><div class="ilabel">Телефон</div><div class="ivalue"><a href="tel:{{ repair.customer.phone }}">{{ repair.customer.phone }}</a></div></div>
+      <div class="repair-info-item"><div class="ilabel">Устройство</div><div class="ivalue">{{ repair.phone_model }}</div></div>
+      <div class="repair-info-item"><div class="ilabel">Принят</div><div class="ivalue">{{ repair.created_at|date:"d.m.Y H:i" }}</div></div>
+      <div class="repair-info-item"><div class="ilabel">Исполнитель</div><div class="ivalue">{{ repair.assigned_to.get_full_name|default:"Не назначен" }}</div></div>
+      <div class="repair-info-item"><div class="ilabel">Итого</div><div class="ivalue text-green">{{ repair.final_cost|floatformat:0 }} ₽</div></div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <a href="{% url 'crm:repair_print' repair.pk %}" target="_blank" class="btn btn-secondary">🖨 Печать акта</a>
+  </div>
+</div>
+
+<div class="repair-grid">
+<!-- LEFT COLUMN -->
+<div>
+  <!-- Status update -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">Статус заказа</div>
+    <form method="post" action="{% url 'crm:repair_status' repair.pk %}" style="display:flex;gap:8px;flex-wrap:wrap">
+      {% csrf_token %}
+      <select name="status" class="form-control" style="flex:1">
+        {% for val,label in status_choices %}<option value="{{ val }}" {% if repair.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      <button type="submit" class="btn btn-primary">Обновить</button>
+    </form>
+    {% if repair.complaint %}
+    <div style="margin-top:12px;padding:10px;background:var(--dark-4);border-radius:6px;font-size:13px">
+      <div class="text-muted" style="font-size:11px;margin-bottom:4px">ЖАЛОБА КЛИЕНТА</div>
+      {{ repair.complaint }}
+    </div>
+    {% endif %}
+    {% if repair.notes %}
+    <div style="margin-top:8px;padding:10px;background:var(--dark-4);border-radius:6px;font-size:13px">
+      <div class="text-muted" style="font-size:11px;margin-bottom:4px">ЗАМЕТКИ</div>
+      {{ repair.notes }}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Services -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">Работы
+      <span class="price-tag">{{ repair.order_services.all|length }} поз.</span>
+    </div>
+    {% if services %}
+    <div class="table-wrap" style="margin-bottom:16px"><table>
+      <thead><tr><th>Работа</th><th>Цена</th><th></th></tr></thead>
+      <tbody>
+      {% for s in services %}
+      <tr>
+        <td>{{ s.name }}</td>
+        <td class="price-tag">{{ s.price|floatformat:0 }} ₽</td>
+        <td>
+          <form method="post" action="{% url 'crm:repair_remove_service' repair.pk s.pk %}" style="display:inline">
+            {% csrf_token %}<button type="submit" class="btn btn-danger btn-sm" data-confirm="Удалить работу?">✕</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% endif %}
+    <form method="post" action="{% url 'crm:repair_add_service' repair.pk %}">
+      {% csrf_token %}
+      <div class="form-grid" style="margin-bottom:8px">
+        <div>
+          <label class="form-label">Из прайс-листа</label>
+          <select id="service_select" name="service_id" class="form-control">
+            <option value="">— выбрать из прайса —</option>
+            {% for s in available_services %}<option value="{{ s.id }}" data-price="{{ s.price_from }}">{{ s.name }} (от {{ s.price_from }}₽)</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Или своё название</label>
+          <input name="custom_name" class="form-control" placeholder="Произвольная работа">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <div style="flex:1"><label class="form-label">Цена (₽) *</label><input id="service_price" name="price" type="number" class="form-control" required placeholder="0"></div>
+        <button type="submit" class="btn btn-success">+ Добавить работу</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Parts -->
+  <div class="card">
+    <div class="card-title">Запчасти <small class="text-muted">(списываются со склада)</small></div>
+    {% if parts_used %}
+    <div class="table-wrap" style="margin-bottom:16px"><table>
+      <thead><tr><th>Запчасть</th><th>Кол-во</th><th>Цена</th><th>Сумма</th><th></th></tr></thead>
+      <tbody>
+      {% for p in parts_used %}
+      <tr>
+        <td>{{ p.part.name }}</td><td>{{ p.quantity }}</td>
+        <td>{{ p.price|floatformat:0 }} ₽</td>
+        <td class="price-tag">{{ p.total|floatformat:0 }} ₽</td>
+        <td>
+          <form method="post" action="{% url 'crm:repair_remove_part' repair.pk p.pk %}" style="display:inline">
+            {% csrf_token %}<button type="submit" class="btn btn-danger btn-sm" data-confirm="Удалить и вернуть на склад?">✕</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% endif %}
+    <form method="post" action="{% url 'crm:repair_add_part' repair.pk %}">
+      {% csrf_token %}
+      <div class="form-grid" style="margin-bottom:8px">
+        <div>
+          <label class="form-label">Запчасть</label>
+          <select id="part_select" name="part_id" class="form-control" required>
+            <option value="">— выберите запчасть —</option>
+            {% for p in available_parts %}
+            <option value="{{ p.id }}" data-price="{{ p.sale_price }}" {% if p.is_out_of_stock %}style="color:var(--red)"{% endif %}>
+              {{ p.name }} (склад: {{ p.quantity }}{% if p.is_out_of_stock %} ⚠️ нет!{% endif %})
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div style="display:flex;gap:8px">
+          <div style="flex:1"><label class="form-label">Кол-во</label><input name="quantity" type="number" class="form-control" value="1" min="1"></div>
+          <div style="flex:1"><label class="form-label">Цена за шт.</label><input id="part_price" name="price" type="number" class="form-control" placeholder="авто"></div>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-success">+ Добавить запчасть</button>
+      <a href="{% url 'crm:part_create' %}" class="btn btn-secondary" style="margin-left:8px">+ Запчасть на склад</a>
+    </form>
+  </div>
+</div>
+
+<!-- RIGHT COLUMN -->
+<div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">Итого по заказу</div>
+    <div style="font-size:13px;margin-bottom:8px;display:flex;justify-content:space-between"><span class="text-muted">Работы:</span><span>{{ repair.order_services.all|length }} поз.</span></div>
+    <div style="font-size:13px;margin-bottom:12px;display:flex;justify-content:space-between"><span class="text-muted">Запчасти:</span><span>{{ repair.order_parts.all|length }} поз.</span></div>
+    <div style="font-size:22px;font-weight:800;color:#fff;display:flex;justify-content:space-between;align-items:center">
+      <span>Итого:</span><span class="text-green">{{ repair.final_cost|floatformat:0 }} ₽</span>
+    </div>
+    {% if repair.estimated_cost %}<div class="text-muted" style="font-size:12px;margin-top:4px">Предв.: {{ repair.estimated_cost|floatformat:0 }} ₽</div>{% endif %}
+  </div>
+
+  <!-- Assign -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">Исполнитель</div>
+    <form method="post" action="{% url 'crm:repair_assign' repair.pk %}">
+      {% csrf_token %}
+      <select name="assigned_to" class="form-control" style="margin-bottom:8px">
+        <option value="">— не назначен —</option>
+        {% for emp in employees %}<option value="{{ emp.id }}" {% if repair.assigned_to_id == emp.id %}selected{% endif %}>{{ emp.get_full_name|default:emp.username }}</option>{% endfor %}
+      </select>
+      <button type="submit" class="btn btn-secondary" style="width:100%">Сохранить</button>
+    </form>
+  </div>
+
+  <!-- Condition check -->
+  {% if condition %}
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">Проверка функционала</div>
+    {% for item in condition.get_items %}
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px">
+      <span class="text-muted">{{ item.label }}</span>
+      <span class="badge badge-{{ item.state }}">{{ item.state_display }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Device info -->
+  <div class="card">
+    <div class="card-title">Устройство</div>
+    <div style="font-size:13px">
+      {% if repair.imei %}<div style="margin-bottom:6px"><span class="text-muted">IMEI:</span> {{ repair.imei }}</div>{% endif %}
+      {% if repair.device_password %}<div style="margin-bottom:6px"><span class="text-muted">Пароль:</span> {{ repair.device_password }}</div>{% endif %}
+      {% if repair.appearance %}<div style="margin-bottom:6px"><span class="text-muted">Вид:</span> {{ repair.appearance }}</div>{% endif %}
+      <div><span class="text-muted">Гарантия:</span> {{ repair.warranty_days }} дней</div>
+    </div>
+    <div style="margin-top:12px">
+      <a href="{% url 'crm:customer_detail' repair.customer.pk %}" class="btn btn-secondary btn-sm">👤 Карточка клиента</a>
+    </div>
+  </div>
+</div>
+</div>
+{% endblock %}

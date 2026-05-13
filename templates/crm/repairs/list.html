@@ -1,0 +1,35 @@
+{% extends 'crm/base.html' %}
+{% block title %}Ремонты{% endblock %}
+{% block page_title %}Ремонты{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Ремонты</h1></div>
+  <a href="{% url 'crm:repair_create' %}" class="btn btn-primary">➕ Новый ремонт</a>
+</div>
+<div class="filter-bar">
+  <form method="get" style="display:flex;gap:8px;flex-wrap:wrap">
+    <input type="text" name="q" value="{{ q }}" placeholder="Поиск по номеру, клиенту...">
+    <select name="status" onchange="this.form.submit()">
+      <option value="">Все статусы</option>
+      {% for val,label in status_choices %}<option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <button type="submit" class="btn btn-secondary btn-sm">Найти</button>
+    {% if q or status_filter %}<a href="{% url 'crm:repair_list' %}" class="btn btn-secondary btn-sm">✕</a>{% endif %}
+  </form>
+</div>
+<div class="card"><div class="table-wrap"><table>
+  <thead><tr><th>Номер</th><th>Клиент</th><th>Телефон</th><th>Устройство</th><th>Статус</th><th>Исполнитель</th><th>Стоимость</th><th>Дата</th></tr></thead>
+  <tbody>
+  {% for r in repairs %}
+  <tr onclick="location.href='{% url 'crm:repair_detail' r.pk %}'" style="cursor:pointer">
+    <td class="td-name">{{ r.order_number }}</td><td>{{ r.customer.name }}</td><td>{{ r.customer.phone }}</td>
+    <td>{{ r.phone_model }}</td><td><span class="badge badge-{{ r.status }}">{{ r.get_status_display }}</span></td>
+    <td>{{ r.assigned_to.get_full_name|default:r.assigned_to.username|default:"—" }}</td>
+    <td class="price-tag">{% if r.final_cost %}{{ r.final_cost|floatformat:0 }} ₽{% else %}—{% endif %}</td>
+    <td class="text-muted">{{ r.created_at|date:"d.m.Y H:i" }}</td>
+  </tr>
+  {% empty %}<tr><td colspan="8"><div class="empty-state"><div class="icon">🔧</div><p>Ремонтов не найдено</p></div></td></tr>
+  {% endfor %}
+  </tbody>
+</table></div></div>
+{% endblock %}

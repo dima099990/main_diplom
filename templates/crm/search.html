@@ -1,0 +1,33 @@
+{% extends 'crm/base.html' %}
+{% block title %}Поиск{% endblock %}
+{% block page_title %}Поиск{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>🔍 Поиск клиентов и ремонтов</h1></div></div>
+<form method="get" style="display:flex;gap:8px;margin-bottom:24px">
+  <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Телефон, имя, номер заказа..." style="max-width:400px" autofocus>
+  <button type="submit" class="btn btn-primary">Найти</button>
+</form>
+{% if q %}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+<div class="card"><div class="card-title">Клиенты ({{ customers|length }})</div>
+  {% for c in customers %}
+  <div style="padding:10px 0;border-bottom:1px solid var(--border)">
+    <a href="{% url 'crm:customer_detail' c.pk %}" style="font-weight:700;color:#fff">{{ c.name }}</a>
+    <div class="text-muted" style="font-size:12px">{{ c.phone }}{% if c.email %} · {{ c.email }}{% endif %}</div>
+  </div>
+  {% empty %}<p class="text-muted">Клиентов не найдено</p>{% endfor %}
+</div>
+<div class="card"><div class="card-title">Ремонты ({{ repairs|length }})</div>
+  {% for r in repairs %}
+  <div style="padding:10px 0;border-bottom:1px solid var(--border)">
+    <div style="display:flex;justify-content:space-between">
+      <a href="{% url 'crm:repair_detail' r.pk %}" style="font-weight:700;color:#fff">{{ r.order_number }}</a>
+      <span class="badge badge-{{ r.status }}">{{ r.get_status_display }}</span>
+    </div>
+    <div class="text-muted" style="font-size:12px">{{ r.customer.name }} · {{ r.phone_model }}</div>
+  </div>
+  {% empty %}<p class="text-muted">Ремонтов не найдено</p>{% endfor %}
+</div>
+</div>
+{% endif %}
+{% endblock %}

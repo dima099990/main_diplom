@@ -1,0 +1,51 @@
+{% extends 'crm/base.html' %}
+{% block title %}Аксессуары{% endblock %}
+{% block page_title %}Склад — Аксессуары{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>📦 Аксессуары</h1></div>
+  <a href="{% url 'crm:accessory_create' %}" class="btn btn-primary">➕ Добавить аксессуар</a>
+</div>
+<div class="filter-bar">
+  <form method="get" style="display:flex;gap:8px">
+    <input type="text" name="q" value="{{ q }}" placeholder="Поиск...">
+    <select name="cat" onchange="this.form.submit()">
+      <option value="">Все категории</option>
+      {% for val,label in categories %}<option value="{{ val }}" {% if cat_filter == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <button type="submit" class="btn btn-secondary btn-sm">Найти</button>
+  </form>
+</div>
+<div class="card"><div class="table-wrap"><table>
+  <thead><tr><th>Название</th><th>Категория</th><th>Совместим</th><th>На складе</th><th>Закуп.</th><th>Продажа</th><th>Действия</th></tr></thead>
+  <tbody>
+  {% for a in accessories %}
+  <tr>
+    <td class="td-name">{{ a.name }}</td>
+    <td><span class="badge badge-na">{{ a.get_category_display }}</span></td>
+    <td class="text-muted">{{ a.compatible_with|default:"—" }}</td>
+    <td>
+      <span class="{% if a.is_out_of_stock %}stock-danger{% elif a.is_low_stock %}stock-warning{% endif %}">
+        {{ a.quantity }} шт.
+      </span>
+      {% if a.is_out_of_stock %}<span class="badge badge-out" style="margin-left:4px">нет</span>
+      {% elif a.is_low_stock %}<span class="badge badge-low" style="margin-left:4px">мало</span>{% endif %}
+    </td>
+    <td class="text-muted">{{ a.purchase_price|floatformat:0 }} ₽</td>
+    <td class="price-tag">{{ a.sale_price|floatformat:0 }} ₽</td>
+    <td>
+      <div style="display:flex;gap:4px">
+        <form method="post" action="{% url 'crm:accessory_stock_in' a.pk %}" style="display:inline-flex;gap:4px">
+          {% csrf_token %}
+          <input name="quantity" type="number" value="1" min="1" style="width:50px;background:var(--dark-4);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:3px 6px;font-size:12px">
+          <button type="submit" class="btn btn-success btn-sm">+</button>
+        </form>
+        <a href="{% url 'crm:accessory_edit' a.pk %}" class="btn btn-secondary btn-sm">✏️</a>
+      </div>
+    </td>
+  </tr>
+  {% empty %}<tr><td colspan="7"><div class="empty-state"><div class="icon">📦</div><p>Аксессуаров нет</p></div></td></tr>
+  {% endfor %}
+  </tbody>
+</table></div></div>
+{% endblock %}

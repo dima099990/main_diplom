@@ -1,0 +1,37 @@
+{% extends 'crm/base.html' %}
+{% block title %}Заявки на обзвон{% endblock %}
+{% block page_title %}Заявки на обзвон{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>📞 Заявки на обзвон</h1><p class="sub">Заявки с публичного сайта</p></div>
+  <div>
+    {% if show_all %}<a href="{% url 'crm:call_request_list' %}" class="btn btn-secondary">Только необработанные</a>
+    {% else %}<a href="?all=1" class="btn btn-secondary">Показать все</a>{% endif %}
+  </div>
+</div>
+<div class="card"><div class="table-wrap"><table>
+  <thead><tr><th>Дата</th><th>Имя</th><th>Телефон</th><th>Сообщение</th><th>Статус</th><th>Результат</th><th></th></tr></thead>
+  <tbody>
+  {% for r in requests %}
+  <tr>
+    <td class="text-muted">{{ r.created_at|date:"d.m.Y H:i" }}</td>
+    <td class="td-name">{{ r.name }}</td>
+    <td><a href="tel:{{ r.phone }}">{{ r.phone }}</a></td>
+    <td class="text-muted" style="max-width:200px">{{ r.message|truncatechars:80 }}</td>
+    <td>{% if r.is_processed %}<span class="badge badge-done">Обработана</span>{% else %}<span class="badge badge-new">Новая</span>{% endif %}</td>
+    <td class="text-muted" style="max-width:160px">{{ r.result|truncatechars:60|default:"—" }}</td>
+    <td>
+      {% if not r.is_processed %}
+      <form method="post" action="{% url 'crm:call_request_update' r.pk %}" style="display:flex;gap:6px">
+        {% csrf_token %}
+        <input name="result" class="form-control" placeholder="Результат звонка" style="font-size:12px">
+        <button type="submit" class="btn btn-success btn-sm">✓</button>
+      </form>
+      {% endif %}
+    </td>
+  </tr>
+  {% empty %}<tr><td colspan="7"><div class="empty-state"><div class="icon">📞</div><p>Нет необработанных заявок</p></div></td></tr>
+  {% endfor %}
+  </tbody>
+</table></div></div>
+{% endblock %}

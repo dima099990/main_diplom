@@ -1,0 +1,69 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}{{ site.company_name }} — Ремонт телефонов{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'core/css/style.css' %}">
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="container nav-inner">
+    <a href="{% url 'home' %}" class="logo">
+      <span class="logo-mark">●</span>{{ site.company_name }}
+    </a>
+    <button class="burger" id="burger" aria-label="Меню">
+      <span></span><span></span><span></span>
+    </button>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="{% url 'home' %}" {% if request.resolver_match.url_name == 'home' %}class="active"{% endif %}>Главная</a></li>
+      <li><a href="{% url 'about' %}" {% if request.resolver_match.url_name == 'about' %}class="active"{% endif %}>О нас</a></li>
+      <li><a href="{% url 'prices' %}" {% if request.resolver_match.url_name == 'prices' %}class="active"{% endif %}>Цены</a></li>
+      <li><a href="{% url 'contacts' %}" {% if request.resolver_match.url_name == 'contacts' %}class="active"{% endif %}>Контакты</a></li>
+      <li><a href="tel:{{ site.phone }}" class="nav-phone">{{ site.phone }}</a></li>
+    </ul>
+  </div>
+</nav>
+
+{% if messages %}
+<div class="messages-container">
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% block content %}{% endblock %}
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="footer-brand">
+      <a href="{% url 'home' %}" class="logo"><span class="logo-mark">●</span>{{ site.company_name }}</a>
+      <p>{{ site.tagline }}</p>
+    </div>
+    <div class="footer-links">
+      <a href="{% url 'about' %}">О нас</a>
+      <a href="{% url 'prices' %}">Цены</a>
+      <a href="{% url 'contacts' %}">Контакты</a>
+    </div>
+    <div class="footer-contacts">
+      <a href="tel:{{ site.phone }}">{{ site.phone }}</a>
+      <span>{{ site.working_hours }}</span>
+      <a href="{{ site.telegram_bot_link }}" target="_blank" class="btn btn-sm">Написать в Telegram</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p>© {% now "Y" %} {{ site.company_name }}. Все права защищены.</p>
+  </div>
+</footer>
+
+<script src="{% static 'core/js/main.js' %}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

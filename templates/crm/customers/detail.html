@@ -1,0 +1,39 @@
+{% extends 'crm/base.html' %}
+{% block title %}{{ customer.name }}{% endblock %}
+{% block page_title %}Клиент: {{ customer.name }}{% endblock %}
+{% block content %}
+<div class="breadcrumb"><a href="{% url 'crm:customer_list' %}">Клиенты</a><span>›</span>{{ customer.name }}</div>
+<div style="display:grid;grid-template-columns:300px 1fr;gap:20px;margin-top:16px">
+<div class="card" style="height:fit-content">
+  <div class="card-title">{{ customer.name }}</div>
+  <div style="font-size:13px">
+    <div style="margin-bottom:8px"><span class="text-muted">Телефон:</span><br><a href="tel:{{ customer.phone }}" style="font-size:15px;font-weight:600">{{ customer.phone }}</a></div>
+    {% if customer.email %}<div style="margin-bottom:8px"><span class="text-muted">Email:</span><br>{{ customer.email }}</div>{% endif %}
+    <div style="margin-bottom:8px"><span class="text-muted">Клиент с:</span><br>{{ customer.created_at|date:"d.m.Y" }}</div>
+    {% if customer.notes %}<div style="margin-bottom:8px"><span class="text-muted">Примечание:</span><br>{{ customer.notes }}</div>{% endif %}
+  </div>
+  <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
+    <a href="{% url 'crm:customer_edit' customer.pk %}" class="btn btn-secondary btn-sm">✏️ Редактировать</a>
+    <a href="{% url 'crm:repair_create' %}" class="btn btn-primary btn-sm">➕ Новый ремонт</a>
+  </div>
+</div>
+<div class="card">
+  <div class="card-title">История ремонтов ({{ repairs|length }})</div>
+  {% if repairs %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Номер</th><th>Устройство</th><th>Статус</th><th>Стоимость</th><th>Дата</th></tr></thead>
+    <tbody>
+    {% for r in repairs %}
+    <tr onclick="location.href='{% url 'crm:repair_detail' r.pk %}'" style="cursor:pointer">
+      <td class="td-name">{{ r.order_number }}</td><td>{{ r.phone_model }}</td>
+      <td><span class="badge badge-{{ r.status }}">{{ r.get_status_display }}</span></td>
+      <td class="price-tag">{% if r.final_cost %}{{ r.final_cost|floatformat:0 }} ₽{% else %}—{% endif %}</td>
+      <td class="text-muted">{{ r.created_at|date:"d.m.Y" }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="text-muted">Ремонтов нет</p>{% endif %}
+</div>
+</div>
+{% endblock %}
