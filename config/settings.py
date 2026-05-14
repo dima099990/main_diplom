@@ -15,12 +15,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     # Third-party
-    'rest_framework',
-    'rest_framework_simplejwt',
-    'drf_spectacular',
     'corsheaders',
-    'crispy_forms',
-    'crispy_tailwind',
     # Project apps
     'core',
     'crm',
@@ -129,36 +124,13 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# REST Framework
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
-    ],
-    'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.IsAuthenticated'],
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 25,
-}
-
 # CORS
 CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000', cast=Csv())
 CORS_ALLOW_CREDENTIALS = True
 
-# Crispy forms
-CRISPY_ALLOWED_TEMPLATE_PACKS = 'tailwind'
-CRISPY_TEMPLATE_PACK = 'tailwind'
-
 # App settings
 TELEGRAM_BOT_LINK = config('TELEGRAM_BOT_LINK', default='https://t.me/your_bot')
 WARRANTY_DAYS_DEFAULT = 90
-
-# Spectacular (Swagger)
-SPECTACULAR_SETTINGS = {
-    'TITLE': 'Kayros CRM API',
-    'DESCRIPTION': 'API для системы управления сервисным центром',
-    'VERSION': '1.0.0',
-}
 
 # Logging
 LOGGING = {

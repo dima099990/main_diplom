@@ -1145,6 +1145,19 @@ def payroll_add_record(request, employee_pk):
         period_month=month,
         created_by=request.user,
     )
+
+    # Уведомление сотруднику при штрафе
+    if record_type == 'penalty':
+        issuer = request.user.get_full_name() or request.user.username
+        msg = description if description else 'Без комментария'
+        Notification.objects.create(
+            user=emp,
+            notification_type='penalty',
+            title=f'Штраф на {amount} ₽',
+            message=f'Выписал: {issuer}. Причина: {msg}',
+            link='',
+        )
+
     type_label = dict(PayrollRecord.RECORD_TYPES).get(record_type, record_type)
     messages.success(request, f'Запись «{type_label}» на {amount} ₽ добавлена для {emp.get_full_name() or emp.username}')
     return redirect('crm:payroll_employee', employee_pk=emp.pk)

@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import (UserProfile, Customer, Part, Accessory, StockMovement,
-                     RepairOrder, DeviceConditionCheck, RepairOrderService,
+                     RepairOrder, RepairOrderService,
                      RepairOrderPart, SaleOrder, SaleOrderItem)
 
 

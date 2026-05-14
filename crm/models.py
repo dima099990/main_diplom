@@ -5,38 +5,6 @@ from django.db.models import Sum
 from decimal import Decimal
 from core.models import Brand, PhoneModel, RepairService
 
-# ─── Condition check constants ──────────────────────────────────────────────
-
-CONDITION_ITEMS = [
-    ('display', 'Дисплей'),
-    ('touchscreen', 'Тачскрин / сенсор'),
-    ('front_camera', 'Фронтальная камера'),
-    ('rear_camera', 'Основная камера'),
-    ('speaker_earpiece', 'Разговорный динамик'),
-    ('speaker_loud', 'Громкоговоритель'),
-    ('microphone', 'Микрофон'),
-    ('face_id', 'Face ID / Touch ID'),
-    ('home_button', 'Кнопка Home'),
-    ('volume_buttons', 'Кнопки громкости'),
-    ('power_button', 'Кнопка питания'),
-    ('charging_port', 'Разъём зарядки'),
-    ('wifi', 'Wi-Fi'),
-    ('bluetooth', 'Bluetooth'),
-    ('gps', 'GPS'),
-    ('cellular', 'Сотовая связь / SIM'),
-    ('vibration', 'Вибромотор'),
-    ('battery', 'Аккумулятор'),
-    ('nfc', 'NFC'),
-    ('body', 'Корпус (царапины/повреждения)'),
-]
-
-CONDITION_STATES = [
-    ('ok', 'Работает'),
-    ('broken', 'Не работает'),
-    ('na', 'Не проверено'),
-]
-
-
 # ─── Branch (Филиал) ─────────────────────────────────────────────────────────
 
 class Branch(models.Model):
@@ -398,47 +366,6 @@ class OrderHistory(models.Model):
     def __str__(self):
         return f"{self.order.order_number} | {self.get_event_type_display()}"
 
-
-# ─── Device Condition Check ──────────────────────────────────────────────────
-
-class DeviceConditionCheck(models.Model):
-    repair_order = models.OneToOneField(RepairOrder, on_delete=models.CASCADE, related_name='condition_check')
-    display = models.CharField(max_length=10, choices=CONDITION_STATES, default='na')
-    touchscreen = models.CharField(max_length=10, choices=CONDITION_STATES, default='na')
-    front_camera = models.CharField(max_length=10, choices=CONDITION_STATES, default='na')
-    rear_camera = models.CharField(max_length=10, choices=CONDITION_STATES, default='na')
-    speaker_earpiece = models.CharField(max_length=10, choices=CONDITION_STATES, default='na')
-    speaker_loud = models.CharField(max_length=10, choices=CONDITION_STATES, default='na')
-    microphone = models.CharField(max_length=10, choices=CONDITION_STATES, default='na')
-    face_id = models.CharField(max_length=10, choices=CONDITION_STATES, default='na')
-    home_button = models.CharField(max_length=10, choices=CONDITION_STATES, default='na')
-    volume_buttons = models.CharField(max_length=10, choices=CONDITION_STATES, default='na')
-    power_button = models.CharField(max_length=10, choices=CONDITION_STATES, default='na')
-    charging_port = models.CharField(max_length=10, choices=CONDITION_STATES, default='na')
-    wifi = models.CharField(max_length=10, choices=CONDITION_STATES, default='na')
-    bluetooth = models.CharField(max_length=10, choices=CONDITION_STATES, default='na')
-    gps = models.CharField(max_length=10, choices=CONDITION_STATES, default='na')
-    cellular = models.CharField(max_length=10, choices=CONDITION_STATES, default='na')
-    vibration = models.CharField(max_length=10, choices=CONDITION_STATES, default='na')
-    battery = models.CharField(max_length=10, choices=CONDITION_STATES, default='na')
-    nfc = models.CharField(max_length=10, choices=CONDITION_STATES, default='na')
-    body = models.CharField(max_length=10, choices=CONDITION_STATES, default='na')
-
-    class Meta:
-        verbose_name = "Проверка функционала"
-
-    def get_items(self):
-        result = []
-        for field_name, label in CONDITION_ITEMS:
-            result.append({
-                'field': field_name,
-                'label': label,
-                'state': getattr(self, field_name),
-                'state_display': dict(CONDITION_STATES).get(getattr(self, field_name), ''),
-            })
-        return result
-
-
 # ─── Order Services & Parts ──────────────────────────────────────────────────
 
 class RepairOrderService(models.Model):
@@ -680,6 +607,7 @@ class Notification(models.Model):
         ('comment', 'Комментарий'),
         ('task', 'Задача'),
         ('payment', 'Оплата'),
+        ('penalty', 'Штраф'),
     ]
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
     notification_type = models.CharField("Тип", max_length=20, choices=NOTIFICATION_TYPES)

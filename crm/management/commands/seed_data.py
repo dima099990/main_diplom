@@ -14,7 +14,7 @@ from django.utils import timezone
 
 from core.models import Brand, PhoneModel, RepairService, SiteSettings
 from crm.models import (
-    Accessory, Branch, Customer, DeviceConditionCheck, Expense,
+    Accessory, Branch, Customer, Expense,
     OrderHistory, Part, PaymentRecord, PayrollRecord, RepairOrder,
     RepairOrderPart, RepairOrderService, SaleOrder, SaleOrderItem,
     StockMovement, Supplier, Task, UserProfile,
@@ -258,8 +258,6 @@ class Command(BaseCommand):
             order.save()
             order.created_at = created_at
             order.save(update_fields=['created_at'])
-
-            DeviceConditionCheck.objects.get_or_create(repair_order=order)
 
             # Add services
             available_svcs = list(RepairService.objects.filter(phone_model=model, is_active=True))

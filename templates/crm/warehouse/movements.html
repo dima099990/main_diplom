@@ -1,35 +1,54 @@
 {% extends 'crm/base.html' %}
-{% block title %}История движений{% endblock %}
-{% block page_title %}История движений склада{% endblock %}
+{% block title %}Движения склада{% endblock %}
+{% block page_title %}Движения склада{% endblock %}
+
 {% block content %}
-<div class="page-header">
-  <div><h1>📊 История движений</h1></div>
-  <div style="display:flex;gap:8px">
-    <a href="{% url 'crm:warehouse_parts' %}" class="btn btn-secondary">🔩 Запчасти</a>
-    <a href="{% url 'crm:warehouse_accessories' %}" class="btn btn-secondary">📦 Аксессуары</a>
-  </div>
+{% include 'crm/includes/messages.html' %}
+
+<div class="card overflow-hidden">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="text-xs text-slate-500 uppercase border-b border-slate-800">
+        <th class="text-left px-4 py-3">Дата</th>
+        <th class="text-left px-4 py-3">Тип</th>
+        <th class="text-left px-4 py-3">Товар</th>
+        <th class="text-left px-4 py-3 hidden sm:table-cell">Кол-во</th>
+        <th class="text-left px-4 py-3 hidden md:table-cell">Комментарий</th>
+        <th class="text-left px-4 py-3 hidden lg:table-cell">Сотрудник</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-800/60">
+      {% for m in movements %}
+      <tr class="hover:bg-slate-800/30 transition-colors">
+        <td class="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{{ m.created_at|date:"d.m.Y H:i" }}</td>
+        <td class="px-4 py-3">
+          {% if m.movement_type == 'in' %}
+            <span class="badge badge-done">+ Поступление</span>
+          {% elif m.movement_type == 'out' %}
+            <span class="badge badge-cancelled">− Списание</span>
+          {% elif m.movement_type == 'repair' %}
+            <span class="badge badge-in_progress">🔧 Ремонт</span>
+          {% else %}
+            <span class="badge badge-new">🛍 Продажа</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3 text-slate-200 font-medium">{{ m.part|default:m.accessory }}</td>
+        <td class="px-4 py-3 hidden sm:table-cell font-mono font-semibold {% if m.quantity > 0 %}text-green-400{% else %}text-red-400{% endif %}">
+          {% if m.quantity > 0 %}+{% endif %}{{ m.quantity|floatformat:0 }}
+        </td>
+        <td class="px-4 py-3 text-slate-500 text-xs hidden md:table-cell">{{ m.comment|default:"—" }}</td>
+        <td class="px-4 py-3 text-slate-500 text-xs hidden lg:table-cell">
+          {% if m.created_by %}{{ m.created_by.get_full_name|default:m.created_by.username }}{% else %}—{% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6">
+          {% include 'crm/includes/empty_state.html' with icon="📊" title="Движений нет" subtitle="Поступления и списания товаров появятся здесь" %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
-<div class="card"><div class="table-wrap"><table>
-  <thead><tr><th>Дата</th><th>Тип</th><th>Товар</th><th>Кол-во</th><th>Комментарий</th><th>Сотрудник</th></tr></thead>
-  <tbody>
-  {% for m in movements %}
-  <tr>
-    <td class="text-muted">{{ m.created_at|date:"d.m.Y H:i" }}</td>
-    <td>
-      {% if m.movement_type == 'in' %}<span class="badge badge-done">+ Поступление</span>
-      {% elif m.movement_type == 'out' %}<span class="badge badge-cancelled">− Списание</span>
-      {% elif m.movement_type == 'repair' %}<span class="badge badge-in_progress">🔧 Ремонт</span>
-      {% else %}<span class="badge badge-diagnosis">🛍 Продажа</span>{% endif %}
-    </td>
-    <td class="td-name">{{ m.part|default:m.accessory }}</td>
-    <td class="{% if m.quantity > 0 %}text-green{% else %}text-red{% endif %}">
-      {{ m.quantity|floatformat:0 }}{% if m.quantity > 0 %}+{% endif %}
-    </td>
-    <td class="text-muted">{{ m.comment|default:"—" }}</td>
-    <td class="text-muted">{% if m.created_by %}{{ m.created_by.get_full_name|default:m.created_by.username }}{% else %}—{% endif %}</td>
-  </tr>
-  {% empty %}<tr><td colspan="6"><div class="empty-state"><div class="icon">📊</div><p>Движений нет</p></div></td></tr>
-  {% endfor %}
-  </tbody>
-</table></div></div>
 {% endblock %}
