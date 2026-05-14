@@ -15,11 +15,10 @@ from django.views.decorators.http import require_POST
 from core.models import Brand, CallRequest, PhoneModel, RepairService, SiteSettings
 from .decorators import admin_required, crm_required, manager_required
 from .models import (
-    Accessory, Branch, Customer, DeviceConditionCheck, Expense,
+    Accessory, Branch, Customer, Expense,
     Notification, OrderHistory, Part, PaymentRecord, PayrollRecord,
     RepairOrder, RepairOrderPart, RepairOrderService, SaleOrder,
     SaleOrderItem, StockMovement, Supplier, Task, UserProfile,
-    CONDITION_ITEMS, CONDITION_STATES,
 )
 
 
@@ -82,7 +81,7 @@ def dashboard(request):
 
     # Chart data: last 30 days
     days = [today - timedelta(days=i) for i in range(29, -1, -1)]
-    chart_labels = [d.strftime('%-d %b') for d in days]
+    chart_labels = [d.strftime('%d %b') for d in days]
     chart_revenue = []
     chart_profit = []
     for d in days:
@@ -173,8 +172,7 @@ def search(request):
 @crm_required
 def customer_list(request):
     qs = Customer.objects.annotate(
-        orders_count=Count('repairs'),
-        total_spent=Sum('repairs__final_cost', filter=Q(repairs__status='issued')),
+        repair_count=Count('repairs'),
     ).order_by('-created_at')
     q = request.GET.get('q', '')
     if q:
@@ -321,7 +319,6 @@ def repair_create(request):
                 branch_id=branch_id,
                 deadline=deadline,
             )
-            DeviceConditionCheck.objects.create(repair_order=order)
             OrderHistory.objects.create(
                 order=order, event_type='created',
                 description=f'Заказ создан. Клиент: {customer.name}, устройство: {order.phone_model}',
@@ -351,29 +348,31 @@ def repair_detail(request, pk):
         ).prefetch_related('order_services__service', 'order_parts__part', 'history__user'),
         pk=pk,
     )
-    condition = getattr(repair, 'condition_check', None)
     services_total = sum(s.price for s in repair.order_services.all())
     parts_total = sum(p.total for p in repair.order_parts.all())
 
     available_services = RepairService.objects.filter(
         phone_model=repair.phone_model, is_active=True
     ).select_related('phone_model__brand')
-    available_parts = Part.objects.filter(quantity__gt=0).order_by('name')
+    # Запчасти: сначала подходящие для модели, потом все остальные
+    parts_for_model = Part.objects.filter(
+        phone_model=repair.phone_model, quantity__gt=0
+    ).order_by('name')
+    all_parts = Part.objects.filter(quantity__gt=0).order_by('name')
 
     tabs = [
         ('info', 'Информация'),
         ('works', 'Работы и материалы'),
-        ('condition', 'Состояние устройства'),
         ('comment', 'Комментарий'),
     ]
 
     return render(request, 'crm/repairs/detail.html', {
         'repair': repair,
-        'condition': condition,
         'services_total': services_total,
         'parts_total': parts_total,
         'available_services': available_services,
-        'available_parts': available_parts,
+        'available_parts': all_parts,
+        'parts_for_model': parts_for_model,
         'masters': User.objects.filter(profile__role__in=['master', 'employee', 'admin', 'manager']),
         'status_choices': RepairOrder.STATUS_CHOICES,
         'history': repair.history.order_by('created_at'),
@@ -469,7 +468,8 @@ def repair_add_part(request, pk):
     repair = get_object_or_404(RepairOrder, pk=pk)
     part = get_object_or_404(Part, pk=request.POST.get('part_id'))
     qty = int(request.POST.get('quantity', 1))
-    price = Decimal(request.POST.get('price', 0) or part.sale_price)
+    price_raw = str(request.POST.get('price', '') or part.sale_price).replace(',', '.')
+    price = Decimal(price_raw)
 
     if part.quantity < qty:
         messages.error(request, f'Недостаточно запчасти "{part.name}" на складе (есть: {part.quantity})')
@@ -588,10 +588,28 @@ def repair_print(request, pk):
         pk=pk,
     )
     site_settings = SiteSettings.get()
+
+    # Determine document type
+    doc_type = request.GET.get('type', '')
+    if not doc_type:
+        # Auto-select based on status
+        if repair.status in ('done', 'issued'):
+            doc_type = 'work_act'
+        else:
+            doc_type = 'receipt'
+
+    valid_types = {'receipt', 'work_act', 'warranty', 'refusal', 'receipt_sale'}
+    if doc_type not in valid_types:
+        doc_type = 'receipt'
+
     return render(request, 'crm/repairs/print_act.html', {
         'repair': repair,
         'site_settings': site_settings,
         'today': timezone.now().date(),
+        'doc_type': doc_type,
+        'services': repair.order_services.all(),
+        'parts': repair.order_parts.select_related('part').all(),
+        'print_date': timezone.now(),
     })
 
 
@@ -815,29 +833,12 @@ def sale_list(request):
 
 @crm_required
 def sale_create(request):
-    if request.method == 'POST':
-        with transaction.atomic():
-            sale = SaleOrder.objects.create(
-                customer_name=request.POST.get('customer_name', ''),
-                customer_phone=request.POST.get('customer_phone', ''),
-                created_by=request.user,
-                payment_method=request.POST.get('payment_method', 'cash'),
-            )
-            acc_ids = request.POST.getlist('accessory_id')
-            quantities = request.POST.getlist('quantity')
-            prices = request.POST.getlist('price')
-            for acc_id, qty, price in zip(acc_ids, quantities, prices):
-                if acc_id and qty and price:
-                    SaleOrderItem.objects.create(
-                        order=sale, accessory_id=acc_id,
-                        quantity=int(qty), price=Decimal(price),
-                    )
-            sale.recalculate_total()
-            messages.success(request, f'Продажа {sale.order_number} создана')
-            return redirect('crm:sale_detail', sale.pk)
-    return render(request, 'crm/sales/create.html', {
-        'accessories': Accessory.objects.filter(quantity__gt=0).order_by('category', 'name'),
-    })
+    # Создаём черновик и сразу открываем кассу
+    sale = SaleOrder.objects.create(
+        created_by=request.user,
+        payment_method=request.POST.get('payment_method', 'cash') if request.method == 'POST' else 'cash',
+    )
+    return redirect('crm:sale_detail', sale.pk)
 
 
 @crm_required
@@ -846,7 +847,34 @@ def sale_detail(request, pk):
         SaleOrder.objects.prefetch_related('items__accessory').select_related('created_by'),
         pk=pk,
     )
-    return render(request, 'crm/sales/detail.html', {'sale': sale})
+    if request.method == 'POST' and not sale.is_finalized:
+        action = request.POST.get('action')
+        if action == 'add_item':
+            acc_id = request.POST.get('accessory_id')
+            qty = int(request.POST.get('quantity', 1))
+            price = request.POST.get('price')
+            if acc_id:
+                try:
+                    acc = Accessory.objects.get(pk=acc_id)
+                    price = Decimal(price) if price else acc.sale_price
+                    SaleOrderItem.objects.create(
+                        order=sale, accessory=acc,
+                        quantity=qty, price=price,
+                    )
+                    sale.recalculate_total()
+                except (Accessory.DoesNotExist, Exception):
+                    messages.error(request, 'Ошибка добавления товара')
+        elif action == 'set_payment':
+            sale.payment_method = request.POST.get('payment_method', 'cash')
+            sale.save(update_fields=['payment_method'])
+        return redirect('crm:sale_detail', pk)
+
+    accessories = Accessory.objects.filter(quantity__gt=0).order_by('category', 'name')
+    return render(request, 'crm/sales/detail.html', {
+        'sale': sale,
+        'accessories': accessories,
+        'payment_methods': SaleOrder._meta.get_field('payment_method').choices,
+    })
 
 
 @crm_required
@@ -926,12 +954,62 @@ def finance(request):
         ).aggregate(t=Sum('amount'))['t'] or Decimal('0'),
     }
 
+    # ── Зарплата к выплате: агрегация по сотрудникам ──
+    all_payroll = PayrollRecord.objects.select_related('employee').order_by(
+        'employee__last_name', 'employee__first_name'
+    )
+    emp_map = {}
+    for rec in all_payroll:
+        uid = rec.employee_id
+        if uid not in emp_map:
+            try:
+                role_display = rec.employee.profile.get_role_display()
+            except Exception:
+                role_display = '—'
+            emp_map[uid] = {
+                'employee_pk': uid,
+                'name': rec.employee.get_full_name() or rec.employee.username,
+                'role_display': role_display,
+                'accrued': Decimal('0'),
+                'penalties': Decimal('0'),
+            }
+        if rec.record_type == 'penalty':
+            emp_map[uid]['penalties'] += rec.amount
+        else:
+            emp_map[uid]['accrued'] += rec.amount
+
+    payroll_summary = []
+    total_accrued = Decimal('0')
+    total_penalties = Decimal('0')
+    for row in emp_map.values():
+        row['net'] = row['accrued'] - row['penalties']
+        total_accrued += row['accrued']
+        total_penalties += row['penalties']
+        payroll_summary.append(row)
+    payroll_total = total_accrued - total_penalties
+
+    from crm.decorators import get_role
+    current_role = get_role(request.user)
+
+    # For admin: pass list of all employees for payroll management
+    all_employees = []
+    if current_role == 'admin':
+        from django.contrib.auth.models import User as AuthUser
+        all_employees = AuthUser.objects.filter(is_active=True).select_related('profile').order_by(
+            'last_name', 'first_name'
+        )
+
     return render(request, 'crm/finance/index.html', {
         'stats': stats,
         'payments': payments,
         'expenses': expenses,
         'payroll_records': payroll_records,
+        'payroll_summary': payroll_summary,
+        'payroll_total': payroll_total,
+        'payroll_total_accrued': total_accrued,
+        'payroll_total_penalties': total_penalties,
         'month_label': month_start.strftime('%B %Y'),
+        'all_employees': all_employees,
     })
 
 
@@ -992,6 +1070,86 @@ def payroll_my(request):
     })
 
 
+@crm_required
+@admin_required
+def payroll_employee(request, employee_pk):
+    """Admin view: detailed payroll for a specific employee."""
+    from django.contrib.auth.models import User as AuthUser
+    from datetime import date as date_type
+    emp = get_object_or_404(AuthUser, pk=employee_pk)
+    now = timezone.now()
+    year = int(request.GET.get('year', now.year))
+    month = int(request.GET.get('month', now.month))
+
+    records = PayrollRecord.objects.filter(
+        employee=emp, period_year=year, period_month=month
+    ).order_by('-created_at')
+
+    total = records.aggregate(
+        income=Sum('amount', filter=~Q(record_type='penalty')),
+        penalty=Sum('amount', filter=Q(record_type='penalty')),
+    )
+    net = (total['income'] or Decimal('0')) - (total['penalty'] or Decimal('0'))
+
+    month_range = []
+    for i in range(5, -1, -1):
+        d = now.date().replace(day=1)
+        m = d.month - i
+        y = d.year
+        while m <= 0:
+            m += 12
+            y -= 1
+        month_range.append({'year': y, 'month': m, 'label': date_type(y, m, 1).strftime('%b %Y')})
+
+    return render(request, 'crm/finance/payroll_employee.html', {
+        'emp': emp,
+        'records': records,
+        'year': year, 'month': month,
+        'net': net,
+        'income': total['income'] or Decimal('0'),
+        'penalty': total['penalty'] or Decimal('0'),
+        'month_range': month_range,
+    })
+
+
+@crm_required
+@admin_required
+@require_POST
+def payroll_add_record(request, employee_pk):
+    """Admin: add a payroll record (penalty, bonus, salary) for any employee."""
+    from django.contrib.auth.models import User as AuthUser
+    emp = get_object_or_404(AuthUser, pk=employee_pk)
+    now = timezone.now()
+
+    record_type = request.POST.get('record_type', 'penalty')
+    valid_types = {'repair_bonus', 'sale_bonus', 'base_salary', 'bonus', 'penalty'}
+    if record_type not in valid_types:
+        record_type = 'penalty'
+
+    amount_raw = str(request.POST.get('amount', '0')).replace(',', '.')
+    try:
+        amount = Decimal(amount_raw)
+    except Exception:
+        amount = Decimal('0')
+
+    description = request.POST.get('description', '').strip()
+    year = int(request.POST.get('year', now.year))
+    month = int(request.POST.get('month', now.month))
+
+    PayrollRecord.objects.create(
+        employee=emp,
+        record_type=record_type,
+        amount=amount,
+        description=description,
+        period_year=year,
+        period_month=month,
+        created_by=request.user,
+    )
+    type_label = dict(PayrollRecord.RECORD_TYPES).get(record_type, record_type)
+    messages.success(request, f'Запись «{type_label}» на {amount} ₽ добавлена для {emp.get_full_name() or emp.username}')
+    return redirect('crm:payroll_employee', employee_pk=emp.pk)
+
+
 # ─── ANALYTICS ────────────────────────────────────────────────────────────────
 
 @crm_required
@@ -1017,7 +1175,7 @@ def analytics(request):
     days = [now - timedelta(days=i) for i in range(days_back - 1, -1, -1)]
     if days_back > 30:
         # Weekly buckets
-        chart_labels = [d.strftime('%-d %b') for d in days[::7]]
+        chart_labels = [d.strftime('%d %b') for d in days[::7]]
         chart_revenue, chart_profit = [], []
         for i in range(0, len(days), 7):
             week = days[i:i+7]
@@ -1034,7 +1192,7 @@ def analytics(request):
             chart_revenue.append(rev)
             chart_profit.append(prf)
     else:
-        chart_labels = [d.strftime('%-d %b') for d in days]
+        chart_labels = [d.strftime('%d %b') for d in days]
         chart_revenue, chart_profit = [], []
         for d in days:
             rev = float(PaymentRecord.objects.filter(
@@ -1088,7 +1246,9 @@ def analytics(request):
             order__created_at__date__gte=date_from,
         )
         total_qty = items.aggregate(t=Sum('quantity'))['t'] or 0
-        total_rev = items.aggregate(t=Sum('price') * Sum('quantity'))['t'] or 0
+        total_rev = float(sum(
+            (i.price * i.quantity) for i in items.select_related()
+        ))
         if total_qty:
             accessory_sales.append({
                 'category_label': label,
@@ -1100,7 +1260,7 @@ def analytics(request):
     repair_profit = float(profit)
     acc_profit = float(SaleOrder.objects.filter(
         is_finalized=True, created_at__date__gte=date_from
-    ).aggregate(t=Sum('final_cost') - Sum('cost_price'))['t'] or 0)
+    ).aggregate(t=Sum('total') - Sum('cost_price'))['t'] or 0)
 
     period_labels = {
         'revenue': revenue, 'profit': profit,
@@ -1202,9 +1362,9 @@ def employee_create(request):
                 user=user,
                 role=request.POST.get('role', 'employee'),
                 phone=request.POST.get('phone', ''),
-                repair_percent=Decimal(request.POST.get('repair_percent', 0)),
-                accessory_percent=Decimal(request.POST.get('accessory_percent', 0)),
-                base_salary=Decimal(request.POST.get('base_salary', 0)),
+                repair_percent=Decimal(request.POST.get('repair_percent') or '0'),
+                accessory_percent=Decimal(request.POST.get('accessory_percent') or '0'),
+                base_salary=Decimal(request.POST.get('base_salary') or '0'),
                 branch_id=request.POST.get('branch') or None,
             )
             messages.success(request, f'Сотрудник {user.get_full_name()} создан')
@@ -1228,9 +1388,9 @@ def employee_edit(request, pk):
         if profile:
             profile.role = request.POST.get('role', 'employee')
             profile.phone = request.POST.get('phone', '')
-            profile.repair_percent = Decimal(request.POST.get('repair_percent', 0))
-            profile.accessory_percent = Decimal(request.POST.get('accessory_percent', 0))
-            profile.base_salary = Decimal(request.POST.get('base_salary', 0))
+            profile.repair_percent = Decimal(request.POST.get('repair_percent') or '0')
+            profile.accessory_percent = Decimal(request.POST.get('accessory_percent') or '0')
+            profile.base_salary = Decimal(request.POST.get('base_salary') or '0')
             profile.branch_id = request.POST.get('branch') or None
             profile.save()
         messages.success(request, 'Сотрудник обновлён')
@@ -1255,7 +1415,7 @@ def notifications(request):
 # ─── SETTINGS ─────────────────────────────────────────────────────────────────
 
 @crm_required
-@manager_required
+@admin_required
 def settings_company(request):
     settings_obj = SiteSettings.get()
     if request.method == 'POST':
@@ -1293,6 +1453,21 @@ def settings_company(request):
 
 
 # ─── DOCUMENTS ────────────────────────────────────────────────────────────────
+
+@crm_required
+def document_blank_print(request, doc_type):
+    """Print a blank (empty) form template."""
+    valid_types = {'receipt', 'work_act', 'warranty', 'refusal', 'receipt_sale'}
+    if doc_type not in valid_types:
+        doc_type = 'receipt'
+    site_settings = SiteSettings.get()
+    return render(request, 'crm/repairs/print_blank.html', {
+        'doc_type': doc_type,
+        'site_settings': site_settings,
+        'today': timezone.now().date(),
+        'print_date': timezone.now(),
+    })
+
 
 @crm_required
 def document_list(request):
@@ -1357,5 +1532,126 @@ def api_prices(request):
 def api_models_for_brand(request, brand_id):
     models = PhoneModel.objects.filter(brand_id=brand_id, is_active=True).values('id', 'name')
     return JsonResponse(list(models), safe=False)
+
+
+# ─── Price List Editor ────────────────────────────────────────────────────────
+
+@crm_required
+@manager_required
+def price_list(request):
+    brands = Brand.objects.filter(is_active=True).prefetch_related(
+        'phone_models__services'
+    )
+    selected_brand_id = request.GET.get('brand')
+    try:
+        selected_brand_id = int(selected_brand_id)
+    except (TypeError, ValueError):
+        selected_brand_id = brands.first().pk if brands.exists() else None
+
+    selected_brand = None
+    phone_models = []
+    if selected_brand_id:
+        selected_brand = Brand.objects.filter(pk=selected_brand_id).first()
+        phone_models = PhoneModel.objects.filter(
+            brand_id=selected_brand_id
+        ).prefetch_related('services').order_by('order', 'name')
+
+    return render(request, 'crm/prices/index.html', {
+        'brands': brands,
+        'selected_brand': selected_brand,
+        'selected_brand_id': selected_brand_id,
+        'phone_models': phone_models,
+    })
+
+
+@crm_required
+@manager_required
+def price_service_save(request):
+    if request.method != 'POST':
+        return redirect('crm:price_list')
+
+    pk = request.POST.get('pk')
+    model_id = request.POST.get('phone_model_id')
+    name = request.POST.get('name', '').strip()
+    price_from = request.POST.get('price_from', '').strip()
+    price_to = request.POST.get('price_to', '').strip() or None
+    duration = request.POST.get('duration', '1–2 часа').strip()
+    is_popular = request.POST.get('is_popular') == '1'
+    is_active = request.POST.get('is_active', '1') == '1'
+    brand_id = request.POST.get('brand_id')
+
+    if not name or not price_from or not model_id:
+        messages.error(request, 'Заполните обязательные поля')
+        return redirect(f"{request.build_absolute_uri('/crm/prices/')}?brand={brand_id}")
+
+    try:
+        price_from = int(price_from)
+        price_to = int(price_to) if price_to else None
+    except (ValueError, TypeError):
+        messages.error(request, 'Некорректная цена')
+        return redirect(f'/crm/prices/?brand={brand_id}')
+
+    if pk:
+        svc = get_object_or_404(RepairService, pk=pk)
+        svc.phone_model_id = model_id
+        svc.name = name
+        svc.price_from = price_from
+        svc.price_to = price_to
+        svc.duration = duration
+        svc.is_popular = is_popular
+        svc.is_active = is_active
+        svc.save()
+        messages.success(request, f'Услуга «{name}» обновлена')
+    else:
+        RepairService.objects.create(
+            phone_model_id=model_id,
+            name=name,
+            price_from=price_from,
+            price_to=price_to,
+            duration=duration,
+            is_popular=is_popular,
+            is_active=is_active,
+        )
+        messages.success(request, f'Услуга «{name}» добавлена')
+
+    return redirect(f'/crm/prices/?brand={brand_id}')
+
+
+@crm_required
+@manager_required
+def price_service_delete(request, pk):
+    svc = get_object_or_404(RepairService, pk=pk)
+    brand_id = request.POST.get('brand_id', '')
+    svc.delete()
+    messages.success(request, 'Услуга удалена')
+    return redirect(f'/crm/prices/?brand={brand_id}')
+
+
+@crm_required
+@manager_required
+def price_model_save(request):
+    if request.method != 'POST':
+        return redirect('crm:price_list')
+
+    brand_id = request.POST.get('brand_id')
+    name = request.POST.get('name', '').strip()
+    if not name or not brand_id:
+        messages.error(request, 'Укажите название модели')
+        return redirect(f'/crm/prices/?brand={brand_id}')
+
+    PhoneModel.objects.create(brand_id=brand_id, name=name)
+    messages.success(request, f'Модель «{name}» добавлена')
+    return redirect(f'/crm/prices/?brand={brand_id}')
+
+
+@crm_required
+@manager_required
+def price_model_delete(request, pk):
+    model = get_object_or_404(PhoneModel, pk=pk)
+    brand_id = request.POST.get('brand_id', '')
+    count = model.services.count()
+    model.delete()
+    messages.success(request, f'Модель удалена вместе с {count} услугами')
+    return redirect(f'/crm/prices/?brand={brand_id}')
 
 

@@ -1,37 +1,88 @@
 {% extends 'crm/base.html' %}
 {% block title %}Заявки на обзвон{% endblock %}
 {% block page_title %}Заявки на обзвон{% endblock %}
+
 {% block content %}
-<div class="page-header">
-  <div><h1>📞 Заявки на обзвон</h1><p class="sub">Заявки с публичного сайта</p></div>
+{% include 'crm/includes/messages.html' %}
+
+<!-- Header -->
+<div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
+  <p class="text-slate-500 text-sm">Заявки с публичного сайта</p>
   <div>
-    {% if show_all %}<a href="{% url 'crm:call_request_list' %}" class="btn btn-secondary">Только необработанные</a>
-    {% else %}<a href="?all=1" class="btn btn-secondary">Показать все</a>{% endif %}
+    {% if show_all %}
+    <a href="{% url 'crm:call_request_list' %}" class="btn-secondary px-4 py-2 text-sm">Только необработанные</a>
+    {% else %}
+    <a href="?all=1" class="btn-secondary px-4 py-2 text-sm">Показать все</a>
+    {% endif %}
   </div>
 </div>
-<div class="card"><div class="table-wrap"><table>
-  <thead><tr><th>Дата</th><th>Имя</th><th>Телефон</th><th>Сообщение</th><th>Статус</th><th>Результат</th><th></th></tr></thead>
-  <tbody>
-  {% for r in requests %}
-  <tr>
-    <td class="text-muted">{{ r.created_at|date:"d.m.Y H:i" }}</td>
-    <td class="td-name">{{ r.name }}</td>
-    <td><a href="tel:{{ r.phone }}">{{ r.phone }}</a></td>
-    <td class="text-muted" style="max-width:200px">{{ r.message|truncatechars:80 }}</td>
-    <td>{% if r.is_processed %}<span class="badge badge-done">Обработана</span>{% else %}<span class="badge badge-new">Новая</span>{% endif %}</td>
-    <td class="text-muted" style="max-width:160px">{{ r.result|truncatechars:60|default:"—" }}</td>
-    <td>
-      {% if not r.is_processed %}
-      <form method="post" action="{% url 'crm:call_request_update' r.pk %}" style="display:flex;gap:6px">
-        {% csrf_token %}
-        <input name="result" class="form-control" placeholder="Результат звонка" style="font-size:12px">
-        <button type="submit" class="btn btn-success btn-sm">✓</button>
-      </form>
-      {% endif %}
-    </td>
-  </tr>
-  {% empty %}<tr><td colspan="7"><div class="empty-state"><div class="icon">📞</div><p>Нет необработанных заявок</p></div></td></tr>
-  {% endfor %}
-  </tbody>
-</table></div></div>
+
+<!-- Table -->
+<div class="card overflow-hidden">
+  <table class="w-full">
+    <thead>
+      <tr class="text-xs text-slate-500 uppercase border-b border-slate-800">
+        <th class="text-left px-4 py-3 font-medium hidden lg:table-cell">Дата</th>
+        <th class="text-left px-4 py-3 font-medium">Имя</th>
+        <th class="text-left px-4 py-3 font-medium">Телефон</th>
+        <th class="text-left px-4 py-3 font-medium hidden md:table-cell">Сообщение</th>
+        <th class="text-left px-4 py-3 font-medium">Статус</th>
+        <th class="text-left px-4 py-3 font-medium hidden sm:table-cell">Результат</th>
+        <th class="text-left px-4 py-3 font-medium">Действие</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-800/60">
+      {% for r in requests %}
+      <tr class="table-row">
+        <td class="px-4 py-3 hidden lg:table-cell">
+          <span class="text-slate-500 text-sm">{{ r.created_at|date:"d.m.Y H:i" }}</span>
+        </td>
+        <td class="px-4 py-3">
+          <span class="text-slate-200 font-medium text-sm">{{ r.name }}</span>
+        </td>
+        <td class="px-4 py-3">
+          <a href="tel:{{ r.phone }}" class="text-indigo-400 hover:text-indigo-300 text-sm">{{ r.phone }}</a>
+        </td>
+        <td class="px-4 py-3 hidden md:table-cell max-w-xs">
+          <span class="text-slate-400 text-sm">{{ r.message|truncatechars:80 }}</span>
+        </td>
+        <td class="px-4 py-3">
+          {% if r.is_processed %}
+            <span class="badge bg-green-500/15 text-green-400 border-green-500/20">Обработана</span>
+          {% else %}
+            <span class="badge bg-yellow-500/15 text-yellow-400 border-yellow-500/20">Новая</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3 hidden sm:table-cell max-w-[160px]">
+          <span class="text-slate-500 text-sm">{{ r.result|truncatechars:60|default:"—" }}</span>
+        </td>
+        <td class="px-4 py-3">
+          {% if not r.is_processed %}
+          <form method="post" action="{% url 'crm:call_request_update' r.pk %}" class="flex items-center gap-2">
+            {% csrf_token %}
+            <input name="result" class="input-dark px-2 py-1 text-xs w-32"
+                   placeholder="Результат звонка">
+            <button type="submit"
+                    class="flex-shrink-0 w-7 h-7 flex items-center justify-center bg-green-600 hover:bg-green-500 rounded-lg transition-colors"
+                    title="Отметить обработанной">
+              <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+              </svg>
+            </button>
+          </form>
+          {% else %}
+          <span class="text-slate-600 text-xs">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7">
+          {% include 'crm/includes/empty_state.html' with icon="📞" title="Нет необработанных заявок" subtitle="Все заявки на обзвон обработаны" %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 {% endblock %}

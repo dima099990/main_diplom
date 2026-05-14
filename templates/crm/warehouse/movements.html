@@ -5,8 +5,8 @@
 <div class="page-header">
   <div><h1>📊 История движений</h1></div>
   <div style="display:flex;gap:8px">
-    <a href="{% url 'crm:part_list' %}" class="btn btn-secondary">🔩 Запчасти</a>
-    <a href="{% url 'crm:accessory_list' %}" class="btn btn-secondary">📦 Аксессуары</a>
+    <a href="{% url 'crm:warehouse_parts' %}" class="btn btn-secondary">🔩 Запчасти</a>
+    <a href="{% url 'crm:warehouse_accessories' %}" class="btn btn-secondary">📦 Аксессуары</a>
   </div>
 </div>
 <div class="card"><div class="table-wrap"><table>
@@ -26,7 +26,7 @@
       {{ m.quantity|floatformat:0 }}{% if m.quantity > 0 %}+{% endif %}
     </td>
     <td class="text-muted">{{ m.comment|default:"—" }}</td>
-    <td class="text-muted">{{ m.created_by.get_full_name|default:m.created_by.username|default:"—" }}</td>
+    <td class="text-muted">{% if m.created_by %}{{ m.created_by.get_full_name|default:m.created_by.username }}{% else %}—{% endif %}</td>
   </tr>
   {% empty %}<tr><td colspan="6"><div class="empty-state"><div class="icon">📊</div><p>Движений нет</p></div></td></tr>
   {% endfor %}

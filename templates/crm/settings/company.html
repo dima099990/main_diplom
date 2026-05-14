@@ -3,19 +3,7 @@
 {% block page_title %}Настройки{% endblock %}
 
 {% block content %}
-<div class="flex gap-4">
-  <!-- Settings sidebar -->
-  <div class="w-52 flex-shrink-0 hidden lg:block">
-    <div class="card py-2">
-      {% for tab_id, tab_label, tab_url in settings_tabs %}
-      <a href="{{ tab_url }}"
-         class="flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors rounded-lg mx-1 my-0.5
-         {% if current_tab == tab_id %}bg-indigo-600/20 text-indigo-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800{% endif %}">
-        {{ tab_label }}
-      </a>
-      {% endfor %}
-    </div>
-  </div>
+<div class="max-w-4xl">
 
   <!-- Settings content -->
   <div class="flex-1 min-w-0">

@@ -66,10 +66,26 @@
           </div>
         </div>
 
-        <a href="{% url 'crm:repair_print' repair.pk %}" target="_blank" class="btn-secondary px-3 py-2 text-sm flex items-center gap-1.5">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-          Акт
-        </a>
+        <!-- Print dropdown -->
+        <div x-data="{ open: false }" class="relative">
+          <button @click="open = !open" class="btn-secondary px-3 py-2 text-sm flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+            {% if repair.status == 'issued' or repair.status == 'done' %}Документы▾{% else %}Акт▾{% endif %}
+          </button>
+          <div x-show="open" @click.away="open = false" x-cloak
+               class="absolute right-0 top-10 w-56 card py-1 shadow-2xl z-30">
+            <a href="{% url 'crm:repair_print' repair.pk %}?type=receipt" target="_blank"
+               class="block px-4 py-2 text-sm hover:bg-slate-800 text-slate-300">📄 Акт приёма-передачи</a>
+            <a href="{% url 'crm:repair_print' repair.pk %}?type=work_act" target="_blank"
+               class="block px-4 py-2 text-sm hover:bg-slate-800 {% if repair.status == 'issued' or repair.status == 'done' %}text-indigo-400 font-semibold{% else %}text-slate-300{% endif %}">🔧 Акт выполненных работ</a>
+            <a href="{% url 'crm:repair_print' repair.pk %}?type=warranty" target="_blank"
+               class="block px-4 py-2 text-sm hover:bg-slate-800 text-slate-300">🛡 Гарантийный талон</a>
+            <a href="{% url 'crm:repair_print' repair.pk %}?type=refusal" target="_blank"
+               class="block px-4 py-2 text-sm hover:bg-slate-800 text-slate-300">❌ Акт отказа</a>
+            <a href="{% url 'crm:repair_print' repair.pk %}?type=receipt_sale" target="_blank"
+               class="block px-4 py-2 text-sm hover:bg-slate-800 text-slate-300">🧾 Товарный чек</a>
+          </div>
+        </div>
 
         {% if repair.status == 'done' and not repair.is_paid %}
         <button onclick="document.getElementById('pay-modal').classList.remove('hidden')"
@@ -154,11 +170,11 @@
             <h3 class="text-xs text-slate-500 uppercase tracking-wide font-semibold">Сотрудники</h3>
             <div>
               <label class="text-xs text-slate-500">Менеджер</label>
-              <p class="text-slate-200 mt-0.5">{{ repair.created_by.get_full_name|default:repair.created_by.username|default:"—" }}</p>
+              <p class="text-slate-200 mt-0.5">{% if repair.created_by %}{{ repair.created_by.get_full_name|default:repair.created_by.username }}{% else %}—{% endif %}</p>
             </div>
             <div>
               <label class="text-xs text-slate-500">Мастер</label>
-              <p class="text-slate-200 mt-0.5">{{ repair.assigned_to.get_full_name|default:repair.assigned_to.username|default:"Не назначен" }}</p>
+              <p class="text-slate-200 mt-0.5">{% if repair.assigned_to %}{{ repair.assigned_to.get_full_name|default:repair.assigned_to.username }}{% else %}Не назначен{% endif %}</p>
             </div>
             {% if repair.deadline %}
             <div>
@@ -213,18 +229,18 @@
       <div x-show="tab === 'works'" class="p-5">
         <div class="grid md:grid-cols-2 gap-6">
 
-          <!-- Services -->
+          <!-- ── УСЛУГИ ── -->
           <div>
-            <div class="flex items-center justify-between mb-3">
-              <h3 class="text-sm font-semibold text-slate-200">Работы / услуги</h3>
-            </div>
-            <div class="space-y-2 mb-3" id="services-list">
+            <h3 class="text-sm font-semibold text-slate-200 mb-3">Работы / услуги</h3>
+
+            <!-- Добавленные услуги -->
+            <div class="space-y-2 mb-4">
               {% for svc in repair.order_services.all %}
-              <div class="flex items-center gap-3 bg-slate-800/50 rounded-lg p-3">
-                <div class="flex-1">
-                  <p class="text-sm text-slate-200">{{ svc.name }}</p>
+              <div class="flex items-center gap-3 bg-slate-800/50 rounded-lg px-3 py-2.5">
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm text-slate-200 truncate">{{ svc.name }}</p>
                 </div>
-                <span class="text-white font-semibold text-sm">{{ svc.price }} ₽</span>
+                <span class="text-white font-semibold text-sm whitespace-nowrap">{{ svc.price|floatformat:0 }} ₽</span>
                 <form method="post" action="{% url 'crm:repair_remove_service' repair.pk svc.pk %}">
                   {% csrf_token %}
                   <button type="submit" class="text-slate-600 hover:text-red-400 transition-colors" title="Удалить">
@@ -233,45 +249,54 @@
                 </form>
               </div>
               {% empty %}
-              <p class="text-slate-500 text-sm">Услуги не добавлены</p>
+              <p class="text-xs text-slate-600 italic">Пока ничего не добавлено</p>
               {% endfor %}
             </div>
 
-            <!-- Add service -->
+            <!-- Из прайса: карточки услуг -->
+            {% if available_services %}
+            <p class="text-xs text-slate-500 mb-2">Из прайса ({{ repair.phone_model }}):</p>
+            <div class="space-y-1 mb-3 max-h-40 overflow-y-auto pr-1">
+              {% for svc in available_services %}
+              <form method="post" action="{% url 'crm:repair_add_service' repair.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="service_id" value="{{ svc.pk }}">
+                <input type="hidden" name="custom_price" value="{{ svc.price_from }}">
+                <button type="submit"
+                        class="w-full text-left flex items-center justify-between px-3 py-2 rounded-lg bg-slate-800/40 hover:bg-indigo-500/10 hover:border-indigo-500/30 border border-transparent transition-all group">
+                  <span class="text-sm text-slate-300 group-hover:text-slate-100 truncate">{{ svc.name }}</span>
+                  <span class="text-xs text-green-400 font-semibold ml-2 whitespace-nowrap">{{ svc.price_from|floatformat:0 }} ₽</span>
+                </button>
+              </form>
+              {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Произвольная работа -->
+            <p class="text-xs text-slate-500 mb-1.5">Добавить произвольно:</p>
             <form method="post" action="{% url 'crm:repair_add_service' repair.pk %}" class="flex gap-2">
               {% csrf_token %}
-              <select name="service_id" class="input-dark flex-1 px-3 py-2 text-sm">
-                <option value="">Выбрать из прайса...</option>
-                {% for svc in available_services %}
-                <option value="{{ svc.pk }}" data-price="{{ svc.price_from }}">{{ svc.phone_model.full_name }} — {{ svc.name }}</option>
-                {% endfor %}
-              </select>
-              <input type="number" name="custom_price" placeholder="Цена ₽" class="input-dark w-28 px-3 py-2 text-sm">
-              <button type="submit" class="btn-primary px-3 py-2 text-sm">+</button>
+              <input type="text" name="custom_name" placeholder="Название работы..." required
+                     class="input-dark flex-1 px-3 py-2 text-sm min-w-0">
+              <input type="number" name="custom_price" placeholder="₽" min="0"
+                     class="input-dark w-24 px-3 py-2 text-sm" required>
+              <button type="submit" class="btn-primary px-3 py-2 text-sm whitespace-nowrap">+ Добавить</button>
             </form>
-            <div class="mt-2">
-              <form method="post" action="{% url 'crm:repair_add_service' repair.pk %}" class="flex gap-2">
-                {% csrf_token %}
-                <input type="text" name="custom_name" placeholder="Произвольная работа..." class="input-dark flex-1 px-3 py-2 text-sm">
-                <input type="number" name="custom_price" placeholder="Цена ₽" class="input-dark w-28 px-3 py-2 text-sm">
-                <button type="submit" class="btn-secondary px-3 py-2 text-sm">+ Доп.</button>
-              </form>
-            </div>
           </div>
 
-          <!-- Parts -->
+          <!-- ── ЗАПЧАСТИ ── -->
           <div>
-            <div class="flex items-center justify-between mb-3">
-              <h3 class="text-sm font-semibold text-slate-200">Запчасти</h3>
-            </div>
-            <div class="space-y-2 mb-3">
+            <h3 class="text-sm font-semibold text-slate-200 mb-3">Запчасти</h3>
+
+            <!-- Добавленные запчасти -->
+            <div class="space-y-2 mb-4">
               {% for op in repair.order_parts.all %}
-              <div class="flex items-center gap-3 bg-slate-800/50 rounded-lg p-3">
+              <div class="flex items-center gap-3 bg-slate-800/50 rounded-lg px-3 py-2.5">
                 <div class="flex-1 min-w-0">
                   <p class="text-sm text-slate-200 truncate">{{ op.part.name }}</p>
-                  <p class="text-xs text-slate-500">{{ op.quantity }} шт × {{ op.price }} ₽</p>
+                  <p class="text-xs text-slate-500">{{ op.quantity }} шт × {{ op.price|floatformat:0 }} ₽</p>
                 </div>
-                <span class="text-white font-semibold text-sm">{{ op.total }} ₽</span>
+                <span class="text-white font-semibold text-sm whitespace-nowrap">{{ op.total|floatformat:0 }} ₽</span>
                 <form method="post" action="{% url 'crm:repair_remove_part' repair.pk op.pk %}">
                   {% csrf_token %}
                   <button type="submit" class="text-slate-600 hover:text-red-400 transition-colors">
@@ -280,22 +305,63 @@
                 </form>
               </div>
               {% empty %}
-              <p class="text-slate-500 text-sm">Запчасти не добавлены</p>
+              <p class="text-xs text-slate-600 italic">Пока ничего не добавлено</p>
               {% endfor %}
             </div>
-            <form method="post" action="{% url 'crm:repair_add_part' repair.pk %}" class="flex gap-2">
+
+            <!-- Запчасти для этой модели -->
+            {% if parts_for_model %}
+            <p class="text-xs text-slate-500 mb-2">Для {{ repair.phone_model }} на складе:</p>
+            <div class="space-y-1 mb-3 max-h-36 overflow-y-auto pr-1">
+              {% for part in parts_for_model %}
+              <form method="post" action="{% url 'crm:repair_add_part' repair.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="part_id" value="{{ part.pk }}">
+                <input type="hidden" name="quantity" value="1">
+                <input type="hidden" name="price" value="{{ part.sale_price }}">
+                <button type="submit"
+                        class="w-full text-left flex items-center justify-between px-3 py-2 rounded-lg bg-slate-800/40 hover:bg-green-500/10 hover:border-green-500/30 border border-transparent transition-all group">
+                  <span class="text-sm text-slate-300 group-hover:text-slate-100 truncate">{{ part.name }}</span>
+                  <span class="text-xs text-slate-500 ml-2 whitespace-nowrap">{{ part.quantity }} шт · <span class="text-green-400 font-semibold">{{ part.sale_price|floatformat:0 }} ₽</span></span>
+                </button>
+              </form>
+              {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Поиск по всем запчастям -->
+            <p class="text-xs text-slate-500 mb-1.5">{% if parts_for_model %}Или выбрать из всего склада:{% else %}Выбрать запчасть:{% endif %}</p>
+            <form method="post" action="{% url 'crm:repair_add_part' repair.pk %}" class="space-y-2" id="partAddForm">
               {% csrf_token %}
-              <select name="part_id" class="input-dark flex-1 px-3 py-2 text-sm">
-                <option value="">Выбрать запчасть...</option>
-                {% for part in available_parts %}
-                <option value="{{ part.pk }}" data-price="{{ part.sale_price }}" data-qty="{{ part.quantity }}">
-                  {{ part.name }} ({{ part.quantity }} шт)
-                </option>
-                {% endfor %}
-              </select>
-              <input type="number" name="quantity" value="1" min="1" class="input-dark w-16 px-3 py-2 text-sm">
-              <input type="number" name="price" placeholder="Цена ₽" class="input-dark w-28 px-3 py-2 text-sm">
-              <button type="submit" class="btn-primary px-3 py-2 text-sm">+</button>
+              <div class="relative">
+                <input type="text" id="partSearch" placeholder="Поиск запчасти..."
+                       class="input-dark w-full px-3 py-2 text-sm" autocomplete="off">
+                <div id="partDropdown" class="hidden absolute z-10 w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                  {% for part in available_parts %}
+                  <div class="part-option px-3 py-2.5 cursor-pointer hover:bg-slate-700 transition-colors border-b border-slate-700/50 last:border-0"
+                       data-id="{{ part.pk }}"
+                       data-name="{{ part.name }}"
+                       data-price="{{ part.sale_price }}"
+                       data-qty="{{ part.quantity }}"
+                       data-name-lower="{{ part.name|lower }}">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm text-slate-200">{{ part.name }}</span>
+                      <span class="text-xs text-slate-500 ml-2 whitespace-nowrap">{{ part.quantity }} шт · <span class="text-green-400">{{ part.sale_price|floatformat:0 }} ₽</span></span>
+                    </div>
+                    {% if part.phone_model %}<span class="text-xs text-slate-600">{{ part.phone_model }}</span>{% endif %}
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+              <input type="hidden" name="part_id" id="selectedPartId">
+              <div id="partFormFields" class="hidden flex gap-2">
+                <div class="flex-1 bg-slate-800/50 rounded-lg px-3 py-2 text-sm text-slate-300 truncate" id="selectedPartName">—</div>
+                <input type="number" name="quantity" id="partQty" value="1" min="1"
+                       class="input-dark w-16 px-2 py-2 text-sm text-center">
+                <input type="number" name="price" id="partPrice" placeholder="₽"
+                       class="input-dark w-24 px-3 py-2 text-sm">
+                <button type="submit" class="btn-primary px-3 py-2 text-sm">+</button>
+              </div>
             </form>
           </div>
         </div>
@@ -323,27 +389,6 @@
             </div>
           </div>
         </div>
-      </div>
-
-      <!-- Tab: Проверка устройства -->
-      <div x-show="tab === 'condition'" class="p-5">
-        {% if condition %}
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {% for item in condition.get_items %}
-          <div class="bg-slate-800/50 rounded-xl p-3">
-            <p class="text-xs text-slate-500 mb-1">{{ item.label }}</p>
-            <span class="badge
-              {% if item.state == 'ok' %}bg-green-500/20 text-green-400 border-green-500/20
-              {% elif item.state == 'broken' %}bg-red-500/20 text-red-400 border-red-500/20
-              {% else %}bg-slate-700 text-slate-400 border-slate-600{% endif %}">
-              {{ item.state_display }}
-            </span>
-          </div>
-          {% endfor %}
-        </div>
-        {% else %}
-        <p class="text-slate-500 text-sm">Проверка устройства не заполнена</p>
-        {% endif %}
       </div>
 
       <!-- Tab: Комментарий -->
@@ -405,7 +450,7 @@
           <div>
             <p class="text-xs text-slate-400 leading-relaxed">{{ event.description }}</p>
             <p class="text-xs text-slate-600 mt-0.5">
-              {{ event.user.get_full_name|default:event.user.username|default:"Система" }} · {{ event.created_at|date:"d.m H:i" }}
+              {% if event.user %}{{ event.user.get_full_name|default:event.user.username }}{% else %}Система{% endif %} · {{ event.created_at|date:"d.m H:i" }}
             </p>
           </div>
         </div>
@@ -449,28 +494,81 @@
 
 {% block extra_js %}
 <script>
-// Auto-fill price when service selected
-document.querySelectorAll('select[name="service_id"]').forEach(sel => {
-  sel.addEventListener('change', function() {
-    const opt = this.options[this.selectedIndex];
-    const price = opt.dataset.price;
-    if (price) {
-      const priceInput = this.closest('form').querySelector('input[name="custom_price"]');
-      if (priceInput && !priceInput.value) priceInput.value = price;
-    }
-  });
-});
+/* ── Поиск запчастей ── */
+(function () {
+  const searchInput  = document.getElementById('partSearch');
+  const dropdown     = document.getElementById('partDropdown');
+  const hiddenId     = document.getElementById('selectedPartId');
+  const formFields   = document.getElementById('partFormFields');
+  const nameDisplay  = document.getElementById('selectedPartName');
+  const priceInput   = document.getElementById('partPrice');
+  const qtyInput     = document.getElementById('partQty');
 
-// Auto-fill part price
-document.querySelectorAll('select[name="part_id"]').forEach(sel => {
-  sel.addEventListener('change', function() {
-    const opt = this.options[this.selectedIndex];
-    const price = opt.dataset.price;
-    if (price) {
-      const priceInput = this.closest('form').querySelector('input[name="price"]');
-      if (priceInput) priceInput.value = price;
+  if (!searchInput) return;
+
+  // Show dropdown on focus / input
+  searchInput.addEventListener('focus', function () {
+    filterParts(this.value);
+    dropdown.classList.remove('hidden');
+  });
+
+  searchInput.addEventListener('input', function () {
+    filterParts(this.value);
+    dropdown.classList.remove('hidden');
+    // Clear selection if user types again
+    hiddenId.value = '';
+    formFields.classList.add('hidden');
+  });
+
+  // Hide dropdown when clicking outside
+  document.addEventListener('click', function (e) {
+    if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+      dropdown.classList.add('hidden');
     }
   });
-});
+
+  // Click on a part option
+  dropdown.addEventListener('click', function (e) {
+    const option = e.target.closest('.part-option');
+    if (!option) return;
+
+    const id    = option.dataset.id;
+    const name  = option.dataset.name;
+    const price = option.dataset.price;
+    const qty   = parseInt(option.dataset.qty, 10);
+
+    hiddenId.value         = id;
+    nameDisplay.textContent = name;
+    priceInput.value       = parseFloat(price);
+    qtyInput.max           = qty;
+    searchInput.value      = name;
+
+    formFields.classList.remove('hidden');
+    dropdown.classList.add('hidden');
+  });
+
+  function filterParts(query) {
+    const q = query.trim().toLowerCase();
+    let anyVisible = false;
+    document.querySelectorAll('#partDropdown .part-option').forEach(function (opt) {
+      const match = !q || opt.dataset.nameLower.includes(q);
+      opt.style.display = match ? '' : 'none';
+      if (match) anyVisible = true;
+    });
+    // Show/hide empty hint
+    let emptyHint = dropdown.querySelector('.part-empty-hint');
+    if (!anyVisible) {
+      if (!emptyHint) {
+        emptyHint = document.createElement('div');
+        emptyHint.className = 'part-empty-hint px-3 py-2.5 text-xs text-slate-500 italic';
+        emptyHint.textContent = 'Ничего не найдено';
+        dropdown.appendChild(emptyHint);
+      }
+      emptyHint.style.display = '';
+    } else if (emptyHint) {
+      emptyHint.style.display = 'none';
+    }
+  }
+})();
 </script>
 {% endblock %}

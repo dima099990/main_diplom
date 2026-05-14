@@ -1,39 +1,106 @@
 {% extends 'crm/base.html' %}
 {% block title %}{{ customer.name }}{% endblock %}
-{% block page_title %}Клиент: {{ customer.name }}{% endblock %}
+
+{% block page_title %}
+<a href="{% url 'crm:customer_list' %}" class="text-slate-500 hover:text-slate-300 mr-1">Клиенты</a>
+<span class="text-slate-600 mr-1">/</span>
+{{ customer.name }}
+{% endblock %}
+
 {% block content %}
-<div class="breadcrumb"><a href="{% url 'crm:customer_list' %}">Клиенты</a><span>›</span>{{ customer.name }}</div>
-<div style="display:grid;grid-template-columns:300px 1fr;gap:20px;margin-top:16px">
-<div class="card" style="height:fit-content">
-  <div class="card-title">{{ customer.name }}</div>
-  <div style="font-size:13px">
-    <div style="margin-bottom:8px"><span class="text-muted">Телефон:</span><br><a href="tel:{{ customer.phone }}" style="font-size:15px;font-weight:600">{{ customer.phone }}</a></div>
-    {% if customer.email %}<div style="margin-bottom:8px"><span class="text-muted">Email:</span><br>{{ customer.email }}</div>{% endif %}
-    <div style="margin-bottom:8px"><span class="text-muted">Клиент с:</span><br>{{ customer.created_at|date:"d.m.Y" }}</div>
-    {% if customer.notes %}<div style="margin-bottom:8px"><span class="text-muted">Примечание:</span><br>{{ customer.notes }}</div>{% endif %}
+{% include 'crm/includes/messages.html' %}
+
+<div class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-5">
+
+  <!-- Info card -->
+  <div class="card p-5 h-fit">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-10 h-10 bg-indigo-700 rounded-full flex items-center justify-center text-base font-semibold text-white flex-shrink-0">
+        {{ customer.name|first|upper }}
+      </div>
+      <div>
+        <p class="text-slate-200 font-semibold text-sm leading-tight">{{ customer.name }}</p>
+        <p class="text-slate-500 text-xs mt-0.5">Клиент с {{ customer.created_at|date:"d.m.Y" }}</p>
+      </div>
+    </div>
+
+    <div class="space-y-3 text-sm border-t border-slate-800 pt-4">
+      <div>
+        <p class="text-xs text-slate-500 mb-0.5">Телефон</p>
+        <a href="tel:{{ customer.phone }}" class="text-indigo-400 hover:text-indigo-300 font-medium">{{ customer.phone }}</a>
+      </div>
+      {% if customer.email %}
+      <div>
+        <p class="text-xs text-slate-500 mb-0.5">Email</p>
+        <p class="text-slate-300">{{ customer.email }}</p>
+      </div>
+      {% endif %}
+      {% if customer.notes %}
+      <div>
+        <p class="text-xs text-slate-500 mb-0.5">Примечание</p>
+        <p class="text-slate-400 text-xs leading-relaxed">{{ customer.notes }}</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="flex flex-col gap-2 mt-5">
+      <a href="{% url 'crm:customer_edit' customer.pk %}" class="btn-secondary px-4 py-2 text-sm text-center">Редактировать</a>
+      <a href="{% url 'crm:repair_create' %}" class="btn-primary px-4 py-2 text-sm text-center">+ Новый ремонт</a>
+    </div>
   </div>
-  <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
-    <a href="{% url 'crm:customer_edit' customer.pk %}" class="btn btn-secondary btn-sm">✏️ Редактировать</a>
-    <a href="{% url 'crm:repair_create' %}" class="btn btn-primary btn-sm">➕ Новый ремонт</a>
+
+  <!-- Repairs table -->
+  <div class="card overflow-hidden">
+    <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+      <h2 class="text-sm font-semibold text-slate-200">История ремонтов</h2>
+      <span class="text-xs text-slate-500">{{ repairs|length }} запис{{ repairs|length|pluralize:"ь,и,ей" }}</span>
+    </div>
+
+    {% if repairs %}
+    <table class="w-full">
+      <thead>
+        <tr class="text-xs text-slate-500 uppercase border-b border-slate-800">
+          <th class="text-left px-5 py-3 font-medium">Номер</th>
+          <th class="text-left px-5 py-3 font-medium hidden sm:table-cell">Устройство</th>
+          <th class="text-left px-5 py-3 font-medium">Статус</th>
+          <th class="text-left px-5 py-3 font-medium hidden md:table-cell">Стоимость</th>
+          <th class="text-left px-5 py-3 font-medium hidden lg:table-cell">Дата</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-800/60">
+        {% for r in repairs %}
+        <tr class="table-row cursor-pointer" onclick="location.href='{% url 'crm:repair_detail' r.pk %}'">
+          <td class="px-5 py-3">
+            <span class="text-indigo-400 font-medium text-sm">{{ r.order_number }}</span>
+          </td>
+          <td class="px-5 py-3 hidden sm:table-cell">
+            <span class="text-slate-300 text-sm">{{ r.phone_model }}</span>
+          </td>
+          <td class="px-5 py-3">
+            {% if r.status == 'done' or r.status == 'issued' %}
+              <span class="badge bg-green-500/15 text-green-400 border-green-500/20">{{ r.get_status_display }}</span>
+            {% elif r.status == 'in_progress' %}
+              <span class="badge bg-blue-500/15 text-blue-400 border-blue-500/20">{{ r.get_status_display }}</span>
+            {% elif r.status == 'cancelled' %}
+              <span class="badge bg-red-500/15 text-red-400 border-red-500/20">{{ r.get_status_display }}</span>
+            {% else %}
+              <span class="badge bg-slate-700/50 text-slate-400 border-slate-600/50">{{ r.get_status_display }}</span>
+            {% endif %}
+          </td>
+          <td class="px-5 py-3 hidden md:table-cell">
+            <span class="text-slate-300 text-sm">{% if r.final_cost %}{{ r.final_cost|floatformat:0 }} ₽{% else %}—{% endif %}</span>
+          </td>
+          <td class="px-5 py-3 hidden lg:table-cell">
+            <span class="text-slate-500 text-sm">{{ r.created_at|date:"d.m.Y" }}</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    {% include 'crm/includes/empty_state.html' with icon="🔧" title="Ремонтов нет" subtitle="У этого клиента ещё не было ремонтов" %}
+    {% endif %}
   </div>
-</div>
-<div class="card">
-  <div class="card-title">История ремонтов ({{ repairs|length }})</div>
-  {% if repairs %}
-  <div class="table-wrap"><table>
-    <thead><tr><th>Номер</th><th>Устройство</th><th>Статус</th><th>Стоимость</th><th>Дата</th></tr></thead>
-    <tbody>
-    {% for r in repairs %}
-    <tr onclick="location.href='{% url 'crm:repair_detail' r.pk %}'" style="cursor:pointer">
-      <td class="td-name">{{ r.order_number }}</td><td>{{ r.phone_model }}</td>
-      <td><span class="badge badge-{{ r.status }}">{{ r.get_status_display }}</span></td>
-      <td class="price-tag">{% if r.final_cost %}{{ r.final_cost|floatformat:0 }} ₽{% else %}—{% endif %}</td>
-      <td class="text-muted">{{ r.created_at|date:"d.m.Y" }}</td>
-    </tr>
-    {% endfor %}
-    </tbody>
-  </table></div>
-  {% else %}<p class="text-muted">Ремонтов нет</p>{% endif %}
-</div>
+
 </div>
 {% endblock %}

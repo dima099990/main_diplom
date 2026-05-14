@@ -122,7 +122,7 @@ class Command(BaseCommand):
             admin.first_name = 'Администратор'
             admin.last_name = 'Системы'
             admin.save()
-            UserProfile.objects.create(user=admin, role='admin', branch=branches[0])
+            UserProfile.objects.update_or_create(user=admin, defaults={'role': 'admin', 'branch': branches[0]})
             self.stdout.write(self.style.SUCCESS('  admin / admin123'))
 
         # ── Staff
@@ -138,9 +138,11 @@ class Command(BaseCommand):
             if not User.objects.filter(username=username).exists():
                 u = User.objects.create_user(username, f'{username}@kayros.ru', 'pass123',
                                              first_name=fn, last_name=ln)
-                UserProfile.objects.create(
-                    user=u, role=role, branch=branch,
-                    repair_percent=rp, accessory_percent=ap, base_salary=25000,
+                UserProfile.objects.update_or_create(
+                    user=u, defaults={
+                        'role': role, 'branch': branch,
+                        'repair_percent': rp, 'accessory_percent': ap, 'base_salary': 25000,
+                    }
                 )
                 staff.append(u)
             else:

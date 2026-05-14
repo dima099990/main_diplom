@@ -1,37 +1,97 @@
 {% extends 'crm/base.html' %}
-{% block title %}{% if part %}Редактировать запчасть{% else %}Новая запчасть{% endblock %}
-{% block page_title %}{% if part %}Редактировать запчасть{% else %}Новая запчасть{% endif %}{% endblock %}
+{% block title %}{% if part %}Редактировать запчасть{% else %}Новая запчасть{% endif %}{% endblock %}
+
+{% block page_title %}
+<a href="{% url 'crm:warehouse_parts' %}" class="text-slate-500 hover:text-slate-300 mr-1">Запчасти</a>
+<span class="text-slate-600 mr-1">/</span>
+{% if part %}{{ part.name }}{% else %}Новая запчасть{% endif %}
+{% endblock %}
+
 {% block content %}
-<div class="breadcrumb"><a href="{% url 'crm:part_list' %}">Запчасти</a><span>›</span>{% if part %}{{ part.name }}{% else %}Новая{% endif %}</div>
-<div class="card" style="max-width:700px;margin-top:16px">
-  <form method="post">{% csrf_token %}
-    <div class="form-grid">
-      <div class="form-group"><label class="form-label">Название *</label><input name="name" class="form-control" value="{{ part.name|default:'' }}" required></div>
-      <div class="form-group"><label class="form-label">Артикул</label><input name="sku" class="form-control" value="{{ part.sku|default:'' }}"></div>
-      <div class="form-group"><label class="form-label">Марка</label>
-        <select name="brand" id="id_part_brand" class="form-control">
-          <option value="">— не указана —</option>
-          {% for b in brands %}<option value="{{ b.id }}" {% if part.brand_id == b.id %}selected{% endif %}>{{ b.name }}</option>{% endfor %}
-        </select>
+{% include 'crm/includes/messages.html' %}
+
+<div class="max-w-2xl">
+  <div class="card p-6">
+    <h2 class="text-base font-semibold text-slate-200 mb-5">
+      {% if part %}Редактировать запчасть{% else %}Добавить запчасть{% endif %}
+    </h2>
+
+    <form method="post">
+      {% csrf_token %}
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Название *</label>
+          <input name="name" class="input-dark w-full px-3 py-2 text-sm"
+                 value="{{ part.name|default:'' }}" required>
+        </div>
+
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Артикул (SKU)</label>
+          <input name="sku" class="input-dark w-full px-3 py-2 text-sm"
+                 value="{{ part.sku|default:'' }}">
+        </div>
+
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Марка</label>
+          <select name="brand" id="id_part_brand" class="input-dark w-full px-3 py-2 text-sm">
+            <option value="">— не указана —</option>
+            {% for b in brands %}
+            <option value="{{ b.id }}" {% if part.brand_id == b.id %}selected{% endif %}>{{ b.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Модель телефона</label>
+          <select name="phone_model" id="id_part_model" class="input-dark w-full px-3 py-2 text-sm">
+            <option value="">— все модели —</option>
+            {% for m in phone_models %}
+            <option value="{{ m.id }}" {% if part.phone_model_id == m.id %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        {% if not part %}
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Начальный остаток</label>
+          <input name="quantity" type="number" class="input-dark w-full px-3 py-2 text-sm"
+                 value="0" min="0">
+        </div>
+        {% endif %}
+
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Мин. остаток (предупреждение)</label>
+          <input name="min_quantity" type="number" class="input-dark w-full px-3 py-2 text-sm"
+                 value="{{ part.min_quantity|default:1 }}" min="0">
+        </div>
+
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Закупочная цена (₽)</label>
+          <input name="purchase_price" type="number" class="input-dark w-full px-3 py-2 text-sm"
+                 value="{{ part.purchase_price|default:0 }}" step="0.01">
+        </div>
+
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Цена списания (₽)</label>
+          <input name="sale_price" type="number" class="input-dark w-full px-3 py-2 text-sm"
+                 value="{{ part.sale_price|default:0 }}" step="0.01">
+        </div>
+
       </div>
-      <div class="form-group"><label class="form-label">Модель</label>
-        <select name="phone_model" id="id_part_model" class="form-control">
-          <option value="">— все модели —</option>
-          {% for m in phone_models %}<option value="{{ m.id }}" {% if part.phone_model_id == m.id %}selected{% endif %}>{{ m }}</option>{% endfor %}
-        </select>
+
+      <div class="mb-5">
+        <label class="text-xs text-slate-400 mb-1 block">Примечания</label>
+        <textarea name="notes" class="input-dark w-full px-3 py-2 text-sm" rows="3">{{ part.notes|default:'' }}</textarea>
       </div>
-      {% if not part %}
-      <div class="form-group"><label class="form-label">Начальный остаток</label><input name="quantity" type="number" class="form-control" value="0" min="0"></div>
-      {% endif %}
-      <div class="form-group"><label class="form-label">Мин. остаток (предупреждение)</label><input name="min_quantity" type="number" class="form-control" value="{{ part.min_quantity|default:1 }}" min="0"></div>
-      <div class="form-group"><label class="form-label">Закупочная цена (₽)</label><input name="purchase_price" type="number" class="form-control" value="{{ part.purchase_price|default:0 }}" step="0.01"></div>
-      <div class="form-group"><label class="form-label">Цена списания (₽)</label><input name="sale_price" type="number" class="form-control" value="{{ part.sale_price|default:0 }}" step="0.01"></div>
-    </div>
-    <div class="form-group"><label class="form-label">Примечания</label><textarea name="notes" class="form-control" rows="2">{{ part.notes|default:'' }}</textarea></div>
-    <div style="display:flex;gap:8px">
-      <button type="submit" class="btn btn-primary">💾 Сохранить</button>
-      <a href="{% url 'crm:part_list' %}" class="btn btn-secondary">Отмена</a>
-    </div>
-  </form>
+
+      <div class="flex items-center gap-3">
+        <button type="submit" class="btn-primary px-5 py-2 text-sm">Сохранить</button>
+        <a href="{% url 'crm:warehouse_parts' %}" class="btn-secondary px-5 py-2 text-sm">Отмена</a>
+      </div>
+
+    </form>
+  </div>
 </div>
 {% endblock %}

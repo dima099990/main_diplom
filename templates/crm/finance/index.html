@@ -35,7 +35,7 @@
     <button @click="tab='expenses'" :class="tab==='expenses' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200'"
             class="px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap">Расходы</button>
     <button @click="tab='payroll'" :class="tab==='payroll' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200'"
-            class="px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap">Зарплаты</button>
+            class="px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap">💰 Зарплаты</button>
   </div>
 
   <!-- Payments -->
@@ -116,39 +116,271 @@
   </div>
 
   <!-- Payroll -->
-  <div x-show="tab==='payroll'" x-cloak class="card overflow-hidden">
-    <div class="flex items-center justify-between px-4 py-3 border-b border-slate-800">
-      <h2 class="text-sm font-semibold text-slate-200">Зарплатные начисления</h2>
-      <a href="{% url 'crm:payroll_my' %}" class="text-xs text-indigo-400 hover:text-indigo-300">Моя зарплата →</a>
+  <div x-show="tab==='payroll'" x-cloak>
+    {% if role == 'admin' %}
+    <!-- ── Admin: список сотрудников с зарплатами ── -->
+    <div class="card overflow-hidden">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-slate-800">
+        <h2 class="text-sm font-semibold text-slate-200">Зарплаты сотрудников</h2>
+        <a href="{% url 'crm:payroll_my' %}" class="text-xs text-indigo-400 hover:text-indigo-300">Моя зарплата →</a>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead><tr class="border-b border-slate-800 text-xs text-slate-500 uppercase">
+            <th class="text-left px-5 py-3">Сотрудник</th>
+            <th class="text-left px-4 py-3 hidden md:table-cell">Должность</th>
+            <th class="text-right px-4 py-3">Начислено</th>
+            <th class="text-right px-4 py-3">Штрафы</th>
+            <th class="text-right px-4 py-3">К выплате</th>
+            <th class="px-4 py-3 text-center">Действия</th>
+          </tr></thead>
+          <tbody class="divide-y divide-slate-800/60">
+            {% for emp_row in payroll_summary %}
+            <tr class="hover:bg-slate-800/30 transition-colors">
+              <td class="px-5 py-3">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-7 h-7 rounded-full bg-indigo-500/20 flex items-center justify-center text-xs font-bold text-indigo-400 flex-shrink-0">
+                    {{ emp_row.name|first|upper }}
+                  </div>
+                  <span class="text-slate-200 font-medium">{{ emp_row.name }}</span>
+                </div>
+              </td>
+              <td class="px-4 py-3 hidden md:table-cell text-slate-500 text-xs">{{ emp_row.role_display }}</td>
+              <td class="px-4 py-3 text-right text-green-400 font-semibold">{{ emp_row.accrued|floatformat:0 }} ₽</td>
+              <td class="px-4 py-3 text-right">
+                {% if emp_row.penalties > 0 %}
+                  <span class="text-red-400 font-semibold">−{{ emp_row.penalties|floatformat:0 }} ₽</span>
+                {% else %}<span class="text-slate-600">—</span>{% endif %}
+              </td>
+              <td class="px-4 py-3 text-right">
+                <span class="font-bold {% if emp_row.net > 0 %}text-white{% else %}text-red-400{% endif %}">
+                  {{ emp_row.net|floatformat:0 }} ₽
+                </span>
+              </td>
+              <td class="px-4 py-3 text-center">
+                <a href="{% url 'crm:payroll_employee' emp_row.employee_pk %}"
+                   class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-indigo-600/20 border border-slate-700 text-xs transition-all whitespace-nowrap">
+                  Подробнее
+                </a>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="px-5 py-10 text-center text-slate-500 text-sm">
+              Начислений нет. Они появятся после оплаты заказов с назначенными мастерами<br>или после ручного добавления.
+            </td></tr>
+            {% endfor %}
+          </tbody>
+          {% if payroll_summary %}
+          <tfoot class="border-t-2 border-slate-700">
+            <tr class="bg-slate-800/30">
+              <td colspan="2" class="px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">
+                Итого · {{ payroll_summary|length }} сотрудн.
+              </td>
+              <td class="px-4 py-3 text-right text-green-400 font-bold">{{ payroll_total_accrued|floatformat:0 }} ₽</td>
+              <td class="px-4 py-3 text-right text-red-400 font-bold">
+                {% if payroll_total_penalties > 0 %}−{{ payroll_total_penalties|floatformat:0 }} ₽{% else %}—{% endif %}
+              </td>
+              <td class="px-4 py-3 text-right text-xl font-bold text-white">{{ payroll_total|floatformat:0 }} ₽</td>
+              <td></td>
+            </tr>
+          </tfoot>
+          {% endif %}
+        </table>
+      </div>
+
+      <!-- Add quick records for any employee -->
+      {% if all_employees %}
+      <div class="px-5 py-4 border-t border-slate-800 flex items-center justify-between">
+        <p class="text-xs text-slate-500">Добавить начисление или штраф для сотрудника</p>
+        <button onclick="document.getElementById('payroll-add-modal').classList.remove('hidden')"
+                class="btn-primary px-4 py-2 text-sm flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          Добавить запись
+        </button>
+      </div>
+      {% endif %}
     </div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-sm">
-        <thead><tr class="border-b border-slate-800 text-xs text-slate-500 uppercase">
-          <th class="text-left px-4 py-3">Сотрудник</th>
-          <th class="text-left px-4 py-3">Период</th>
-          <th class="text-left px-4 py-3">Тип</th>
-          <th class="text-left px-4 py-3">Описание</th>
-          <th class="text-right px-4 py-3">Сумма</th>
-        </tr></thead>
-        <tbody class="divide-y divide-slate-800/60">
-          {% for r in payroll_records %}
-          <tr class="table-row">
-            <td class="px-4 py-3 text-slate-200">{{ r.employee.get_full_name|default:r.employee.username }}</td>
-            <td class="px-4 py-3 text-slate-400 text-xs">{{ r.period_month }}/{{ r.period_year }}</td>
-            <td class="px-4 py-3"><span class="badge bg-indigo-500/10 text-indigo-400 border-indigo-500/20">{{ r.get_record_type_display }}</span></td>
-            <td class="px-4 py-3 text-slate-400 text-xs">{{ r.description|default:"—" }}</td>
-            <td class="px-4 py-3 text-right font-semibold {% if r.record_type == 'penalty' %}text-red-400{% else %}text-green-400{% endif %}">
-              {% if r.record_type == 'penalty' %}−{% endif %}{{ r.amount|floatformat:0 }} ₽
-            </td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="5" class="px-4 py-10 text-center text-slate-500">Записей нет</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+
+    {% else %}
+    <!-- ── Non-admin: only own records ── -->
+    <div class="card overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+        <h2 class="text-sm font-semibold text-slate-200">Мои начисления</h2>
+        <a href="{% url 'crm:payroll_my' %}" class="text-xs text-indigo-400 hover:text-indigo-300">Детальный отчёт →</a>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead><tr class="border-b border-slate-800 text-xs text-slate-500 uppercase">
+            <th class="text-left px-4 py-3">Период</th>
+            <th class="text-left px-4 py-3">Тип</th>
+            <th class="text-left px-4 py-3">Описание</th>
+            <th class="text-right px-4 py-3">Сумма</th>
+          </tr></thead>
+          <tbody class="divide-y divide-slate-800/60">
+            {% for r in payroll_records %}
+            {% if r.employee == request.user %}
+            <tr class="table-row">
+              <td class="px-4 py-3 text-slate-400 text-xs">{{ r.period_month }}/{{ r.period_year }}</td>
+              <td class="px-4 py-3"><span class="badge bg-indigo-500/10 text-indigo-400 border-indigo-500/20">{{ r.get_record_type_display }}</span></td>
+              <td class="px-4 py-3 text-slate-400 text-xs">{{ r.description|default:"—" }}</td>
+              <td class="px-4 py-3 text-right font-semibold {% if r.record_type == 'penalty' %}text-red-400{% else %}text-green-400{% endif %}">
+                {% if r.record_type == 'penalty' %}−{% endif %}{{ r.amount|floatformat:0 }} ₽
+              </td>
+            </tr>
+            {% endif %}
+            {% empty %}
+            <tr><td colspan="4" class="px-4 py-10 text-center text-slate-500">Начислений нет</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- REMOVED: old К выплате section merged into Зарплаты tab -->
+  {% if False %}<div x-show="tab==='payout'">
+    <div class="card overflow-hidden mb-4">
+      <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+        <div>
+          <h2 class="text-sm font-semibold text-slate-200">Зарплата к выплате</h2>
+          <p class="text-xs text-slate-500 mt-0.5">На основе всех начислений и штрафов</p>
+        </div>
+        <a href="{% url 'crm:payroll_my' %}" class="text-xs text-indigo-400 hover:text-indigo-300">Моя зарплата →</a>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-xs text-slate-500 uppercase border-b border-slate-800">
+              <th class="text-left px-5 py-3">Сотрудник</th>
+              <th class="text-right px-4 py-3">Начислено</th>
+              <th class="text-right px-4 py-3">Штрафы</th>
+              <th class="text-right px-5 py-3">К выплате</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-800/60">
+            {% for emp in payroll_summary %}
+            <tr class="hover:bg-slate-800/30 transition-colors">
+              <td class="px-5 py-3">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-7 h-7 rounded-full bg-indigo-500/20 flex items-center justify-center text-xs font-bold text-indigo-400 flex-shrink-0">
+                    {{ emp.name|first|upper }}
+                  </div>
+                  <span class="text-slate-200 font-medium">{{ emp.name }}</span>
+                </div>
+              </td>
+              <td class="px-4 py-3 text-right text-green-400 font-semibold">{{ emp.accrued|floatformat:0 }} ₽</td>
+              <td class="px-4 py-3 text-right">
+                {% if emp.penalties > 0 %}
+                  <span class="text-red-400 font-semibold">−{{ emp.penalties|floatformat:0 }} ₽</span>
+                {% else %}
+                  <span class="text-slate-600">—</span>
+                {% endif %}
+              </td>
+              <td class="px-5 py-3 text-right">
+                <span class="text-lg font-bold {% if emp.net > 0 %}text-white{% else %}text-red-400{% endif %}">
+                  {{ emp.net|floatformat:0 }} ₽
+                </span>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="4" class="px-5 py-10 text-center text-slate-500 text-sm">
+                Начислений нет. Они появятся после проведения ремонтов и продаж.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          {% if payroll_summary %}
+          <tfoot class="border-t-2 border-slate-700">
+            <tr class="bg-slate-800/30">
+              <td class="px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">
+                Итого · {{ payroll_summary|length }} сотрудн.
+              </td>
+              <td class="px-4 py-3 text-right text-green-400 font-bold">{{ payroll_total_accrued|floatformat:0 }} ₽</td>
+              <td class="px-4 py-3 text-right text-red-400 font-bold">
+                {% if payroll_total_penalties > 0 %}−{{ payroll_total_penalties|floatformat:0 }} ₽{% else %}—{% endif %}
+              </td>
+              <td class="px-5 py-3 text-right text-xl font-bold text-white">{{ payroll_total|floatformat:0 }} ₽</td>
+            </tr>
+          </tfoot>
+          {% endif %}
+        </table>
+      </div>
     </div>
   </div>
+  {% endif %}
+
 </div>
+
+<!-- Payroll Add Modal (admin only) -->
+{% if role == 'admin' and all_employees %}
+<div id="payroll-add-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center px-4 modal-overlay">
+  <div class="card w-full max-w-md p-6 shadow-2xl">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-bold text-white">Добавить начисление / штраф</h2>
+      <button type="button" onclick="document.getElementById('payroll-add-modal').classList.add('hidden')"
+              class="text-slate-500 hover:text-slate-300 text-xl">✕</button>
+    </div>
+    <form id="payroll-add-form" method="post" action="" class="space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="text-xs text-slate-500 mb-1 block">Сотрудник *</label>
+        <select name="_employee" id="payrollEmpSelect" class="input-dark w-full px-3 py-2 text-sm" required
+                onchange="updatePayrollAction(this.value)">
+          <option value="">— Выберите сотрудника —</option>
+          {% for emp in all_employees %}
+          <option value="{{ emp.pk }}">{{ emp.get_full_name|default:emp.username }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="text-xs text-slate-500 mb-1 block">Тип записи</label>
+        <select name="record_type" class="input-dark w-full px-3 py-2 text-sm">
+          <option value="penalty">❌ Штраф</option>
+          <option value="bonus">⭐ Премия</option>
+          <option value="base_salary">💼 Оклад</option>
+          <option value="repair_bonus">🔧 Бонус за ремонт</option>
+          <option value="sale_bonus">🛍 Бонус за продажу</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs text-slate-500 mb-1 block">Сумма ₽ *</label>
+        <input type="number" name="amount" step="1" min="0" placeholder="0" required
+               class="input-dark w-full px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="text-xs text-slate-500 mb-1 block">Комментарий</label>
+        <input type="text" name="description" placeholder="Причина штрафа / премии..."
+               class="input-dark w-full px-3 py-2 text-sm">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs text-slate-500 mb-1 block">Месяц</label>
+          <select name="month" id="payrollMonth" class="input-dark w-full px-3 py-2 text-sm">
+            <option value="1">Январь</option><option value="2">Февраль</option>
+            <option value="3">Март</option><option value="4">Апрель</option>
+            <option value="5">Май</option><option value="6">Июнь</option>
+            <option value="7">Июль</option><option value="8">Август</option>
+            <option value="9">Сентябрь</option><option value="10">Октябрь</option>
+            <option value="11">Ноябрь</option><option value="12">Декабрь</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-slate-500 mb-1 block">Год</label>
+          <input type="number" name="year" id="payrollYear" value="2026"
+                 class="input-dark w-full px-3 py-2 text-sm">
+        </div>
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="submit" class="btn-primary flex-1 py-2.5 text-sm">Сохранить</button>
+        <button type="button" onclick="document.getElementById('payroll-add-modal').classList.add('hidden')"
+                class="btn-secondary px-4 py-2.5 text-sm">Отмена</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
 
 <!-- Expense Modal -->
 <div id="expense-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center px-4 modal-overlay">
@@ -187,4 +419,22 @@
     </form>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function updatePayrollAction(empPk) {
+  if (empPk) {
+    document.getElementById('payroll-add-form').action = '/crm/finance/payroll/' + empPk + '/add/';
+  }
+}
+// Pre-select current month/year in payroll modal
+(function(){
+  var now = new Date();
+  var monthSel = document.getElementById('payrollMonth');
+  if (monthSel) monthSel.value = now.getMonth() + 1;
+  var yearInput = document.getElementById('payrollYear');
+  if (yearInput) yearInput.value = now.getFullYear();
+})();
+</script>
 {% endblock %}

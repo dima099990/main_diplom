@@ -1,31 +1,93 @@
 {% extends 'crm/base.html' %}
-{% block title %}{% if acc %}Редактировать{% else %}Новый аксессуар{% endif %}{% endblock %}
-{% block page_title %}{% if acc %}Редактировать аксессуар{% else %}Новый аксессуар{% endif %}{% endblock %}
+{% block title %}{% if acc %}Редактировать аксессуар{% else %}Новый аксессуар{% endif %}{% endblock %}
+
+{% block page_title %}
+<a href="{% url 'crm:warehouse_accessories' %}" class="text-slate-500 hover:text-slate-300 mr-1">Аксессуары</a>
+<span class="text-slate-600 mr-1">/</span>
+{% if acc %}{{ acc.name }}{% else %}Новый аксессуар{% endif %}
+{% endblock %}
+
 {% block content %}
-<div class="breadcrumb"><a href="{% url 'crm:accessory_list' %}">Аксессуары</a><span>›</span>{% if acc %}{{ acc.name }}{% else %}Новый{% endif %}</div>
-<div class="card" style="max-width:700px;margin-top:16px">
-  <form method="post">{% csrf_token %}
-    <div class="form-grid">
-      <div class="form-group"><label class="form-label">Название *</label><input name="name" class="form-control" value="{{ acc.name|default:'' }}" required></div>
-      <div class="form-group"><label class="form-label">Категория</label>
-        <select name="category" class="form-control">
-          {% for val,label in categories %}<option value="{{ val }}" {% if acc.category == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
-        </select>
+{% include 'crm/includes/messages.html' %}
+
+<div class="max-w-2xl">
+  <div class="card p-6">
+    <h2 class="text-base font-semibold text-slate-200 mb-5">
+      {% if acc %}Редактировать аксессуар{% else %}Добавить аксессуар{% endif %}
+    </h2>
+
+    <form method="post">
+      {% csrf_token %}
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Название *</label>
+          <input name="name" class="input-dark w-full px-3 py-2 text-sm"
+                 value="{{ acc.name|default:'' }}" required>
+        </div>
+
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Категория</label>
+          <select name="category" class="input-dark w-full px-3 py-2 text-sm">
+            {% for val, label in categories %}
+            <option value="{{ val }}" {% if acc.category == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Артикул (SKU)</label>
+          <input name="sku" class="input-dark w-full px-3 py-2 text-sm"
+                 value="{{ acc.sku|default:'' }}">
+        </div>
+
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Совместимость</label>
+          <input name="compatible_with" class="input-dark w-full px-3 py-2 text-sm"
+                 value="{{ acc.compatible_with|default:'' }}"
+                 placeholder="iPhone 14, Samsung S22...">
+        </div>
+
+        {% if not acc %}
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Начальный остаток</label>
+          <input name="quantity" type="number" class="input-dark w-full px-3 py-2 text-sm"
+                 value="0" min="0">
+        </div>
+        {% endif %}
+
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Мин. остаток</label>
+          <input name="min_quantity" type="number" class="input-dark w-full px-3 py-2 text-sm"
+                 value="{{ acc.min_quantity|default:2 }}" min="0">
+        </div>
+
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Закупочная цена (₽)</label>
+          <input name="purchase_price" type="number" class="input-dark w-full px-3 py-2 text-sm"
+                 value="{{ acc.purchase_price|default:0 }}" step="0.01">
+        </div>
+
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Цена продажи (₽)</label>
+          <input name="sale_price" type="number" class="input-dark w-full px-3 py-2 text-sm"
+                 value="{{ acc.sale_price|default:0 }}" step="0.01">
+        </div>
+
       </div>
-      <div class="form-group"><label class="form-label">Артикул</label><input name="sku" class="form-control" value="{{ acc.sku|default:'' }}"></div>
-      <div class="form-group"><label class="form-label">Совместимость</label><input name="compatible_with" class="form-control" value="{{ acc.compatible_with|default:'' }}" placeholder="iPhone 14, Samsung S22..."></div>
-      {% if not acc %}
-      <div class="form-group"><label class="form-label">Начальный остаток</label><input name="quantity" type="number" class="form-control" value="0" min="0"></div>
-      {% endif %}
-      <div class="form-group"><label class="form-label">Мин. остаток</label><input name="min_quantity" type="number" class="form-control" value="{{ acc.min_quantity|default:2 }}" min="0"></div>
-      <div class="form-group"><label class="form-label">Закупочная цена (₽)</label><input name="purchase_price" type="number" class="form-control" value="{{ acc.purchase_price|default:0 }}" step="0.01"></div>
-      <div class="form-group"><label class="form-label">Цена продажи (₽)</label><input name="sale_price" type="number" class="form-control" value="{{ acc.sale_price|default:0 }}" step="0.01"></div>
-    </div>
-    <div class="form-group"><label class="form-label">Примечания</label><textarea name="notes" class="form-control" rows="2">{{ acc.notes|default:'' }}</textarea></div>
-    <div style="display:flex;gap:8px">
-      <button type="submit" class="btn btn-primary">💾 Сохранить</button>
-      <a href="{% url 'crm:accessory_list' %}" class="btn btn-secondary">Отмена</a>
-    </div>
-  </form>
+
+      <div class="mb-5">
+        <label class="text-xs text-slate-400 mb-1 block">Примечания</label>
+        <textarea name="notes" class="input-dark w-full px-3 py-2 text-sm" rows="3">{{ acc.notes|default:'' }}</textarea>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button type="submit" class="btn-primary px-5 py-2 text-sm">Сохранить</button>
+        <a href="{% url 'crm:warehouse_accessories' %}" class="btn-secondary px-5 py-2 text-sm">Отмена</a>
+      </div>
+
+    </form>
+  </div>
 </div>
 {% endblock %}

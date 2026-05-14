@@ -57,6 +57,8 @@ urlpatterns = [
     path('finance/', views.finance, name='finance'),
     path('finance/expense/create/', views.expense_create, name='expense_create'),
     path('finance/payroll/my/', views.payroll_my, name='payroll_my'),
+    path('finance/payroll/<int:employee_pk>/', views.payroll_employee, name='payroll_employee'),
+    path('finance/payroll/<int:employee_pk>/add/', views.payroll_add_record, name='payroll_add_record'),
 
     # Analytics
     path('analytics/', views.analytics, name='analytics'),
@@ -79,6 +81,7 @@ urlpatterns = [
 
     # Documents
     path('documents/', views.document_list, name='document_list'),
+    path('documents/blank/<str:doc_type>/', views.document_blank_print, name='document_blank_print'),
 
     # Call requests
     path('call-requests/', views.call_request_list, name='call_request_list'),
@@ -88,4 +91,11 @@ urlpatterns = [
     path('users/', views.employee_list, name='user_list'),
     path('users/new/', views.employee_create, name='user_create'),
     path('users/<int:pk>/edit/', views.employee_edit, name='user_edit'),
+
+    # Price list editor
+    path('prices/', views.price_list, name='price_list'),
+    path('prices/service/save/', views.price_service_save, name='price_service_save'),
+    path('prices/service/<int:pk>/delete/', views.price_service_delete, name='price_service_delete'),
+    path('prices/model/save/', views.price_model_save, name='price_model_save'),
+    path('prices/model/<int:pk>/delete/', views.price_model_delete, name='price_model_delete'),
 ]

@@ -1,62 +1,171 @@
 {% extends 'crm/base.html' %}
-{% block title %}Документы — Kayros CRM{% endblock %}
+{% block title %}Документы{% endblock %}
 {% block page_title %}Документы{% endblock %}
 
 {% block content %}
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-  {% for doc_type, icon, label, color in doc_types %}
-  <div class="card p-5 hover:border-slate-600 transition-colors cursor-pointer group">
-    <div class="text-3xl mb-3">{{ icon }}</div>
-    <p class="text-sm font-semibold text-slate-200">{{ label }}</p>
-    <p class="text-xs text-slate-500 mt-1">Автозаполнение из заказа</p>
+{% include 'crm/includes/messages.html' %}
+
+<!-- Пустые бланки -->
+<div class="card p-5 mb-6">
+  <p class="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-3">Пустые бланки для печати</p>
+  <div class="flex flex-wrap gap-2">
+    <a href="{% url 'crm:document_blank_print' 'receipt' %}" target="_blank"
+       class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:bg-indigo-600/20 hover:border-indigo-500/40 text-sm transition-all flex items-center gap-1.5">
+      📄 Акт приёма-передачи
+    </a>
+    <a href="{% url 'crm:document_blank_print' 'work_act' %}" target="_blank"
+       class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:bg-blue-600/20 hover:border-blue-500/40 text-sm transition-all flex items-center gap-1.5">
+      🔧 Акт выполненных работ
+    </a>
+    <a href="{% url 'crm:document_blank_print' 'warranty' %}" target="_blank"
+       class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:bg-green-600/20 hover:border-green-500/40 text-sm transition-all flex items-center gap-1.5">
+      🛡 Гарантийный талон
+    </a>
+    <a href="{% url 'crm:document_blank_print' 'refusal' %}" target="_blank"
+       class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:bg-red-600/20 hover:border-red-500/40 text-sm transition-all flex items-center gap-1.5">
+      ❌ Акт отказа от ремонта
+    </a>
+    <a href="{% url 'crm:document_blank_print' 'receipt_sale' %}" target="_blank"
+       class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:bg-yellow-600/20 hover:border-yellow-500/40 text-sm transition-all flex items-center gap-1.5">
+      🧾 Товарный чек
+    </a>
   </div>
+</div>
+
+<!-- Выбор типа документа -->
+<p class="text-xs text-slate-500 uppercase tracking-wide mb-3">1. Выберите тип документа</p>
+<div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+  {% for doc_type, icon, label, color in doc_types %}
+  <button type="button"
+          onclick="selectDocType('{{ doc_type }}')"
+          id="doctype-{{ doc_type }}"
+          class="doc-type-btn card p-4 text-left hover:border-slate-600 transition-all">
+    <div class="text-2xl mb-2">{{ icon }}</div>
+    <p class="text-sm font-semibold text-slate-200 leading-tight">{{ label }}</p>
+    <p class="text-xs text-slate-600 mt-1">нажмите, чтобы выбрать</p>
+  </button>
   {% endfor %}
 </div>
 
-<div class="card">
-  <div class="px-5 py-4 border-b border-slate-800">
-    <h2 class="text-sm font-semibold text-slate-200">Последние заказы — выберите для печати документа</h2>
-  </div>
-  <div class="overflow-x-auto">
-    <table class="w-full text-sm">
-      <thead><tr class="border-b border-slate-800 text-xs text-slate-500 uppercase">
+<!-- Список заказов -->
+<p class="text-xs text-slate-500 uppercase tracking-wide mb-3">
+  2. Выберите заказ
+  <span id="selectedTypeLabel" class="normal-case ml-2 text-indigo-400 font-medium hidden"></span>
+</p>
+
+<div class="card overflow-hidden">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="text-xs text-slate-500 uppercase border-b border-slate-800">
         <th class="text-left px-4 py-3">Номер</th>
         <th class="text-left px-4 py-3">Клиент</th>
-        <th class="text-left px-4 py-3">Устройство</th>
-        <th class="text-left px-4 py-3">Статус</th>
-        <th class="text-left px-4 py-3">Дата</th>
-        <th class="px-4 py-3">Документы</th>
-      </tr></thead>
-      <tbody class="divide-y divide-slate-800/60">
-        {% for order in recent_orders %}
-        <tr class="table-row">
-          <td class="px-4 py-3 font-mono text-indigo-400">{{ order.order_number }}</td>
-          <td class="px-4 py-3 text-slate-200">{{ order.customer.name }}</td>
-          <td class="px-4 py-3 text-slate-400 text-xs">{{ order.brand.name }} {{ order.phone_model.name }}</td>
-          <td class="px-4 py-3"><span class="badge {{ order.status_badge }}">{{ order.get_status_display }}</span></td>
-          <td class="px-4 py-3 text-slate-500 text-xs">{{ order.created_at|date:"d.m.Y" }}</td>
-          <td class="px-4 py-3">
-            <div class="flex gap-2">
-              <a href="{% url 'crm:repair_print' order.pk %}" target="_blank"
-                 class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white text-xs transition-colors" title="Акт приёма">
-                📄 Акт
-              </a>
-              <a href="{% url 'crm:repair_print' order.pk %}?type=warranty" target="_blank"
-                 class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white text-xs transition-colors" title="Гарантийный талон">
-                🛡 Гарантия
-              </a>
-              <a href="{% url 'crm:repair_print' order.pk %}?type=receipt" target="_blank"
-                 class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white text-xs transition-colors" title="Чек">
-                🧾 Чек
-              </a>
-            </div>
-          </td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="6" class="px-4 py-10 text-center text-slate-500">Заказов нет</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+        <th class="text-left px-4 py-3 hidden md:table-cell">Устройство</th>
+        <th class="text-left px-4 py-3 hidden sm:table-cell">Статус</th>
+        <th class="text-left px-4 py-3 hidden lg:table-cell">Дата</th>
+        <th class="px-4 py-3 text-center">Документы</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-800/60">
+      {% for order in recent_orders %}
+      <tr class="hover:bg-slate-800/30 transition-colors">
+        <td class="px-4 py-3 font-mono text-indigo-400 text-xs">{{ order.order_number }}</td>
+        <td class="px-4 py-3 text-slate-200 font-medium">{{ order.customer.name }}</td>
+        <td class="px-4 py-3 text-slate-500 text-xs hidden md:table-cell">
+          {% if order.brand %}{{ order.brand.name }}{% endif %}
+          {% if order.phone_model %}{{ order.phone_model.name }}{% endif %}
+        </td>
+        <td class="px-4 py-3 hidden sm:table-cell">
+          <span class="badge {{ order.status_badge }}">{{ order.get_status_display }}</span>
+        </td>
+        <td class="px-4 py-3 text-slate-500 text-xs hidden lg:table-cell">{{ order.created_at|date:"d.m.Y" }}</td>
+        <td class="px-4 py-3">
+          <div class="flex items-center justify-center gap-1.5 flex-wrap" id="btns-{{ order.pk }}">
+            <a href="{% url 'crm:repair_print' order.pk %}" target="_blank"
+               data-doctype="receipt"
+               class="doc-btn px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-indigo-600/20 hover:border-indigo-500/40 border border-slate-700 text-xs transition-all whitespace-nowrap">
+              📄 Акт
+            </a>
+            <a href="{% url 'crm:repair_print' order.pk %}?type=work_act" target="_blank"
+               data-doctype="work_act"
+               class="doc-btn px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-blue-600/20 hover:border-blue-500/40 border border-slate-700 text-xs transition-all whitespace-nowrap">
+              🔧 Работы
+            </a>
+            <a href="{% url 'crm:repair_print' order.pk %}?type=warranty" target="_blank"
+               data-doctype="warranty"
+               class="doc-btn px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-green-600/20 hover:border-green-500/40 border border-slate-700 text-xs transition-all whitespace-nowrap">
+              🛡 Гарантия
+            </a>
+            <a href="{% url 'crm:repair_print' order.pk %}?type=refusal" target="_blank"
+               data-doctype="refusal"
+               class="doc-btn px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-red-600/20 hover:border-red-500/40 border border-slate-700 text-xs transition-all whitespace-nowrap">
+              ❌ Отказ
+            </a>
+            <a href="{% url 'crm:repair_print' order.pk %}?type=receipt_sale" target="_blank"
+               data-doctype="receipt_sale"
+               class="doc-btn px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-yellow-600/20 hover:border-yellow-500/40 border border-slate-700 text-xs transition-all whitespace-nowrap">
+              🧾 Чек
+            </a>
+          </div>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6">
+          {% include 'crm/includes/empty_state.html' with icon="📄" title="Заказов нет" subtitle="Создайте первый заказ на ремонт" %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const DOC_LABELS = {
+  receipt:      '📄 Акт приёма-передачи',
+  work_act:     '🔧 Акт выполненных работ',
+  warranty:     '🛡 Гарантийный талон',
+  refusal:      '❌ Акт отказа',
+  receipt_sale: '🧾 Товарный чек',
+};
+
+let activeType = null;
+
+function selectDocType(type) {
+  activeType = activeType === type ? null : type;
+
+  // Подсветка карточек
+  document.querySelectorAll('.doc-type-btn').forEach(btn => {
+    btn.classList.remove('border-indigo-500', 'bg-indigo-500/5');
+  });
+  if (activeType) {
+    const active = document.getElementById('doctype-' + activeType);
+    if (active) active.classList.add('border-indigo-500', 'bg-indigo-500/5');
+  }
+
+  // Подпись выбранного типа
+  const label = document.getElementById('selectedTypeLabel');
+  if (activeType) {
+    label.textContent = '— ' + DOC_LABELS[activeType];
+    label.classList.remove('hidden');
+  } else {
+    label.classList.add('hidden');
+  }
+
+  // Показываем/скрываем кнопки
+  document.querySelectorAll('.doc-btn').forEach(btn => {
+    if (!activeType || btn.dataset.doctype === activeType) {
+      btn.classList.remove('hidden');
+      if (activeType) {
+        btn.classList.add('ring-1', 'ring-indigo-500/40', 'text-indigo-300');
+      } else {
+        btn.classList.remove('ring-1', 'ring-indigo-500/40', 'text-indigo-300');
+      }
+    } else {
+      btn.classList.add('hidden');
+    }
+  });
+}
+</script>
 {% endblock %}

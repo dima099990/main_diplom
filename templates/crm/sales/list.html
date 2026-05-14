@@ -1,26 +1,80 @@
 {% extends 'crm/base.html' %}
-{% block title %}Продажи{% endblock %}
-{% block page_title %}Продажи{% endblock %}
+{% block title %}Продажи — Kayros CRM{% endblock %}
+{% block page_title %}Продажи аксессуаров{% endblock %}
+
 {% block content %}
-<div class="page-header">
-  <div><h1>Продажи аксессуаров</h1></div>
-  <a href="{% url 'crm:sale_create' %}" class="btn btn-primary">➕ Новая продажа</a>
+<div class="flex justify-between items-center mb-6">
+  <p class="text-sm text-slate-400">Всего: <span class="text-slate-200 font-medium">{{ sales.paginator.count }}</span></p>
+  <form method="post" action="{% url 'crm:sale_create' %}">
+    {% csrf_token %}
+    <button type="submit" class="btn-primary px-4 py-2 text-sm">+ Новая продажа</button>
+  </form>
 </div>
-<div class="card"><div class="table-wrap"><table>
-  <thead><tr><th>Номер</th><th>Покупатель</th><th>Телефон</th><th>Итого</th><th>Статус</th><th>Сотрудник</th><th>Дата</th></tr></thead>
-  <tbody>
-  {% for s in sales %}
-  <tr onclick="location.href='{% url 'crm:sale_detail' s.pk %}'" style="cursor:pointer">
-    <td class="td-name">{{ s.order_number }}</td>
-    <td>{{ s.customer_name|default:"—" }}</td>
-    <td>{{ s.customer_phone|default:"—" }}</td>
-    <td class="price-tag">{{ s.total|floatformat:0 }} ₽</td>
-    <td>{% if s.is_finalized %}<span class="badge badge-done">Завершена</span>{% else %}<span class="badge badge-new">Черновик</span>{% endif %}</td>
-    <td>{{ s.created_by.get_full_name|default:s.created_by.username }}</td>
-    <td class="text-muted">{{ s.created_at|date:"d.m.Y H:i" }}</td>
-  </tr>
-  {% empty %}<tr><td colspan="7"><div class="empty-state"><div class="icon">🛍</div><p>Продаж нет</p></div></td></tr>
-  {% endfor %}
-  </tbody>
-</table></div></div>
+
+<div class="card">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-slate-800 text-xs text-slate-500 uppercase">
+          <th class="text-left px-4 py-3">Номер</th>
+          <th class="text-left px-4 py-3">Позиций</th>
+          <th class="text-left px-4 py-3">Метод оплаты</th>
+          <th class="text-left px-4 py-3">Статус</th>
+          <th class="text-right px-4 py-3">Итого</th>
+          <th class="text-left px-4 py-3 hidden md:table-cell">Сотрудник</th>
+          <th class="text-left px-4 py-3 hidden md:table-cell">Дата</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-800/60">
+        {% for s in sales %}
+        <tr class="table-row cursor-pointer" onclick="location.href='{% url 'crm:sale_detail' s.pk %}'">
+          <td class="px-4 py-3 font-mono text-indigo-400">{{ s.order_number }}</td>
+          <td class="px-4 py-3 text-slate-300">{{ s.items.count }} шт.</td>
+          <td class="px-4 py-3 text-slate-400 text-xs">
+            {% if s.payment_method == 'cash' %}💵 Наличные
+            {% elif s.payment_method == 'card' %}💳 Карта
+            {% elif s.payment_method == 'transfer' %}📲 Перевод
+            {% else %}{{ s.get_payment_method_display }}{% endif %}
+          </td>
+          <td class="px-4 py-3">
+            {% if s.is_finalized %}
+              <span class="badge bg-green-500/15 text-green-400 border-green-500/20">✓ Завершена</span>
+            {% else %}
+              <span class="badge bg-yellow-500/15 text-yellow-400 border-yellow-500/20">Черновик</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-3 text-right font-semibold text-white">{{ s.total|floatformat:0 }} ₽</td>
+          <td class="px-4 py-3 text-slate-400 text-xs hidden md:table-cell">
+            {% if s.created_by %}{{ s.created_by.get_full_name|default:s.created_by.username }}{% else %}—{% endif %}
+          </td>
+          <td class="px-4 py-3 text-slate-500 text-xs hidden md:table-cell">{{ s.created_at|date:"d.m.Y H:i" }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="px-4 py-16 text-center">
+            <div class="text-4xl mb-3">🛍</div>
+            <p class="text-slate-500 text-sm">Продаж ещё нет</p>
+            <form method="post" action="{% url 'crm:sale_create' %}" class="mt-4 inline-block">
+              {% csrf_token %}
+              <button type="submit" class="btn-primary px-4 py-2 text-sm">Создать первую продажу</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if sales.has_other_pages %}
+  <div class="px-5 py-4 border-t border-slate-800 flex gap-2">
+    {% if sales.has_previous %}
+    <a href="?page={{ sales.previous_page_number }}" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-sm hover:text-white">← Назад</a>
+    {% endif %}
+    <span class="px-3 py-1.5 text-slate-500 text-sm">{{ sales.number }} / {{ sales.paginator.num_pages }}</span>
+    {% if sales.has_next %}
+    <a href="?page={{ sales.next_page_number }}" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-sm hover:text-white">Вперёд →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
 {% endblock %}

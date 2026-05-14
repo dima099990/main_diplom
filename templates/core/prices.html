@@ -1,70 +1,215 @@
 {% extends 'core/base.html' %}
 {% block title %}Прайс-лист — {{ site.company_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ─── Accordion ─── */
+.acc-brand { margin-bottom: 16px; border-radius: 14px; overflow: hidden; border: 1px solid #1e1e1e; }
+.acc-brand-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 24px; background: #181818; cursor: pointer;
+  user-select: none; transition: background .2s;
+}
+.acc-brand-header:hover { background: #1f1f1f; }
+.acc-brand-header h2 { font-size: 22px; font-weight: 800; color: #fff; margin: 0; }
+.acc-brand-header .acc-count { font-size: 12px; color: #555; margin-left: 12px; }
+.acc-brand-header .acc-chevron {
+  font-size: 18px; color: #555; transition: transform .25s; flex-shrink: 0;
+}
+.acc-brand-header.open .acc-chevron { transform: rotate(180deg); }
+
+.acc-brand-body { background: #141414; display: none; }
+.acc-brand-body.open { display: block; }
+
+/* Model accordion */
+.acc-model { border-top: 1px solid #1e1e1e; }
+.acc-model-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 24px; cursor: pointer; user-select: none;
+  background: #141414; transition: background .15s;
+}
+.acc-model-header:hover { background: #191919; }
+.acc-model-header h3 { font-size: 16px; font-weight: 700; color: #e0e0e0; margin: 0; }
+.acc-model-header .acc-svc-count { font-size: 12px; color: #555; margin-left: 10px; }
+.acc-model-header .acc-chevron { font-size: 14px; color: #555; transition: transform .25s; }
+.acc-model-header.open .acc-chevron { transform: rotate(180deg); color: #f24a47; }
+
+.acc-model-body { display: none; }
+.acc-model-body.open { display: block; }
+
+/* Service rows */
+.svc-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 13px 24px; border-top: 1px solid #1a1a1a;
+}
+.svc-row:hover { background: #181818; }
+.svc-name { color: #e0e0e0; font-size: 14px; font-weight: 500; }
+.svc-duration { color: #555; font-size: 12px; margin-top: 2px; }
+.svc-price { color: #f24a47; font-weight: 700; font-size: 16px; white-space: nowrap; }
+
+/* Search bar */
+.prices-search {
+  display: flex; gap: 10px; max-width: 540px; margin: 0 auto 36px;
+}
+.prices-search input {
+  flex: 1; background: #181818; border: 1px solid #2a2a2a; border-radius: 10px;
+  padding: 13px 18px; color: #e0e0e0; font-size: 15px; outline: none; transition: border-color .2s;
+}
+.prices-search input:focus { border-color: #f24a47; }
+.prices-search button {
+  background: #f24a47; color: #fff; border: none; border-radius: 10px;
+  padding: 13px 22px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: opacity .2s;
+}
+.prices-search button:hover { opacity: .85; }
+.prices-search .reset-link {
+  background: #222; color: #888; border: 1px solid #2a2a2a; border-radius: 10px;
+  padding: 13px 16px; text-decoration: none; white-space: nowrap; display: flex; align-items: center;
+}
+.prices-search .reset-link:hover { color: #e0e0e0; }
+
+/* CTA bottom */
+.prices-cta {
+  text-align: center; margin-top: 48px; padding: 36px;
+  background: #141414; border-radius: 14px; border: 1px solid #1e1e1e;
+}
+.prices-cta h3 { color: #fff; margin-bottom: 8px; font-size: 20px; }
+.prices-cta p  { color: #666; margin-bottom: 22px; }
+.prices-cta a  {
+  background: #f24a47; color: #fff; padding: 13px 28px;
+  border-radius: 10px; font-weight: 700; text-decoration: none; display: inline-block;
+}
+.prices-cta a:hover { opacity: .85; }
+
+/* Search result mode: no accordion, flat list */
+.search-brand-title { font-size: 22px; font-weight: 800; color: #fff; margin: 32px 0 12px; }
+.search-model-title { font-size: 16px; font-weight: 700; color: #ccc; margin: 16px 0 6px; padding-left: 4px; }
+</style>
+{% endblock %}
+
 {% block content %}
 <section class="section">
   <div class="container">
     <h1 class="section-title">Прайс-лист на ремонт</h1>
-    <p class="section-subtitle">Выберите марку телефона, модель — и увидите актуальные цены</p>
+    <p class="section-subtitle">Выберите марку и модель — найдите актуальные цены</p>
 
     <!-- Search -->
-    <form method="get" style="display:flex;gap:12px;max-width:500px;margin:0 auto 32px">
-      <input type="text" name="q" value="{{ search_q }}" placeholder="🔍 Поиск по модели или услуге..." 
-        style="flex:1;background:#181818;border:1px solid #2a2a2a;border-radius:8px;padding:12px 16px;color:#e0e0e0;font-size:15px">
-      <button type="submit" style="background:#f24a47;color:#fff;border:none;border-radius:8px;padding:12px 20px;font-weight:700;cursor:pointer">Найти</button>
-      {% if search_q or selected_model %}<a href="/prices/" style="background:#222;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:8px;padding:12px 16px;text-decoration:none;white-space:nowrap">✕ Сбросить</a>{% endif %}
+    <form method="get" class="prices-search">
+      <input type="text" name="q" value="{{ search_q }}" placeholder="🔍 Поиск по модели или услуге...">
+      <button type="submit">Найти</button>
+      {% if search_q or selected_model %}
+      <a href="{% url 'prices' %}" class="reset-link">✕ Сбросить</a>
+      {% endif %}
     </form>
 
-    <!-- Model filter pills -->
-    {% if not search_q %}
-    <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:32px">
-      <a href="/prices/" style="padding:8px 16px;border-radius:100px;font-size:13px;font-weight:600;border:1px solid {% if not selected_model %}#f24a47{% else %}#2a2a2a{% endif %};color:{% if not selected_model %}#f24a47{% else %}#888{% endif %};background:transparent;text-decoration:none">Все</a>
-      {% for m in all_models %}
-      <a href="?model={{ m.id }}" style="padding:8px 16px;border-radius:100px;font-size:13px;font-weight:600;border:1px solid {% if selected_model == m.id|stringformat:'s' %}#f24a47{% else %}#2a2a2a{% endif %};color:{% if selected_model == m.id|stringformat:'s' %}#f24a47{% else %}#888{% endif %};background:transparent;text-decoration:none">{{ m }}</a>
-      {% endfor %}
-    </div>
-    {% endif %}
-
-    <!-- Results -->
     {% if result %}
-    {% for brand_group in result %}
-    <div style="margin-bottom:40px">
-      <h2 style="font-size:24px;font-weight:800;color:#fff;margin-bottom:20px">{{ brand_group.brand.icon }} {{ brand_group.brand.name }}</h2>
-      {% for model_group in brand_group.models %}
-      <div style="background:#141414;border:1px solid #1e1e1e;border-radius:12px;margin-bottom:16px;overflow:hidden">
-        <div style="padding:16px 20px;background:#181818;border-bottom:1px solid #222;display:flex;align-items:center;justify-content:space-between">
-          <h3 style="font-size:18px;font-weight:700;color:#fff">{{ model_group.model.name }}</h3>
-          <span style="font-size:12px;color:#666">{{ model_group.services|length }} услуг</span>
+
+      {% if search_q %}
+      <!-- ── Поиск: плоский список без аккордеона ── -->
+      {% for brand_group in result %}
+        <div class="search-brand-title">{{ brand_group.brand.icon }} {{ brand_group.brand.name }}</div>
+        {% for model_group in brand_group.models %}
+          <div class="search-model-title">{{ model_group.model.name }}</div>
+          <div style="background:#141414;border:1px solid #1e1e1e;border-radius:12px;overflow:hidden;margin-bottom:8px">
+            {% for service in model_group.services %}
+            <div class="svc-row">
+              <div>
+                <div class="svc-name">{{ service.name }}</div>
+                {% if service.duration %}<div class="svc-duration">⏱ {{ service.duration }}</div>{% endif %}
+              </div>
+              <div class="svc-price">{{ service.price_display }}</div>
+            </div>
+            {% endfor %}
+          </div>
+        {% endfor %}
+      {% endfor %}
+
+      {% else %}
+      <!-- ── Аккордеон: бренд → модель ── -->
+      {% for brand_group in result %}
+      <div class="acc-brand">
+
+        <!-- Brand header -->
+        <div class="acc-brand-header" onclick="toggleBrand(this)"
+             {% if forloop.first %}{% endif %}>
+          <div style="display:flex;align-items:center;gap:12px">
+            <h2>{{ brand_group.brand.icon }} {{ brand_group.brand.name }}</h2>
+            <span class="acc-count">{{ brand_group.models|length }} моделей</span>
+          </div>
+          <span class="acc-chevron">▾</span>
         </div>
-        <div style="padding:0">
-          {% for service in model_group.services %}
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #1a1a1a">
-            <div>
-              <div style="color:#e0e0e0;font-size:14px;font-weight:500">{{ service.name }}</div>
-              {% if service.duration %}<div style="color:#555;font-size:12px;margin-top:2px">⏱ {{ service.duration }}</div>{% endif %}
+
+        <!-- Brand body -->
+        <div class="acc-brand-body {% if forloop.first %}open{% endif %}">
+          {% for model_group in brand_group.models %}
+          <div class="acc-model">
+
+            <!-- Model header -->
+            <div class="acc-model-header" onclick="toggleModel(this)">
+              <div style="display:flex;align-items:center;gap:8px">
+                <h3>{{ model_group.model.name }}</h3>
+                <span class="acc-svc-count">{{ model_group.services|length }} услуг</span>
+              </div>
+              <span class="acc-chevron">▾</span>
             </div>
-            <div style="text-align:right">
-              <div style="color:#f24a47;font-weight:700;font-size:16px">{{ service.price_display }}</div>
+
+            <!-- Model body -->
+            <div class="acc-model-body">
+              {% for service in model_group.services %}
+              <div class="svc-row">
+                <div>
+                  <div class="svc-name">{{ service.name }}</div>
+                  {% if service.duration %}<div class="svc-duration">⏱ {{ service.duration }}</div>{% endif %}
+                </div>
+                <div class="svc-price">{{ service.price_display }}</div>
+              </div>
+              {% endfor %}
             </div>
+
           </div>
           {% endfor %}
         </div>
+
       </div>
       {% endfor %}
-    </div>
-    {% endfor %}
+      {% endif %}
+
     {% else %}
-    <div style="text-align:center;padding:60px 0;color:#666">
-      <div style="font-size:48px;margin-bottom:16px">🔍</div>
-      <h3 style="color:#fff;margin-bottom:8px">Ничего не найдено</h3>
-      <p>Попробуйте другой запрос или <a href="/prices/" style="color:#f24a47">сбросьте фильтр</a></p>
+    <div style="text-align:center;padding:72px 0;color:#666">
+      <div style="font-size:52px;margin-bottom:18px">🔍</div>
+      <h3 style="color:#fff;margin-bottom:8px;font-size:20px">Ничего не найдено</h3>
+      <p>Попробуйте другой запрос или <a href="{% url 'prices' %}" style="color:#f24a47">сбросьте фильтр</a></p>
     </div>
     {% endif %}
 
-    <div style="text-align:center;margin-top:40px;padding:32px;background:#141414;border-radius:12px;border:1px solid #1e1e1e">
-      <h3 style="color:#fff;margin-bottom:8px">Не нашли свою модель?</h3>
-      <p style="color:#666;margin-bottom:20px">Оставьте заявку — мы уточним стоимость и свяжемся с вами</p>
-      <a href="/contacts/" class="btn-primary-link" style="background:#f24a47;color:#fff;padding:12px 24px;border-radius:8px;font-weight:700;text-decoration:none">Связаться с нами</a>
+    <div class="prices-cta">
+      <h3>Не нашли свою модель?</h3>
+      <p>Оставьте заявку — мы уточним стоимость и свяжемся с вами</p>
+      <a href="{% url 'contacts' %}">Связаться с нами</a>
     </div>
   </div>
 </section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Open first brand by default
+document.addEventListener('DOMContentLoaded', function () {
+  var firstHeader = document.querySelector('.acc-brand-header');
+  if (firstHeader) firstHeader.classList.add('open');
+});
+
+function toggleBrand(header) {
+  var body = header.nextElementSibling;
+  var isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  header.classList.toggle('open', !isOpen);
+}
+
+function toggleModel(header) {
+  var body = header.nextElementSibling;
+  var isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  header.classList.toggle('open', !isOpen);
+}
+</script>
 {% endblock %}

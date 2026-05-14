@@ -43,7 +43,7 @@
         </span>
         {% endif %}
         {% if task.assigned_to %}
-        <span class="text-xs text-slate-500">👤 {{ task.assigned_to.get_full_name|default:task.assigned_to.username }}</span>
+        <span class="text-xs text-slate-500">👤 {{ task.assigned_to.get_full_name|default:task.assigned_to.username|default:"" }}</span>
         {% endif %}
         {% if task.repair_order %}
         <a href="{% url 'crm:repair_detail' task.repair_order.pk %}" class="text-xs text-indigo-400 hover:text-indigo-300">{{ task.repair_order.order_number }}</a>
