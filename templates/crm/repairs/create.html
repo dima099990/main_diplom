@@ -1,74 +1,195 @@
 {% extends 'crm/base.html' %}
-{% block title %}Новый ремонт{% endblock %}
-{% block page_title %}Новый ремонт{% endblock %}
+{% block title %}Новый заказ — Kayros CRM{% endblock %}
+{% block page_title %}
+  <a href="{% url 'crm:repair_list' %}" class="text-slate-500 hover:text-slate-300 mr-1">Заказы</a>
+  <span class="text-slate-600 mr-1">/</span> Новый заказ
+{% endblock %}
+
 {% block content %}
-<div class="page-header">
-  <div><div class="breadcrumb"><a href="{% url 'crm:repair_list' %}">Ремонты</a><span>›</span>Новый</div><h1>Создать заказ на ремонт</h1></div>
-</div>
-<form method="post">{% csrf_token %}
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-<div>
-  <div class="card" style="margin-bottom:16px">
-    <div class="form-section"><h3>👤 Клиент</h3>
-      <div class="form-grid">
-        <div class="form-group"><label class="form-label">ФИО *</label><input name="customer_name" class="form-control" required></div>
-        <div class="form-group"><label class="form-label">Телефон *</label><input name="customer_phone" class="form-control" required placeholder="+7 (999) 000-00-00"></div>
-        <div class="form-group"><label class="form-label">Email</label><input name="customer_email" type="email" class="form-control"></div>
+<form method="post" class="max-w-4xl mx-auto">
+  {% csrf_token %}
+  <div class="grid md:grid-cols-2 gap-4">
+
+    <!-- Customer -->
+    <div class="card p-5 md:col-span-2">
+      <h2 class="text-sm font-semibold text-slate-200 mb-4">Клиент</h2>
+      <div class="grid md:grid-cols-3 gap-4">
+        <div>
+          <label class="text-xs text-slate-500 mb-1 block">Поиск клиента</label>
+          <input type="text" id="customer-search" placeholder="Начните вводить имя или телефон..."
+                 class="input-dark w-full px-3 py-2 text-sm" autocomplete="off">
+          <input type="hidden" name="customer_id" id="customer-id">
+          <div id="customer-dropdown" class="hidden absolute z-20 bg-slate-800 border border-slate-700 rounded-xl mt-1 w-80 shadow-xl max-h-48 overflow-y-auto"></div>
+          <div id="customer-selected" class="hidden mt-2 p-2 bg-indigo-500/10 border border-indigo-500/20 rounded-lg text-sm text-indigo-300"></div>
+        </div>
+        <div>
+          <label class="text-xs text-slate-500 mb-1 block">ФИО (новый клиент)</label>
+          <input type="text" name="customer_name" placeholder="Иван Иванов" class="input-dark w-full px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="text-xs text-slate-500 mb-1 block">Телефон *</label>
+          <input type="text" name="customer_phone" placeholder="+7 (900) 000-00-00" class="input-dark w-full px-3 py-2 text-sm" required>
+        </div>
       </div>
     </div>
-    <div class="form-section"><h3>📱 Устройство</h3>
-      <div class="form-grid">
-        <div class="form-group"><label class="form-label">Марка *</label>
-          <select name="brand" id="id_brand" class="form-control" required>
-            <option value="">— выберите марку —</option>
-            {% for b in brands %}<option value="{{ b.id }}">{{ b.icon }} {{ b.name }}</option>{% endfor %}
+
+    <!-- Device -->
+    <div class="card p-5">
+      <h2 class="text-sm font-semibold text-slate-200 mb-4">Устройство</h2>
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs text-slate-500 mb-1 block">Бренд *</label>
+          <select name="brand" id="brand-select" class="input-dark w-full px-3 py-2 text-sm" required>
+            <option value="">Выбрать бренд...</option>
+            {% for brand in brands %}
+            <option value="{{ brand.pk }}">{{ brand.emoji }} {{ brand.name }}</option>
+            {% endfor %}
           </select>
         </div>
-        <div class="form-group"><label class="form-label">Модель *</label>
-          <select name="phone_model" id="id_phone_model" class="form-control" required>
-            <option value="">— сначала выберите марку —</option>
+        <div>
+          <label class="text-xs text-slate-500 mb-1 block">Модель *</label>
+          <select name="phone_model" id="model-select" class="input-dark w-full px-3 py-2 text-sm" required disabled>
+            <option value="">Сначала выберите бренд...</option>
           </select>
         </div>
-        <div class="form-group"><label class="form-label">IMEI</label><input name="imei" class="form-control" placeholder="15 цифр"></div>
-        <div class="form-group"><label class="form-label">Пароль устройства</label><input name="device_password" class="form-control"></div>
+        <div>
+          <label class="text-xs text-slate-500 mb-1 block">IMEI / S/N</label>
+          <input type="text" name="imei" placeholder="357901041234567" class="input-dark w-full px-3 py-2 text-sm font-mono">
+        </div>
+        <div>
+          <label class="text-xs text-slate-500 mb-1 block">Пароль устройства</label>
+          <input type="text" name="device_password" placeholder="1234" class="input-dark w-full px-3 py-2 text-sm">
+        </div>
       </div>
-      <div class="form-group"><label class="form-label">Внешний вид / комплектация</label><textarea name="appearance" class="form-control" rows="2" placeholder="Царапины, сколы..."></textarea></div>
-      <div class="form-group"><label class="form-label">Жалоба клиента</label><textarea name="complaint" class="form-control" rows="2" placeholder="Что не работает..."></textarea></div>
     </div>
-    <div><h3 style="color:#fff;font-weight:700;margin-bottom:16px">👨‍🔧 Назначение</h3>
-      <div class="form-grid">
-        <div class="form-group"><label class="form-label">Исполнитель</label>
-          <select name="assigned_to" class="form-control"><option value="">— не назначен —</option>
-            {% for emp in employees %}<option value="{{ emp.id }}">{{ emp.get_full_name|default:emp.username }}</option>{% endfor %}
+
+    <!-- Complaint -->
+    <div class="card p-5">
+      <h2 class="text-sm font-semibold text-slate-200 mb-4">Заявка</h2>
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs text-slate-500 mb-1 block">Неисправность *</label>
+          <textarea name="complaint" rows="3" placeholder="Опишите проблему клиента..." class="input-dark w-full px-3 py-2 text-sm resize-none" required></textarea>
+        </div>
+        <div>
+          <label class="text-xs text-slate-500 mb-1 block">Внешний вид / комплектация</label>
+          <textarea name="appearance" rows="2" placeholder="Царапины на экране, без зарядки..." class="input-dark w-full px-3 py-2 text-sm resize-none"></textarea>
+        </div>
+        <div>
+          <label class="text-xs text-slate-500 mb-1 block">Предварительная стоимость ₽</label>
+          <input type="number" name="estimated_cost" placeholder="0" class="input-dark w-full px-3 py-2 text-sm">
+        </div>
+      </div>
+    </div>
+
+    <!-- Assignment -->
+    <div class="card p-5">
+      <h2 class="text-sm font-semibold text-slate-200 mb-4">Назначение</h2>
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs text-slate-500 mb-1 block">Мастер</label>
+          <select name="assigned_to" class="input-dark w-full px-3 py-2 text-sm">
+            <option value="">Не назначен</option>
+            {% for m in masters %}
+            <option value="{{ m.pk }}">{{ m.get_full_name|default:m.username }}</option>
+            {% endfor %}
           </select>
         </div>
-        <div class="form-group"><label class="form-label">Предв. стоимость (₽)</label><input name="estimated_cost" type="number" class="form-control" value="0"></div>
+        <div>
+          <label class="text-xs text-slate-500 mb-1 block">Филиал</label>
+          <select name="branch" class="input-dark w-full px-3 py-2 text-sm">
+            <option value="">Основной</option>
+            {% for b in branches %}
+            <option value="{{ b.pk }}">{{ b.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-slate-500 mb-1 block">Срок выполнения</label>
+          <input type="date" name="deadline" class="input-dark w-full px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="text-xs text-slate-500 mb-1 block">Гарантия (дней)</label>
+          <input type="number" name="warranty_days" value="90" class="input-dark w-full px-3 py-2 text-sm">
+        </div>
       </div>
-      <div class="form-group"><label class="form-label">Внутренние заметки</label><textarea name="notes" class="form-control" rows="2"></textarea></div>
+    </div>
+
+    <!-- Notes -->
+    <div class="card p-5">
+      <h2 class="text-sm font-semibold text-slate-200 mb-4">Доп. информация</h2>
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs text-slate-500 mb-1 block">Внутренние заметки</label>
+          <textarea name="notes" rows="4" placeholder="Служебные заметки (не видны клиенту)..." class="input-dark w-full px-3 py-2 text-sm resize-none"></textarea>
+        </div>
+      </div>
     </div>
   </div>
-</div>
-<div class="card">
-  <h3 style="color:#fff;font-weight:700;margin-bottom:6px">✅ Проверка функционала при приёмке</h3>
-  <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">✓ работает &nbsp; ✗ не работает &nbsp; ? не проверено</p>
-  <div class="condition-grid">
-  {% for field_name, label in condition_items %}
-  <div class="condition-item">
-    <label>{{ label }}</label>
-    <div class="condition-radios">
-      {% for val, display in condition_states %}
-      <input type="radio" name="cond_{{ field_name }}" value="{{ val }}" id="cond_{{ field_name }}_{{ val }}" class="cond-radio" {% if val == 'na' %}checked{% endif %}>
-      <label for="cond_{{ field_name }}_{{ val }}" class="cond-label">{% if val == 'ok' %}✓{% elif val == 'broken' %}✗{% else %}?{% endif %}</label>
-      {% endfor %}
-    </div>
+
+  <div class="flex gap-3 mt-4">
+    <button type="submit" class="btn-primary px-6 py-2.5 text-sm">Создать заказ</button>
+    <a href="{% url 'crm:repair_list' %}" class="btn-secondary px-6 py-2.5 text-sm">Отмена</a>
   </div>
-  {% endfor %}
-  </div>
-</div>
-</div>
-<div style="margin-top:20px;display:flex;gap:12px">
-  <button type="submit" class="btn btn-primary btn-lg">✅ Создать заказ</button>
-  <a href="{% url 'crm:repair_list' %}" class="btn btn-secondary btn-lg">Отмена</a>
-</div>
 </form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Load models on brand change
+document.getElementById('brand-select').addEventListener('change', function() {
+  const brandId = this.value;
+  const modelSel = document.getElementById('model-select');
+  modelSel.innerHTML = '<option value="">Загрузка...</option>';
+  modelSel.disabled = true;
+  if (!brandId) return;
+  fetch(`/api/models/${brandId}/`)
+    .then(r => r.json())
+    .then(data => {
+      modelSel.innerHTML = '<option value="">Выбрать модель...</option>';
+      data.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id; opt.textContent = m.name;
+        modelSel.appendChild(opt);
+      });
+      modelSel.disabled = false;
+    });
+});
+
+// Customer autocomplete
+const searchInput = document.getElementById('customer-search');
+const dropdown = document.getElementById('customer-dropdown');
+let searchTimer;
+searchInput.addEventListener('input', function() {
+  clearTimeout(searchTimer);
+  const q = this.value.trim();
+  if (q.length < 2) { dropdown.classList.add('hidden'); return; }
+  searchTimer = setTimeout(() => {
+    fetch(`{% url 'crm:customer_search_api' %}?q=${encodeURIComponent(q)}`)
+      .then(r => r.json())
+      .then(data => {
+        dropdown.innerHTML = '';
+        if (!data.length) {
+          dropdown.innerHTML = '<div class="px-4 py-3 text-sm text-slate-500">Не найдено — будет создан новый клиент</div>';
+        } else {
+          data.forEach(c => {
+            const div = document.createElement('div');
+            div.className = 'px-4 py-3 cursor-pointer hover:bg-slate-700 text-sm';
+            div.innerHTML = `<span class="text-slate-200 font-medium">${c.name}</span> <span class="text-slate-500">${c.phone}</span>`;
+            div.addEventListener('click', () => {
+              document.getElementById('customer-id').value = c.id;
+              document.getElementById('customer-selected').textContent = `✓ ${c.name} — ${c.phone}`;
+              document.getElementById('customer-selected').classList.remove('hidden');
+              searchInput.value = c.name;
+              dropdown.classList.add('hidden');
+            });
+            dropdown.appendChild(div);
+          });
+        }
+        dropdown.classList.remove('hidden');
+      });
+  }, 300);
+});
+document.addEventListener('click', e => { if (!searchInput.contains(e.target)) dropdown.classList.add('hidden'); });
+</script>
 {% endblock %}

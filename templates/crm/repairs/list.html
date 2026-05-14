@@ -1,35 +1,179 @@
 {% extends 'crm/base.html' %}
-{% block title %}Ремонты{% endblock %}
-{% block page_title %}Ремонты{% endblock %}
+{% block title %}Заказы — Kayros CRM{% endblock %}
+{% block page_title %}Заказы на ремонт{% endblock %}
+
 {% block content %}
-<div class="page-header">
-  <div><h1>Ремонты</h1></div>
-  <a href="{% url 'crm:repair_create' %}" class="btn btn-primary">➕ Новый ремонт</a>
-</div>
-<div class="filter-bar">
-  <form method="get" style="display:flex;gap:8px;flex-wrap:wrap">
-    <input type="text" name="q" value="{{ q }}" placeholder="Поиск по номеру, клиенту...">
-    <select name="status" onchange="this.form.submit()">
-      <option value="">Все статусы</option>
-      {% for val,label in status_choices %}<option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
-    </select>
-    <button type="submit" class="btn btn-secondary btn-sm">Найти</button>
-    {% if q or status_filter %}<a href="{% url 'crm:repair_list' %}" class="btn btn-secondary btn-sm">✕</a>{% endif %}
+<!-- Filters -->
+<div class="card p-4 mb-4">
+  <form method="get" class="flex flex-wrap gap-3 items-end">
+    <div class="flex-1 min-w-[200px]">
+      <input type="text" name="q" value="{{ request.GET.q }}" placeholder="Поиск по номеру, клиенту, IMEI..."
+             class="input-dark w-full px-3 py-2 text-sm">
+    </div>
+    <div>
+      <select name="status" class="input-dark px-3 py-2 text-sm">
+        <option value="">Все статусы</option>
+        {% for val, label in status_choices %}
+        <option value="{{ val }}" {% if request.GET.status == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <select name="master" class="input-dark px-3 py-2 text-sm">
+        <option value="">Все мастера</option>
+        {% for m in masters %}
+        <option value="{{ m.pk }}" {% if request.GET.master == m.pk|stringformat:"s" %}selected{% endif %}>{{ m.get_full_name|default:m.username }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <select name="branch" class="input-dark px-3 py-2 text-sm">
+        <option value="">Все филиалы</option>
+        {% for b in branches %}
+        <option value="{{ b.pk }}" {% if request.GET.branch == b.pk|stringformat:"s" %}selected{% endif %}>{{ b.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <input type="date" name="date_from" value="{{ request.GET.date_from }}" class="input-dark px-3 py-2 text-sm">
+    </div>
+    <div>
+      <input type="date" name="date_to" value="{{ request.GET.date_to }}" class="input-dark px-3 py-2 text-sm">
+    </div>
+    <button type="submit" class="btn-primary px-4 py-2 text-sm">Применить</button>
+    <a href="{% url 'crm:repair_list' %}" class="btn-secondary px-4 py-2 text-sm">Сбросить</a>
+    <a href="{% url 'crm:repair_create' %}" class="btn-primary px-4 py-2 text-sm ml-auto flex items-center gap-1.5">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Новый заказ
+    </a>
   </form>
 </div>
-<div class="card"><div class="table-wrap"><table>
-  <thead><tr><th>Номер</th><th>Клиент</th><th>Телефон</th><th>Устройство</th><th>Статус</th><th>Исполнитель</th><th>Стоимость</th><th>Дата</th></tr></thead>
-  <tbody>
-  {% for r in repairs %}
-  <tr onclick="location.href='{% url 'crm:repair_detail' r.pk %}'" style="cursor:pointer">
-    <td class="td-name">{{ r.order_number }}</td><td>{{ r.customer.name }}</td><td>{{ r.customer.phone }}</td>
-    <td>{{ r.phone_model }}</td><td><span class="badge badge-{{ r.status }}">{{ r.get_status_display }}</span></td>
-    <td>{{ r.assigned_to.get_full_name|default:r.assigned_to.username|default:"—" }}</td>
-    <td class="price-tag">{% if r.final_cost %}{{ r.final_cost|floatformat:0 }} ₽{% else %}—{% endif %}</td>
-    <td class="text-muted">{{ r.created_at|date:"d.m.Y H:i" }}</td>
-  </tr>
-  {% empty %}<tr><td colspan="8"><div class="empty-state"><div class="icon">🔧</div><p>Ремонтов не найдено</p></div></td></tr>
+
+<!-- Status tabs -->
+<div class="flex gap-2 mb-4 overflow-x-auto pb-1">
+  <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}"
+     class="px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors
+     {% if not request.GET.status %}bg-indigo-600 text-white{% else %}bg-slate-800 text-slate-400 hover:text-slate-200{% endif %}">
+    Все ({{ total_count }})
+  </a>
+  {% for val, label, count in status_tabs %}
+  <a href="?status={{ val }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}"
+     class="px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors
+     {% if request.GET.status == val %}bg-indigo-600 text-white{% else %}bg-slate-800 text-slate-400 hover:text-slate-200{% endif %}">
+    {{ label }} ({{ count }})
+  </a>
   {% endfor %}
-  </tbody>
-</table></div></div>
+</div>
+
+<!-- Table -->
+<div class="card overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-slate-800 text-xs text-slate-500 uppercase tracking-wide">
+          <th class="text-left px-4 py-3 font-medium">Номер</th>
+          <th class="text-left px-4 py-3 font-medium">Статус</th>
+          <th class="text-left px-4 py-3 font-medium">Срок</th>
+          <th class="text-left px-4 py-3 font-medium">Клиент</th>
+          <th class="text-left px-4 py-3 font-medium">Устройство</th>
+          <th class="text-left px-4 py-3 font-medium hidden lg:table-cell">Неисправность</th>
+          <th class="text-left px-4 py-3 font-medium hidden md:table-cell">Мастер</th>
+          <th class="text-right px-4 py-3 font-medium">Сумма</th>
+          <th class="text-right px-4 py-3 font-medium hidden lg:table-cell">Прибыль</th>
+          <th class="text-left px-4 py-3 font-medium hidden xl:table-cell">Дата</th>
+          <th class="px-4 py-3"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-800/60">
+        {% for order in orders %}
+        <tr class="table-row group">
+          <td class="px-4 py-3">
+            <a href="{% url 'crm:repair_detail' order.pk %}" class="font-mono font-medium text-indigo-400 hover:text-indigo-300">
+              {{ order.order_number }}
+            </a>
+            {% if order.is_overdue %}<span class="ml-1 text-red-400 text-xs">⚠</span>{% endif %}
+          </td>
+          <td class="px-4 py-3">
+            <span class="badge {{ order.status_badge }}">{{ order.get_status_display }}</span>
+          </td>
+          <td class="px-4 py-3 text-slate-400 text-xs">
+            {% if order.deadline %}
+              <span class="{% if order.is_overdue %}text-red-400{% endif %}">{{ order.deadline|date:"d.m.Y" }}</span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="px-4 py-3">
+            <div class="font-medium text-slate-200">{{ order.customer.name }}</div>
+            <div class="text-xs text-slate-500">{{ order.customer.phone }}</div>
+          </td>
+          <td class="px-4 py-3">
+            <div class="text-slate-300">{{ order.brand.name }}</div>
+            <div class="text-xs text-slate-500">{{ order.phone_model.name }}</div>
+          </td>
+          <td class="px-4 py-3 hidden lg:table-cell text-slate-400 max-w-[200px] truncate">
+            {{ order.complaint|truncatechars:50 }}
+          </td>
+          <td class="px-4 py-3 hidden md:table-cell text-slate-400 text-xs">
+            {{ order.assigned_to.get_full_name|default:order.assigned_to.username|default:"—" }}
+          </td>
+          <td class="px-4 py-3 text-right font-semibold text-white">
+            {{ order.final_cost|floatformat:0 }} ₽
+            {% if order.is_paid %}<span class="block text-xs text-green-400">✓ оплачен</span>{% endif %}
+          </td>
+          <td class="px-4 py-3 text-right hidden lg:table-cell">
+            <span class="{% if order.profit > 0 %}text-green-400{% else %}text-red-400{% endif %} font-medium">
+              {{ order.profit|floatformat:0 }} ₽
+            </span>
+          </td>
+          <td class="px-4 py-3 hidden xl:table-cell text-slate-500 text-xs">
+            {{ order.created_at|date:"d.m.Y H:i" }}
+          </td>
+          <td class="px-4 py-3">
+            <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
+              <a href="{% url 'crm:repair_detail' order.pk %}" class="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white" title="Открыть">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              </a>
+              <a href="{% url 'crm:repair_print' order.pk %}" target="_blank" class="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white" title="Печать">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="11" class="px-4 py-16 text-center text-slate-500">
+            <div class="text-4xl mb-3">📋</div>
+            <p class="text-slate-400 font-medium">Заказы не найдены</p>
+            <p class="text-sm mt-1">Попробуйте изменить фильтры или <a href="{% url 'crm:repair_create' %}" class="text-indigo-400 hover:underline">создайте новый заказ</a></p>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if orders.has_other_pages %}
+  <div class="flex items-center justify-between px-4 py-3 border-t border-slate-800">
+    <p class="text-sm text-slate-500">Показано {{ orders.start_index }}–{{ orders.end_index }} из {{ orders.paginator.count }}</p>
+    <div class="flex gap-1">
+      {% if orders.has_previous %}
+      <a href="?page={{ orders.previous_page_number }}{% for k,v in request.GET.items %}{% if k != 'page' %}&{{ k }}={{ v }}{% endif %}{% endfor %}"
+         class="btn-secondary px-3 py-1.5 text-sm">←</a>
+      {% endif %}
+      {% for num in orders.paginator.page_range %}
+      {% if orders.number == num %}
+      <span class="btn-primary px-3 py-1.5 text-sm">{{ num }}</span>
+      {% elif num|add:"-2" <= orders.number and num|add:"2" >= orders.number %}
+      <a href="?page={{ num }}{% for k,v in request.GET.items %}{% if k != 'page' %}&{{ k }}={{ v }}{% endif %}{% endfor %}"
+         class="btn-secondary px-3 py-1.5 text-sm">{{ num }}</a>
+      {% endif %}
+      {% endfor %}
+      {% if orders.has_next %}
+      <a href="?page={{ orders.next_page_number }}{% for k,v in request.GET.items %}{% if k != 'page' %}&{{ k }}={{ v }}{% endif %}{% endfor %}"
+         class="btn-secondary px-3 py-1.5 text-sm">→</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
 {% endblock %}

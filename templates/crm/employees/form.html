@@ -1,0 +1,95 @@
+{% extends 'crm/base.html' %}
+{% block title %}{% if employee %}Редактировать{% else %}Новый сотрудник{% endif %} — Kayros CRM{% endblock %}
+{% block page_title %}
+  <a href="{% url 'crm:employee_list' %}" class="text-slate-500 hover:text-slate-300 mr-1">Сотрудники</a>
+  <span class="text-slate-600 mr-1">/</span>
+  {% if employee %}{{ employee.get_full_name }}{% else %}Новый сотрудник{% endif %}
+{% endblock %}
+
+{% block content %}
+<form method="post" class="max-w-2xl">
+  {% csrf_token %}
+  <div class="space-y-4">
+    <div class="card p-5">
+      <h2 class="text-sm font-semibold text-slate-200 mb-4">Личные данные</h2>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Имя *</label>
+          <input type="text" name="first_name" value="{{ employee.first_name|default:'' }}" class="input-dark w-full px-3 py-2 text-sm" required>
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Фамилия *</label>
+          <input type="text" name="last_name" value="{{ employee.last_name|default:'' }}" class="input-dark w-full px-3 py-2 text-sm" required>
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Email</label>
+          <input type="email" name="email" value="{{ employee.email|default:'' }}" class="input-dark w-full px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Телефон</label>
+          <input type="text" name="phone" value="{{ profile.phone|default:'' }}" class="input-dark w-full px-3 py-2 text-sm">
+        </div>
+        {% if not employee %}
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Логин *</label>
+          <input type="text" name="username" class="input-dark w-full px-3 py-2 text-sm" required>
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Пароль *</label>
+          <input type="password" name="password" class="input-dark w-full px-3 py-2 text-sm" required>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card p-5">
+      <h2 class="text-sm font-semibold text-slate-200 mb-4">Роль и доступ</h2>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Роль *</label>
+          <select name="role" class="input-dark w-full px-3 py-2 text-sm">
+            {% for val, label in roles %}
+            <option value="{{ val }}" {% if profile.role == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Филиал</label>
+          <select name="branch" class="input-dark w-full px-3 py-2 text-sm">
+            <option value="">Не назначен</option>
+            {% for b in branches %}
+            <option value="{{ b.pk }}" {% if profile.branch_id == b.pk %}selected{% endif %}>{{ b.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-5">
+      <h2 class="text-sm font-semibold text-slate-200 mb-4">Зарплата</h2>
+      <div class="grid md:grid-cols-3 gap-4">
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Оклад ₽</label>
+          <input type="number" name="base_salary" value="{{ profile.base_salary|default:'0' }}" class="input-dark w-full px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">% с ремонтов</label>
+          <input type="number" name="repair_percent" value="{{ profile.repair_percent|default:'0' }}" step="0.5" min="0" max="100" class="input-dark w-full px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">% с аксессуаров</label>
+          <input type="number" name="accessory_percent" value="{{ profile.accessory_percent|default:'0' }}" step="0.5" min="0" max="100" class="input-dark w-full px-3 py-2 text-sm">
+        </div>
+      </div>
+      <p class="text-xs text-slate-500 mt-3">Процент начисляется автоматически при оплате заказа или продажи</p>
+    </div>
+  </div>
+
+  <div class="flex gap-3 mt-4">
+    <button type="submit" class="btn-primary px-6 py-2.5 text-sm">
+      {% if employee %}Сохранить{% else %}Создать сотрудника{% endif %}
+    </button>
+    <a href="{% url 'crm:employee_list' %}" class="btn-secondary px-6 py-2.5 text-sm">Отмена</a>
+  </div>
+</form>
+{% endblock %}

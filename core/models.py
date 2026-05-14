@@ -14,6 +14,25 @@ class SiteSettings(models.Model):
     yandex_map_embed = models.TextField("Код встраивания Яндекс.Карты", blank=True)
     google_map_embed = models.TextField("Код встраивания Google Maps", blank=True)
     warranty_days = models.PositiveIntegerField("Гарантия (дней)", default=90)
+    # Legal info
+    inn = models.CharField("ИНН", max_length=20, blank=True)
+    kpp = models.CharField("КПП", max_length=20, blank=True)
+    ogrn = models.CharField("ОГРН / ОГРНИП", max_length=20, blank=True)
+    director_name = models.CharField("ФИО директора", max_length=200, blank=True)
+    email = models.EmailField("Email", blank=True)
+    website = models.URLField("Сайт", blank=True)
+    telegram = models.CharField("Telegram", max_length=100, blank=True)
+    whatsapp = models.CharField("WhatsApp", max_length=50, blank=True)
+    legal_address = models.TextField("Юридический адрес", blank=True)
+    actual_address = models.TextField("Фактический адрес", blank=True)
+    # Bank
+    bank_name = models.CharField("Банк", max_length=200, blank=True)
+    bik = models.CharField("БИК", max_length=20, blank=True)
+    account_number = models.CharField("Расчётный счёт", max_length=30, blank=True)
+    corr_account = models.CharField("Корр. счёт", max_length=30, blank=True)
+    # Branding
+    logo = models.ImageField("Логотип", upload_to='settings/', blank=True, null=True)
+    stamp = models.ImageField("Печать", upload_to='settings/', blank=True, null=True)
 
     class Meta:
         verbose_name = "Настройки сайта"
@@ -32,6 +51,7 @@ class Brand(models.Model):
     """Марка телефона: Apple, Samsung, Xiaomi..."""
     name = models.CharField("Название", max_length=100)
     icon = models.CharField("Эмодзи", max_length=10, default="📱")
+    emoji = models.CharField("Эмодзи (alias)", max_length=10, default="📱")
     order = models.PositiveIntegerField("Порядок", default=0)
     is_active = models.BooleanField("Активна", default=True)
 

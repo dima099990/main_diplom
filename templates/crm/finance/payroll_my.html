@@ -1,0 +1,78 @@
+{% extends 'crm/base.html' %}
+{% block title %}Моя зарплата — Kayros CRM{% endblock %}
+{% block page_title %}Моя зарплата{% endblock %}
+
+{% block content %}
+<!-- Period selector -->
+<div class="flex gap-3 mb-6 items-center flex-wrap">
+  {% for m in month_range %}
+  <a href="?year={{ m.year }}&month={{ m.month }}"
+     class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap
+     {% if m.year == year and m.month == month %}bg-indigo-600 text-white{% else %}bg-slate-800 text-slate-400 hover:text-slate-200{% endif %}">
+    {{ m.label }}
+  </a>
+  {% endfor %}
+</div>
+
+<!-- Summary -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+  <div class="card p-5">
+    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Начислено</p>
+    <p class="text-3xl font-bold text-green-400">{{ income|floatformat:0 }} ₽</p>
+  </div>
+  <div class="card p-5">
+    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Штрафы</p>
+    <p class="text-3xl font-bold text-red-400">{{ penalty|floatformat:0 }} ₽</p>
+  </div>
+  <div class="card p-5 border-indigo-500/30">
+    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Итого к выплате</p>
+    <p class="text-3xl font-bold text-white">{{ net|floatformat:0 }} ₽</p>
+    <p class="text-xs text-slate-500 mt-1">{{ month }}/{{ year }}</p>
+  </div>
+</div>
+
+<!-- Breakdown -->
+<div class="card">
+  <div class="px-5 py-4 border-b border-slate-800">
+    <h2 class="text-sm font-semibold text-slate-200">Детализация начислений</h2>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead><tr class="border-b border-slate-800 text-xs text-slate-500 uppercase">
+        <th class="text-left px-4 py-3">Дата</th>
+        <th class="text-left px-4 py-3">Тип</th>
+        <th class="text-left px-4 py-3">Описание</th>
+        <th class="text-left px-4 py-3">Заказ</th>
+        <th class="text-right px-4 py-3">Сумма</th>
+      </tr></thead>
+      <tbody class="divide-y divide-slate-800/60">
+        {% for r in records %}
+        <tr class="table-row">
+          <td class="px-4 py-3 text-slate-500 text-xs">{{ r.created_at|date:"d.m.Y" }}</td>
+          <td class="px-4 py-3">
+            <span class="badge {% if r.record_type == 'penalty' %}bg-red-500/15 text-red-400 border-red-500/20{% else %}bg-green-500/15 text-green-400 border-green-500/20{% endif %}">
+              {{ r.get_record_type_display }}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-slate-300">{{ r.description|default:"—" }}</td>
+          <td class="px-4 py-3">
+            {% if r.repair_order %}
+            <a href="{% url 'crm:repair_detail' r.repair_order.pk %}" class="text-indigo-400 hover:text-indigo-300 font-mono text-xs">
+              {{ r.repair_order.order_number }}
+            </a>
+            {% else %}—{% endif %}
+          </td>
+          <td class="px-4 py-3 text-right font-semibold {% if r.record_type == 'penalty' %}text-red-400{% else %}text-green-400{% endif %}">
+            {% if r.record_type == 'penalty' %}−{% else %}+{% endif %}{{ r.amount|floatformat:0 }} ₽
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="px-4 py-12 text-center text-slate-500">
+          Нет начислений за {{ month }}/{{ year }}
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

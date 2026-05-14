@@ -1,0 +1,40 @@
+{% extends 'crm/base.html' %}
+{% block title %}Уведомления — Kayros CRM{% endblock %}
+{% block page_title %}Уведомления{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl">
+  <div class="card divide-y divide-slate-800">
+    {% for n in notifications %}
+    <div class="flex items-start gap-4 px-5 py-4 {% if not n.is_read %}bg-indigo-500/5{% endif %}">
+      <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5
+        {% if n.notification_type == 'order_ready' %}bg-green-500/20 text-green-400
+        {% elif n.notification_type == 'order_overdue' %}bg-red-500/20 text-red-400
+        {% elif n.notification_type == 'low_stock' %}bg-yellow-500/20 text-yellow-400
+        {% elif n.notification_type == 'payment' %}bg-emerald-500/20 text-emerald-400
+        {% else %}bg-indigo-500/20 text-indigo-400{% endif %}">
+        {% if n.notification_type == 'order_ready' %}✓
+        {% elif n.notification_type == 'order_overdue' %}⚠
+        {% elif n.notification_type == 'low_stock' %}📦
+        {% elif n.notification_type == 'payment' %}💰
+        {% else %}🔔{% endif %}
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-medium text-slate-200">{{ n.title }}</p>
+        {% if n.message %}<p class="text-xs text-slate-500 mt-0.5">{{ n.message }}</p>{% endif %}
+        <p class="text-xs text-slate-600 mt-1">{{ n.created_at|date:"d.m.Y H:i" }}</p>
+      </div>
+      {% if not n.is_read %}
+      <div class="w-2 h-2 bg-indigo-500 rounded-full mt-2 flex-shrink-0"></div>
+      {% endif %}
+    </div>
+    {% empty %}
+    <div class="px-5 py-16 text-center">
+      <p class="text-4xl mb-3">🔔</p>
+      <p class="text-slate-400 font-medium">Нет уведомлений</p>
+      <p class="text-slate-500 text-sm mt-1">Уведомления появятся здесь</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

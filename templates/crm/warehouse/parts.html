@@ -1,60 +1,140 @@
 {% extends 'crm/base.html' %}
-{% block title %}Запчасти{% endblock %}
+{% block title %}Склад — Запчасти{% endblock %}
 {% block page_title %}Склад — Запчасти{% endblock %}
+
 {% block content %}
-<div class="page-header">
-  <div><h1>🔩 Запчасти</h1></div>
-  <div style="display:flex;gap:8px">
-    <a href="{% url 'crm:stock_movements' %}" class="btn btn-secondary">📊 История движений</a>
-    <a href="{% url 'crm:part_create' %}" class="btn btn-primary">➕ Добавить запчасть</a>
+<!-- Tabs -->
+<div class="flex gap-2 mb-4 overflow-x-auto pb-1">
+  <a href="{% url 'crm:warehouse_parts' %}" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white whitespace-nowrap">Запчасти</a>
+  <a href="{% url 'crm:warehouse_accessories' %}" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-800 text-slate-400 hover:text-slate-200 whitespace-nowrap">Аксессуары</a>
+  <a href="{% url 'crm:stock_movements' %}" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-800 text-slate-400 hover:text-slate-200 whitespace-nowrap">Движения</a>
+  <a href="{% url 'crm:supplier_list' %}" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-800 text-slate-400 hover:text-slate-200 whitespace-nowrap">Поставщики</a>
+</div>
+
+<!-- KPI -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+  <div class="card p-4">
+    <p class="text-xs text-slate-500 mb-1">Всего позиций</p>
+    <p class="text-2xl font-bold text-white">{{ stats.total_parts }}</p>
+  </div>
+  <div class="card p-4">
+    <p class="text-xs text-slate-500 mb-1">Стоимость склада</p>
+    <p class="text-2xl font-bold text-white">{{ stats.stock_value|floatformat:0 }} ₽</p>
+  </div>
+  <div class="card p-4">
+    <p class="text-xs text-slate-500 mb-1">Низкий остаток</p>
+    <p class="text-2xl font-bold text-yellow-400">{{ stats.low_stock }}</p>
+  </div>
+  <div class="card p-4">
+    <p class="text-xs text-slate-500 mb-1">Нет в наличии</p>
+    <p class="text-2xl font-bold text-red-400">{{ stats.out_of_stock }}</p>
   </div>
 </div>
-<div class="filter-bar">
-  <form method="get" style="display:flex;gap:8px;flex-wrap:wrap">
-    <input type="text" name="q" value="{{ q }}" placeholder="Поиск по названию, артикулу...">
-    <select name="brand" onchange="this.form.submit()">
-      <option value="">Все марки</option>
-      {% for b in brands %}<option value="{{ b.id }}" {% if brand_filter == b.id|stringformat:'s' %}selected{% endif %}>{{ b.name }}</option>{% endfor %}
-    </select>
-    <button type="submit" class="btn btn-secondary btn-sm">Найти</button>
+
+<!-- Filters + Add -->
+<div class="card p-4 mb-4">
+  <form method="get" class="flex flex-wrap gap-3 items-end">
+    <div class="flex-1 min-w-[200px]">
+      <input type="text" name="q" value="{{ request.GET.q }}" placeholder="Поиск по названию, артикулу..."
+             class="input-dark w-full px-3 py-2 text-sm">
+    </div>
+    <div>
+      <select name="brand" class="input-dark px-3 py-2 text-sm">
+        <option value="">Все бренды</option>
+        {% for b in brands %}
+        <option value="{{ b.pk }}" {% if request.GET.brand == b.pk|stringformat:"s" %}selected{% endif %}>{{ b.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <select name="stock" class="input-dark px-3 py-2 text-sm">
+        <option value="">Все остатки</option>
+        <option value="low" {% if request.GET.stock == 'low' %}selected{% endif %}>Низкий остаток</option>
+        <option value="out" {% if request.GET.stock == 'out' %}selected{% endif %}>Нет в наличии</option>
+      </select>
+    </div>
+    <button type="submit" class="btn-primary px-4 py-2 text-sm">Найти</button>
+    <a href="{% url 'crm:warehouse_parts' %}" class="btn-secondary px-4 py-2 text-sm">Сбросить</a>
+    <a href="{% url 'crm:part_create' %}" class="btn-primary px-4 py-2 text-sm ml-auto flex items-center gap-1.5">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Добавить запчасть
+    </a>
   </form>
 </div>
-<div class="card"><div class="table-wrap"><table>
-  <thead><tr><th>Название</th><th>Марка / Модель</th><th>Артикул</th><th>На складе</th><th>Мин.</th><th>Закуп.</th><th>Продажа</th><th>Действия</th></tr></thead>
-  <tbody>
-  {% for p in parts %}
-  <tr>
-    <td class="td-name">{{ p.name }}</td>
-    <td class="text-muted">{{ p.phone_model|default:p.brand|default:"—" }}</td>
-    <td class="text-muted">{{ p.sku|default:"—" }}</td>
-    <td>
-      <span class="{% if p.is_out_of_stock %}stock-danger{% elif p.is_low_stock %}stock-warning{% endif %}">
-        {{ p.quantity }} шт.
-      </span>
-      {% if p.is_out_of_stock %}<span class="badge badge-out" style="margin-left:4px">нет</span>
-      {% elif p.is_low_stock %}<span class="badge badge-low" style="margin-left:4px">мало</span>{% endif %}
-    </td>
-    <td class="text-muted">{{ p.min_quantity }}</td>
-    <td class="text-muted">{{ p.purchase_price|floatformat:0 }} ₽</td>
-    <td class="price-tag">{{ p.sale_price|floatformat:0 }} ₽</td>
-    <td>
-      <div style="display:flex;gap:4px">
-        <form method="post" action="{% url 'crm:part_stock_in' p.pk %}" style="display:inline-flex;gap:4px">
-          {% csrf_token %}
-          <input name="quantity" type="number" value="1" min="1" style="width:50px;background:var(--dark-4);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:3px 6px;font-size:12px">
-          <button type="submit" class="btn btn-success btn-sm" title="Прийомка">+</button>
-        </form>
-        <form method="post" action="{% url 'crm:part_stock_out' p.pk %}" style="display:inline-flex;gap:4px">
-          {% csrf_token %}
-          <input name="quantity" type="number" value="1" min="1" style="width:50px;background:var(--dark-4);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:3px 6px;font-size:12px">
-          <button type="submit" class="btn btn-danger btn-sm" title="Списание">−</button>
-        </form>
-        <a href="{% url 'crm:part_edit' p.pk %}" class="btn btn-secondary btn-sm">✏️</a>
-      </div>
-    </td>
-  </tr>
-  {% empty %}<tr><td colspan="8"><div class="empty-state"><div class="icon">🔩</div><p>Запчастей нет</p></div></td></tr>
-  {% endfor %}
-  </tbody>
-</table></div></div>
+
+<!-- Table -->
+<div class="card overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-slate-800 text-xs text-slate-500 uppercase tracking-wide">
+          <th class="text-left px-4 py-3 font-medium">Название</th>
+          <th class="text-left px-4 py-3 font-medium hidden md:table-cell">Бренд / Модель</th>
+          <th class="text-left px-4 py-3 font-medium hidden lg:table-cell">Артикул</th>
+          <th class="text-right px-4 py-3 font-medium">Кол-во</th>
+          <th class="text-right px-4 py-3 font-medium hidden md:table-cell">Закупка</th>
+          <th class="text-right px-4 py-3 font-medium">Продажа</th>
+          <th class="text-left px-4 py-3 font-medium hidden lg:table-cell">Поставщик</th>
+          <th class="px-4 py-3"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-800/60">
+        {% for part in parts %}
+        <tr class="table-row group">
+          <td class="px-4 py-3">
+            <p class="font-medium text-slate-200">{{ part.name }}</p>
+            {% if part.is_out_of_stock %}
+            <span class="badge bg-red-500/15 text-red-400 border-red-500/20 text-xs">Нет в наличии</span>
+            {% elif part.is_low_stock %}
+            <span class="badge bg-yellow-500/15 text-yellow-400 border-yellow-500/20 text-xs">Мало</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-3 hidden md:table-cell text-slate-400 text-xs">
+            {{ part.brand.name|default:"—" }}<br>{{ part.phone_model.name|default:"—" }}
+          </td>
+          <td class="px-4 py-3 hidden lg:table-cell text-slate-500 font-mono text-xs">{{ part.sku|default:"—" }}</td>
+          <td class="px-4 py-3 text-right">
+            <span class="font-bold {% if part.is_out_of_stock %}text-red-400{% elif part.is_low_stock %}text-yellow-400{% else %}text-white{% endif %}">
+              {{ part.quantity }}
+            </span>
+            <span class="text-slate-600 text-xs"> / мин {{ part.min_quantity }}</span>
+          </td>
+          <td class="px-4 py-3 text-right hidden md:table-cell text-slate-400">{{ part.purchase_price }} ₽</td>
+          <td class="px-4 py-3 text-right font-semibold text-white">{{ part.sale_price }} ₽</td>
+          <td class="px-4 py-3 hidden lg:table-cell text-slate-500 text-xs">{{ part.supplier.name|default:"—" }}</td>
+          <td class="px-4 py-3">
+            <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
+              <a href="{% url 'crm:part_edit' part.pk %}" class="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white" title="Редактировать">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+              </a>
+              <a href="{% url 'crm:part_stock_in' part.pk %}" class="p-1.5 rounded-lg hover:bg-green-800 text-slate-400 hover:text-green-300" title="Приход">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              </a>
+              <a href="{% url 'crm:part_stock_out' part.pk %}" class="p-1.5 rounded-lg hover:bg-red-900 text-slate-400 hover:text-red-300" title="Списание">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="8" class="px-4 py-12 text-center text-slate-500">
+            <p class="text-slate-400 mb-2">Запчасти не найдены</p>
+            <a href="{% url 'crm:part_create' %}" class="text-indigo-400 hover:underline text-sm">Добавить первую запчасть</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if parts.has_other_pages %}
+  <div class="flex items-center justify-between px-4 py-3 border-t border-slate-800">
+    <p class="text-sm text-slate-500">{{ parts.start_index }}–{{ parts.end_index }} из {{ parts.paginator.count }}</p>
+    <div class="flex gap-1">
+      {% if parts.has_previous %}<a href="?page={{ parts.previous_page_number }}" class="btn-secondary px-3 py-1.5 text-sm">←</a>{% endif %}
+      {% if parts.has_next %}<a href="?page={{ parts.next_page_number }}" class="btn-secondary px-3 py-1.5 text-sm">→</a>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
 {% endblock %}

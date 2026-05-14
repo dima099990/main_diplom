@@ -1,199 +1,476 @@
 {% extends 'crm/base.html' %}
-{% block title %}{{ repair.order_number }}{% endblock %}
-{% block page_title %}{{ repair.order_number }}{% endblock %}
+{% block title %}{{ repair.order_number }} — Kayros CRM{% endblock %}
+{% block page_title %}
+  <a href="{% url 'crm:repair_list' %}" class="text-slate-500 hover:text-slate-300 mr-1">Заказы</a>
+  <span class="text-slate-600 mr-1">/</span>
+  {{ repair.order_number }}
+{% endblock %}
+
 {% block content %}
-<div class="breadcrumb"><a href="{% url 'crm:repair_list' %}">Ремонты</a><span>›</span>{{ repair.order_number }}</div>
+<div class="flex flex-col xl:flex-row gap-4">
 
-<div class="repair-header">
-  <div>
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
-      <span class="repair-number">{{ repair.order_number }}</span>
-      <span class="badge badge-{{ repair.status }}" style="font-size:13px">{{ repair.get_status_display }}</span>
-    </div>
-    <div class="repair-info">
-      <div class="repair-info-item"><div class="ilabel">Клиент</div><div class="ivalue">{{ repair.customer.name }}</div></div>
-      <div class="repair-info-item"><div class="ilabel">Телефон</div><div class="ivalue"><a href="tel:{{ repair.customer.phone }}">{{ repair.customer.phone }}</a></div></div>
-      <div class="repair-info-item"><div class="ilabel">Устройство</div><div class="ivalue">{{ repair.phone_model }}</div></div>
-      <div class="repair-info-item"><div class="ilabel">Принят</div><div class="ivalue">{{ repair.created_at|date:"d.m.Y H:i" }}</div></div>
-      <div class="repair-info-item"><div class="ilabel">Исполнитель</div><div class="ivalue">{{ repair.assigned_to.get_full_name|default:"Не назначен" }}</div></div>
-      <div class="repair-info-item"><div class="ilabel">Итого</div><div class="ivalue text-green">{{ repair.final_cost|floatformat:0 }} ₽</div></div>
-    </div>
-  </div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap">
-    <a href="{% url 'crm:repair_print' repair.pk %}" target="_blank" class="btn btn-secondary">🖨 Печать акта</a>
-  </div>
-</div>
+  <!-- LEFT: Main card -->
+  <div class="flex-1 min-w-0 space-y-4">
 
-<div class="repair-grid">
-<!-- LEFT COLUMN -->
-<div>
-  <!-- Status update -->
-  <div class="card" style="margin-bottom:16px">
-    <div class="card-title">Статус заказа</div>
-    <form method="post" action="{% url 'crm:repair_status' repair.pk %}" style="display:flex;gap:8px;flex-wrap:wrap">
-      {% csrf_token %}
-      <select name="status" class="form-control" style="flex:1">
-        {% for val,label in status_choices %}<option value="{{ val }}" {% if repair.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
-      </select>
-      <button type="submit" class="btn btn-primary">Обновить</button>
-    </form>
-    {% if repair.complaint %}
-    <div style="margin-top:12px;padding:10px;background:var(--dark-4);border-radius:6px;font-size:13px">
-      <div class="text-muted" style="font-size:11px;margin-bottom:4px">ЖАЛОБА КЛИЕНТА</div>
-      {{ repair.complaint }}
-    </div>
-    {% endif %}
-    {% if repair.notes %}
-    <div style="margin-top:8px;padding:10px;background:var(--dark-4);border-radius:6px;font-size:13px">
-      <div class="text-muted" style="font-size:11px;margin-bottom:4px">ЗАМЕТКИ</div>
-      {{ repair.notes }}
-    </div>
-    {% endif %}
-  </div>
-
-  <!-- Services -->
-  <div class="card" style="margin-bottom:16px">
-    <div class="card-title">Работы
-      <span class="price-tag">{{ repair.order_services.all|length }} поз.</span>
-    </div>
-    {% if services %}
-    <div class="table-wrap" style="margin-bottom:16px"><table>
-      <thead><tr><th>Работа</th><th>Цена</th><th></th></tr></thead>
-      <tbody>
-      {% for s in services %}
-      <tr>
-        <td>{{ s.name }}</td>
-        <td class="price-tag">{{ s.price|floatformat:0 }} ₽</td>
-        <td>
-          <form method="post" action="{% url 'crm:repair_remove_service' repair.pk s.pk %}" style="display:inline">
-            {% csrf_token %}<button type="submit" class="btn btn-danger btn-sm" data-confirm="Удалить работу?">✕</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-      </tbody>
-    </table></div>
-    {% endif %}
-    <form method="post" action="{% url 'crm:repair_add_service' repair.pk %}">
-      {% csrf_token %}
-      <div class="form-grid" style="margin-bottom:8px">
-        <div>
-          <label class="form-label">Из прайс-листа</label>
-          <select id="service_select" name="service_id" class="form-control">
-            <option value="">— выбрать из прайса —</option>
-            {% for s in available_services %}<option value="{{ s.id }}" data-price="{{ s.price_from }}">{{ s.name }} (от {{ s.price_from }}₽)</option>{% endfor %}
-          </select>
+    <!-- Header -->
+    <div class="card p-4 flex flex-wrap items-center gap-4">
+      <div>
+        <div class="flex items-center gap-3 mb-1">
+          <h2 class="text-xl font-bold text-white font-mono">{{ repair.order_number }}</h2>
+          <span class="badge {{ repair.status_badge }} text-sm px-3 py-1">{{ repair.get_status_display }}</span>
+          {% if repair.is_overdue %}<span class="badge bg-red-500/20 text-red-400 border-red-500/30">⚠ Просрочен</span>{% endif %}
+          {% if repair.is_paid %}<span class="badge bg-green-500/20 text-green-400 border-green-500/30">✓ Оплачен</span>{% endif %}
         </div>
-        <div>
-          <label class="form-label">Или своё название</label>
-          <input name="custom_name" class="form-control" placeholder="Произвольная работа">
-        </div>
+        <p class="text-slate-400 text-sm">{{ repair.brand.name }} {{ repair.phone_model.name }} | {{ repair.customer.name }}</p>
       </div>
-      <div style="display:flex;gap:8px;align-items:flex-end">
-        <div style="flex:1"><label class="form-label">Цена (₽) *</label><input id="service_price" name="price" type="number" class="form-control" required placeholder="0"></div>
-        <button type="submit" class="btn btn-success">+ Добавить работу</button>
-      </div>
-    </form>
-  </div>
 
-  <!-- Parts -->
-  <div class="card">
-    <div class="card-title">Запчасти <small class="text-muted">(списываются со склада)</small></div>
-    {% if parts_used %}
-    <div class="table-wrap" style="margin-bottom:16px"><table>
-      <thead><tr><th>Запчасть</th><th>Кол-во</th><th>Цена</th><th>Сумма</th><th></th></tr></thead>
-      <tbody>
-      {% for p in parts_used %}
-      <tr>
-        <td>{{ p.part.name }}</td><td>{{ p.quantity }}</td>
-        <td>{{ p.price|floatformat:0 }} ₽</td>
-        <td class="price-tag">{{ p.total|floatformat:0 }} ₽</td>
-        <td>
-          <form method="post" action="{% url 'crm:repair_remove_part' repair.pk p.pk %}" style="display:inline">
-            {% csrf_token %}<button type="submit" class="btn btn-danger btn-sm" data-confirm="Удалить и вернуть на склад?">✕</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-      </tbody>
-    </table></div>
-    {% endif %}
-    <form method="post" action="{% url 'crm:repair_add_part' repair.pk %}">
-      {% csrf_token %}
-      <div class="form-grid" style="margin-bottom:8px">
-        <div>
-          <label class="form-label">Запчасть</label>
-          <select id="part_select" name="part_id" class="form-control" required>
-            <option value="">— выберите запчасть —</option>
-            {% for p in available_parts %}
-            <option value="{{ p.id }}" data-price="{{ p.sale_price }}" {% if p.is_out_of_stock %}style="color:var(--red)"{% endif %}>
-              {{ p.name }} (склад: {{ p.quantity }}{% if p.is_out_of_stock %} ⚠️ нет!{% endif %})
-            </option>
+      <div class="ml-auto flex flex-wrap gap-2">
+        <!-- Change status -->
+        <div x-data="{ open: false }" class="relative">
+          <button @click="open = !open" class="btn-secondary px-3 py-2 text-sm flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Статус
+          </button>
+          <div x-show="open" @click.away="open = false" x-cloak
+               class="absolute right-0 top-10 w-52 card py-1 shadow-2xl z-30">
+            {% for val, label in status_choices %}
+            <form method="post" action="{% url 'crm:repair_update_status' repair.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="status" value="{{ val }}">
+              <button type="submit" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-800 text-slate-300 flex items-center gap-2
+                {% if repair.status == val %}text-indigo-400 font-semibold{% endif %}">
+                {% if repair.status == val %}✓{% endif %} {{ label }}
+              </button>
+            </form>
             {% endfor %}
-          </select>
+          </div>
         </div>
-        <div style="display:flex;gap:8px">
-          <div style="flex:1"><label class="form-label">Кол-во</label><input name="quantity" type="number" class="form-control" value="1" min="1"></div>
-          <div style="flex:1"><label class="form-label">Цена за шт.</label><input id="part_price" name="price" type="number" class="form-control" placeholder="авто"></div>
+
+        <!-- Assign master -->
+        <div x-data="{ open: false }" class="relative">
+          <button @click="open = !open" class="btn-secondary px-3 py-2 text-sm flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+            {{ repair.assigned_to.get_full_name|default:"Назначить мастера" }}
+          </button>
+          <div x-show="open" @click.away="open = false" x-cloak class="absolute right-0 top-10 w-52 card py-1 shadow-2xl z-30">
+            {% for master in masters %}
+            <form method="post" action="{% url 'crm:repair_update_assigned' repair.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="assigned_to" value="{{ master.pk }}">
+              <button type="submit" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-800 text-slate-300
+                {% if repair.assigned_to == master %}text-indigo-400 font-semibold{% endif %}">
+                {{ master.get_full_name|default:master.username }}
+              </button>
+            </form>
+            {% endfor %}
+          </div>
+        </div>
+
+        <a href="{% url 'crm:repair_print' repair.pk %}" target="_blank" class="btn-secondary px-3 py-2 text-sm flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+          Акт
+        </a>
+
+        {% if repair.status == 'done' and not repair.is_paid %}
+        <button onclick="document.getElementById('pay-modal').classList.remove('hidden')"
+                class="btn-primary px-4 py-2 text-sm flex items-center gap-1.5 bg-green-600 hover:bg-green-500">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+          Оплатить {{ repair.final_cost }} ₽
+        </button>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div x-data="{ tab: 'info' }" class="card">
+      <div class="flex border-b border-slate-800 overflow-x-auto">
+        {% for t_id, t_label in tabs %}
+        <button @click="tab = '{{ t_id }}'"
+                :class="tab === '{{ t_id }}' ? 'border-b-2 border-indigo-500 text-indigo-400 font-semibold' : 'text-slate-500 hover:text-slate-300'"
+                class="px-5 py-3.5 text-sm whitespace-nowrap transition-colors">
+          {{ t_label }}
+        </button>
+        {% endfor %}
+      </div>
+
+      <!-- Tab: Информация -->
+      <div x-show="tab === 'info'" class="p-5">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="space-y-4">
+            <h3 class="text-xs text-slate-500 uppercase tracking-wide font-semibold">Клиент</h3>
+            <div class="space-y-3">
+              <div>
+                <label class="text-xs text-slate-500">ФИО</label>
+                <p class="text-slate-200 font-medium mt-0.5">
+                  <a href="{% url 'crm:customer_detail' repair.customer.pk %}" class="hover:text-indigo-400">{{ repair.customer.name }}</a>
+                </p>
+              </div>
+              <div>
+                <label class="text-xs text-slate-500">Телефон</label>
+                <p class="text-slate-200 mt-0.5"><a href="tel:{{ repair.customer.phone }}" class="hover:text-indigo-400">{{ repair.customer.phone }}</a></p>
+              </div>
+              {% if repair.customer.email %}
+              <div>
+                <label class="text-xs text-slate-500">Email</label>
+                <p class="text-slate-200 mt-0.5">{{ repair.customer.email }}</p>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="space-y-4">
+            <h3 class="text-xs text-slate-500 uppercase tracking-wide font-semibold">Устройство</h3>
+            <div class="space-y-3">
+              <div>
+                <label class="text-xs text-slate-500">Бренд / модель</label>
+                <p class="text-slate-200 font-medium mt-0.5">{{ repair.brand.name }} {{ repair.phone_model.name }}</p>
+              </div>
+              {% if repair.imei %}
+              <div>
+                <label class="text-xs text-slate-500">IMEI / S/N</label>
+                <p class="text-slate-200 font-mono mt-0.5">{{ repair.imei }}</p>
+              </div>
+              {% endif %}
+              {% if repair.device_password %}
+              <div>
+                <label class="text-xs text-slate-500">Пароль</label>
+                <p class="text-slate-200 font-mono mt-0.5">{{ repair.device_password }}</p>
+              </div>
+              {% endif %}
+              <div>
+                <label class="text-xs text-slate-500">Неисправность</label>
+                <p class="text-slate-200 mt-0.5">{{ repair.complaint|default:"—" }}</p>
+              </div>
+              {% if repair.appearance %}
+              <div>
+                <label class="text-xs text-slate-500">Внешний вид</label>
+                <p class="text-slate-200 mt-0.5">{{ repair.appearance }}</p>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <h3 class="text-xs text-slate-500 uppercase tracking-wide font-semibold">Сотрудники</h3>
+            <div>
+              <label class="text-xs text-slate-500">Менеджер</label>
+              <p class="text-slate-200 mt-0.5">{{ repair.created_by.get_full_name|default:repair.created_by.username|default:"—" }}</p>
+            </div>
+            <div>
+              <label class="text-xs text-slate-500">Мастер</label>
+              <p class="text-slate-200 mt-0.5">{{ repair.assigned_to.get_full_name|default:repair.assigned_to.username|default:"Не назначен" }}</p>
+            </div>
+            {% if repair.deadline %}
+            <div>
+              <label class="text-xs text-slate-500">Срок</label>
+              <p class="mt-0.5 {% if repair.is_overdue %}text-red-400{% else %}text-slate-200{% endif %}">{{ repair.deadline|date:"d.m.Y" }}</p>
+            </div>
+            {% endif %}
+            <div>
+              <label class="text-xs text-slate-500">Гарантия</label>
+              <p class="text-slate-200 mt-0.5">{{ repair.warranty_days }} дней</p>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <h3 class="text-xs text-slate-500 uppercase tracking-wide font-semibold">Финансы</h3>
+            <div class="bg-slate-800/50 rounded-xl p-4 space-y-2">
+              <div class="flex justify-between text-sm">
+                <span class="text-slate-400">Предварительно</span>
+                <span class="text-slate-300">{{ repair.estimated_cost }} ₽</span>
+              </div>
+              <div class="flex justify-between text-sm">
+                <span class="text-slate-400">Себестоимость</span>
+                <span class="text-slate-300">{{ repair.cost_price }} ₽</span>
+              </div>
+              {% if repair.discount %}
+              <div class="flex justify-between text-sm">
+                <span class="text-slate-400">Скидка</span>
+                <span class="text-yellow-400">−{{ repair.discount }} ₽</span>
+              </div>
+              {% endif %}
+              <div class="border-t border-slate-700 pt-2 flex justify-between">
+                <span class="text-white font-semibold">Итого</span>
+                <span class="text-white font-bold text-lg">{{ repair.final_cost }} ₽</span>
+              </div>
+              <div class="flex justify-between text-sm">
+                <span class="text-slate-400">Прибыль</span>
+                <span class="{% if repair.profit > 0 %}text-green-400{% else %}text-red-400{% endif %} font-semibold">{{ repair.profit }} ₽</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {% if repair.notes %}
+        <div class="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
+          <p class="text-xs text-yellow-500 font-semibold mb-1">Внутренние заметки</p>
+          <p class="text-slate-300 text-sm">{{ repair.notes }}</p>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Tab: Работы и материалы -->
+      <div x-show="tab === 'works'" class="p-5">
+        <div class="grid md:grid-cols-2 gap-6">
+
+          <!-- Services -->
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-semibold text-slate-200">Работы / услуги</h3>
+            </div>
+            <div class="space-y-2 mb-3" id="services-list">
+              {% for svc in repair.order_services.all %}
+              <div class="flex items-center gap-3 bg-slate-800/50 rounded-lg p-3">
+                <div class="flex-1">
+                  <p class="text-sm text-slate-200">{{ svc.name }}</p>
+                </div>
+                <span class="text-white font-semibold text-sm">{{ svc.price }} ₽</span>
+                <form method="post" action="{% url 'crm:repair_remove_service' repair.pk svc.pk %}">
+                  {% csrf_token %}
+                  <button type="submit" class="text-slate-600 hover:text-red-400 transition-colors" title="Удалить">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                  </button>
+                </form>
+              </div>
+              {% empty %}
+              <p class="text-slate-500 text-sm">Услуги не добавлены</p>
+              {% endfor %}
+            </div>
+
+            <!-- Add service -->
+            <form method="post" action="{% url 'crm:repair_add_service' repair.pk %}" class="flex gap-2">
+              {% csrf_token %}
+              <select name="service_id" class="input-dark flex-1 px-3 py-2 text-sm">
+                <option value="">Выбрать из прайса...</option>
+                {% for svc in available_services %}
+                <option value="{{ svc.pk }}" data-price="{{ svc.price_from }}">{{ svc.phone_model.full_name }} — {{ svc.name }}</option>
+                {% endfor %}
+              </select>
+              <input type="number" name="custom_price" placeholder="Цена ₽" class="input-dark w-28 px-3 py-2 text-sm">
+              <button type="submit" class="btn-primary px-3 py-2 text-sm">+</button>
+            </form>
+            <div class="mt-2">
+              <form method="post" action="{% url 'crm:repair_add_service' repair.pk %}" class="flex gap-2">
+                {% csrf_token %}
+                <input type="text" name="custom_name" placeholder="Произвольная работа..." class="input-dark flex-1 px-3 py-2 text-sm">
+                <input type="number" name="custom_price" placeholder="Цена ₽" class="input-dark w-28 px-3 py-2 text-sm">
+                <button type="submit" class="btn-secondary px-3 py-2 text-sm">+ Доп.</button>
+              </form>
+            </div>
+          </div>
+
+          <!-- Parts -->
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-semibold text-slate-200">Запчасти</h3>
+            </div>
+            <div class="space-y-2 mb-3">
+              {% for op in repair.order_parts.all %}
+              <div class="flex items-center gap-3 bg-slate-800/50 rounded-lg p-3">
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm text-slate-200 truncate">{{ op.part.name }}</p>
+                  <p class="text-xs text-slate-500">{{ op.quantity }} шт × {{ op.price }} ₽</p>
+                </div>
+                <span class="text-white font-semibold text-sm">{{ op.total }} ₽</span>
+                <form method="post" action="{% url 'crm:repair_remove_part' repair.pk op.pk %}">
+                  {% csrf_token %}
+                  <button type="submit" class="text-slate-600 hover:text-red-400 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                  </button>
+                </form>
+              </div>
+              {% empty %}
+              <p class="text-slate-500 text-sm">Запчасти не добавлены</p>
+              {% endfor %}
+            </div>
+            <form method="post" action="{% url 'crm:repair_add_part' repair.pk %}" class="flex gap-2">
+              {% csrf_token %}
+              <select name="part_id" class="input-dark flex-1 px-3 py-2 text-sm">
+                <option value="">Выбрать запчасть...</option>
+                {% for part in available_parts %}
+                <option value="{{ part.pk }}" data-price="{{ part.sale_price }}" data-qty="{{ part.quantity }}">
+                  {{ part.name }} ({{ part.quantity }} шт)
+                </option>
+                {% endfor %}
+              </select>
+              <input type="number" name="quantity" value="1" min="1" class="input-dark w-16 px-3 py-2 text-sm">
+              <input type="number" name="price" placeholder="Цена ₽" class="input-dark w-28 px-3 py-2 text-sm">
+              <button type="submit" class="btn-primary px-3 py-2 text-sm">+</button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Cost summary -->
+        <div class="mt-6 flex justify-end">
+          <div class="bg-slate-800/60 rounded-xl p-4 w-64 space-y-2">
+            <div class="flex justify-between text-sm">
+              <span class="text-slate-400">Работы</span>
+              <span class="text-slate-200">{{ services_total }} ₽</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-slate-400">Запчасти</span>
+              <span class="text-slate-200">{{ parts_total }} ₽</span>
+            </div>
+            {% if repair.discount %}
+            <div class="flex justify-between text-sm">
+              <span class="text-slate-400">Скидка</span>
+              <span class="text-yellow-400">−{{ repair.discount }} ₽</span>
+            </div>
+            {% endif %}
+            <div class="border-t border-slate-700 pt-2 flex justify-between font-bold">
+              <span class="text-white">Итого</span>
+              <span class="text-white text-lg">{{ repair.final_cost }} ₽</span>
+            </div>
+          </div>
         </div>
       </div>
-      <button type="submit" class="btn btn-success">+ Добавить запчасть</button>
-      <a href="{% url 'crm:part_create' %}" class="btn btn-secondary" style="margin-left:8px">+ Запчасть на склад</a>
-    </form>
+
+      <!-- Tab: Проверка устройства -->
+      <div x-show="tab === 'condition'" class="p-5">
+        {% if condition %}
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {% for item in condition.get_items %}
+          <div class="bg-slate-800/50 rounded-xl p-3">
+            <p class="text-xs text-slate-500 mb-1">{{ item.label }}</p>
+            <span class="badge
+              {% if item.state == 'ok' %}bg-green-500/20 text-green-400 border-green-500/20
+              {% elif item.state == 'broken' %}bg-red-500/20 text-red-400 border-red-500/20
+              {% else %}bg-slate-700 text-slate-400 border-slate-600{% endif %}">
+              {{ item.state_display }}
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-slate-500 text-sm">Проверка устройства не заполнена</p>
+        {% endif %}
+      </div>
+
+      <!-- Tab: Комментарий -->
+      <div x-show="tab === 'comment'" class="p-5">
+        <form method="post" action="{% url 'crm:repair_add_comment' repair.pk %}">
+          {% csrf_token %}
+          <textarea name="comment" rows="3" placeholder="Добавить комментарий к заказу..."
+                    class="input-dark w-full px-4 py-3 text-sm resize-none mb-3"></textarea>
+          <button type="submit" class="btn-primary px-4 py-2 text-sm">Добавить</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Timeline -->
+  <div class="w-full xl:w-80 flex-shrink-0 space-y-4">
+
+    <!-- Order meta -->
+    <div class="card p-4 space-y-3">
+      <h3 class="text-xs text-slate-500 uppercase tracking-wide font-semibold">Информация</h3>
+      <div class="space-y-2 text-sm">
+        <div class="flex justify-between">
+          <span class="text-slate-500">Создан</span>
+          <span class="text-slate-300">{{ repair.created_at|date:"d.m.Y H:i" }}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500">Обновлён</span>
+          <span class="text-slate-300">{{ repair.updated_at|date:"d.m.Y H:i" }}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500">Филиал</span>
+          <span class="text-slate-300">{{ repair.branch.name|default:"—" }}</span>
+        </div>
+        {% if repair.is_paid %}
+        <div class="flex justify-between">
+          <span class="text-slate-500">Оплачен</span>
+          <span class="text-green-400">{{ repair.paid_at|date:"d.m.Y H:i" }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="card p-4">
+      <h3 class="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-4">История заказа</h3>
+      <div class="space-y-0" id="order-timeline">
+        {% for event in history %}
+        <div class="relative pl-6 pb-4">
+          <div class="absolute left-0 top-1.5 w-2.5 h-2.5 rounded-full
+            {% if event.event_type == 'status_change' %}bg-indigo-500
+            {% elif event.event_type == 'payment' %}bg-green-500
+            {% elif event.event_type == 'comment' %}bg-slate-500
+            {% elif event.event_type == 'created' %}bg-blue-500
+            {% else %}bg-slate-600{% endif %}
+            ring-2 ring-slate-900"></div>
+          {% if not forloop.last %}
+          <div class="absolute left-1 top-4 bottom-0 w-px bg-slate-800"></div>
+          {% endif %}
+          <div>
+            <p class="text-xs text-slate-400 leading-relaxed">{{ event.description }}</p>
+            <p class="text-xs text-slate-600 mt-0.5">
+              {{ event.user.get_full_name|default:event.user.username|default:"Система" }} · {{ event.created_at|date:"d.m H:i" }}
+            </p>
+          </div>
+        </div>
+        {% empty %}
+        <p class="text-slate-500 text-sm">История пуста</p>
+        {% endfor %}
+      </div>
+    </div>
   </div>
 </div>
 
-<!-- RIGHT COLUMN -->
-<div>
-  <div class="card" style="margin-bottom:16px">
-    <div class="card-title">Итого по заказу</div>
-    <div style="font-size:13px;margin-bottom:8px;display:flex;justify-content:space-between"><span class="text-muted">Работы:</span><span>{{ repair.order_services.all|length }} поз.</span></div>
-    <div style="font-size:13px;margin-bottom:12px;display:flex;justify-content:space-between"><span class="text-muted">Запчасти:</span><span>{{ repair.order_parts.all|length }} поз.</span></div>
-    <div style="font-size:22px;font-weight:800;color:#fff;display:flex;justify-content:space-between;align-items:center">
-      <span>Итого:</span><span class="text-green">{{ repair.final_cost|floatformat:0 }} ₽</span>
-    </div>
-    {% if repair.estimated_cost %}<div class="text-muted" style="font-size:12px;margin-top:4px">Предв.: {{ repair.estimated_cost|floatformat:0 }} ₽</div>{% endif %}
-  </div>
-
-  <!-- Assign -->
-  <div class="card" style="margin-bottom:16px">
-    <div class="card-title">Исполнитель</div>
-    <form method="post" action="{% url 'crm:repair_assign' repair.pk %}">
+<!-- Payment modal -->
+<div id="pay-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center px-4 modal-overlay">
+  <div class="card w-full max-w-sm p-6 shadow-2xl">
+    <h2 class="text-lg font-bold text-white mb-4">Оплата заказа</h2>
+    <form method="post" action="{% url 'crm:repair_pay' repair.pk %}">
       {% csrf_token %}
-      <select name="assigned_to" class="form-control" style="margin-bottom:8px">
-        <option value="">— не назначен —</option>
-        {% for emp in employees %}<option value="{{ emp.id }}" {% if repair.assigned_to_id == emp.id %}selected{% endif %}>{{ emp.get_full_name|default:emp.username }}</option>{% endfor %}
-      </select>
-      <button type="submit" class="btn btn-secondary" style="width:100%">Сохранить</button>
+      <div class="space-y-4 mb-6">
+        <div>
+          <label class="text-xs text-slate-500 mb-1 block">Метод оплаты</label>
+          <select name="method" class="input-dark w-full px-3 py-2 text-sm">
+            <option value="cash">💵 Наличные</option>
+            <option value="card">💳 Карта</option>
+            <option value="transfer">📱 Перевод</option>
+            <option value="mixed">🔀 Смешанная</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-slate-500 mb-1 block">Сумма к оплате</label>
+          <div class="input-dark px-3 py-2 text-white font-bold text-lg">{{ repair.final_cost }} ₽</div>
+        </div>
+      </div>
+      <div class="flex gap-3">
+        <button type="submit" class="btn-primary flex-1 py-2.5 text-sm bg-green-600 hover:bg-green-500">Подтвердить оплату</button>
+        <button type="button" onclick="document.getElementById('pay-modal').classList.add('hidden')" class="btn-secondary px-4 py-2.5 text-sm">Отмена</button>
+      </div>
     </form>
   </div>
-
-  <!-- Condition check -->
-  {% if condition %}
-  <div class="card" style="margin-bottom:16px">
-    <div class="card-title">Проверка функционала</div>
-    {% for item in condition.get_items %}
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px">
-      <span class="text-muted">{{ item.label }}</span>
-      <span class="badge badge-{{ item.state }}">{{ item.state_display }}</span>
-    </div>
-    {% endfor %}
-  </div>
-  {% endif %}
-
-  <!-- Device info -->
-  <div class="card">
-    <div class="card-title">Устройство</div>
-    <div style="font-size:13px">
-      {% if repair.imei %}<div style="margin-bottom:6px"><span class="text-muted">IMEI:</span> {{ repair.imei }}</div>{% endif %}
-      {% if repair.device_password %}<div style="margin-bottom:6px"><span class="text-muted">Пароль:</span> {{ repair.device_password }}</div>{% endif %}
-      {% if repair.appearance %}<div style="margin-bottom:6px"><span class="text-muted">Вид:</span> {{ repair.appearance }}</div>{% endif %}
-      <div><span class="text-muted">Гарантия:</span> {{ repair.warranty_days }} дней</div>
-    </div>
-    <div style="margin-top:12px">
-      <a href="{% url 'crm:customer_detail' repair.customer.pk %}" class="btn btn-secondary btn-sm">👤 Карточка клиента</a>
-    </div>
-  </div>
 </div>
-</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Auto-fill price when service selected
+document.querySelectorAll('select[name="service_id"]').forEach(sel => {
+  sel.addEventListener('change', function() {
+    const opt = this.options[this.selectedIndex];
+    const price = opt.dataset.price;
+    if (price) {
+      const priceInput = this.closest('form').querySelector('input[name="custom_price"]');
+      if (priceInput && !priceInput.value) priceInput.value = price;
+    }
+  });
+});
+
+// Auto-fill part price
+document.querySelectorAll('select[name="part_id"]').forEach(sel => {
+  sel.addEventListener('change', function() {
+    const opt = this.options[this.selectedIndex];
+    const price = opt.dataset.price;
+    if (price) {
+      const priceInput = this.closest('form').querySelector('input[name="price"]');
+      if (priceInput) priceInput.value = price;
+    }
+  });
+});
+</script>
 {% endblock %}

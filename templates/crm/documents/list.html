@@ -1,0 +1,62 @@
+{% extends 'crm/base.html' %}
+{% block title %}Документы — Kayros CRM{% endblock %}
+{% block page_title %}Документы{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  {% for doc_type, icon, label, color in doc_types %}
+  <div class="card p-5 hover:border-slate-600 transition-colors cursor-pointer group">
+    <div class="text-3xl mb-3">{{ icon }}</div>
+    <p class="text-sm font-semibold text-slate-200">{{ label }}</p>
+    <p class="text-xs text-slate-500 mt-1">Автозаполнение из заказа</p>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <div class="px-5 py-4 border-b border-slate-800">
+    <h2 class="text-sm font-semibold text-slate-200">Последние заказы — выберите для печати документа</h2>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead><tr class="border-b border-slate-800 text-xs text-slate-500 uppercase">
+        <th class="text-left px-4 py-3">Номер</th>
+        <th class="text-left px-4 py-3">Клиент</th>
+        <th class="text-left px-4 py-3">Устройство</th>
+        <th class="text-left px-4 py-3">Статус</th>
+        <th class="text-left px-4 py-3">Дата</th>
+        <th class="px-4 py-3">Документы</th>
+      </tr></thead>
+      <tbody class="divide-y divide-slate-800/60">
+        {% for order in recent_orders %}
+        <tr class="table-row">
+          <td class="px-4 py-3 font-mono text-indigo-400">{{ order.order_number }}</td>
+          <td class="px-4 py-3 text-slate-200">{{ order.customer.name }}</td>
+          <td class="px-4 py-3 text-slate-400 text-xs">{{ order.brand.name }} {{ order.phone_model.name }}</td>
+          <td class="px-4 py-3"><span class="badge {{ order.status_badge }}">{{ order.get_status_display }}</span></td>
+          <td class="px-4 py-3 text-slate-500 text-xs">{{ order.created_at|date:"d.m.Y" }}</td>
+          <td class="px-4 py-3">
+            <div class="flex gap-2">
+              <a href="{% url 'crm:repair_print' order.pk %}" target="_blank"
+                 class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white text-xs transition-colors" title="Акт приёма">
+                📄 Акт
+              </a>
+              <a href="{% url 'crm:repair_print' order.pk %}?type=warranty" target="_blank"
+                 class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white text-xs transition-colors" title="Гарантийный талон">
+                🛡 Гарантия
+              </a>
+              <a href="{% url 'crm:repair_print' order.pk %}?type=receipt" target="_blank"
+                 class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white text-xs transition-colors" title="Чек">
+                🧾 Чек
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="px-4 py-10 text-center text-slate-500">Заказов нет</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,192 @@
+{% extends 'crm/base.html' %}
+{% block title %}Аналитика — Kayros CRM{% endblock %}
+{% block page_title %}Аналитика{% endblock %}
+
+{% block content %}
+<!-- Period selector -->
+<div class="flex flex-wrap gap-3 mb-6 items-center">
+  <div class="flex rounded-lg overflow-hidden border border-slate-700">
+    {% for val, label in period_options %}
+    <a href="?period={{ val }}{% if request.GET.branch %}&branch={{ request.GET.branch }}{% endif %}"
+       class="px-4 py-2 text-sm font-medium transition-colors
+       {% if current_period == val %}bg-indigo-600 text-white{% else %}bg-slate-800 text-slate-400 hover:text-slate-200{% endif %}">
+      {{ label }}
+    </a>
+    {% endfor %}
+  </div>
+  <select name="branch" onchange="location='?period={{ current_period }}&branch='+this.value"
+          class="input-dark px-3 py-2 text-sm">
+    <option value="">Все филиалы</option>
+    {% for b in branches %}
+    <option value="{{ b.pk }}" {% if current_branch == b.pk|stringformat:"s" %}selected{% endif %}>{{ b.name }}</option>
+    {% endfor %}
+  </select>
+  <span class="text-sm text-slate-500 ml-2">{{ period_label }}</span>
+</div>
+
+<!-- KPI Grid -->
+<div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+  <div class="card p-4">
+    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Выручка</p>
+    <p class="text-xl font-bold text-white">{{ stats.revenue|floatformat:0 }} ₽</p>
+  </div>
+  <div class="card p-4">
+    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Прибыль</p>
+    <p class="text-xl font-bold text-green-400">{{ stats.profit|floatformat:0 }} ₽</p>
+  </div>
+  <div class="card p-4">
+    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Заказов</p>
+    <p class="text-xl font-bold text-indigo-400">{{ stats.orders_count }}</p>
+  </div>
+  <div class="card p-4">
+    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Средний чек</p>
+    <p class="text-xl font-bold text-white">{{ stats.avg_check|floatformat:0 }} ₽</p>
+  </div>
+  <div class="card p-4">
+    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Рентабельность</p>
+    <p class="text-xl font-bold text-cyan-400">{{ stats.margin|floatformat:1 }}%</p>
+  </div>
+</div>
+
+<!-- Charts row 1 -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+  <div class="card p-5 lg:col-span-2">
+    <h2 class="text-sm font-semibold text-slate-200 mb-4">Выручка и прибыль</h2>
+    <canvas id="revenueChart" height="120"></canvas>
+  </div>
+  <div class="card p-5">
+    <h2 class="text-sm font-semibold text-slate-200 mb-4">Методы оплаты</h2>
+    <canvas id="paymentChart" height="160"></canvas>
+    <div class="mt-4 space-y-1.5">
+      {% for item in payment_methods_data %}
+      <div class="flex justify-between text-xs">
+        <span class="text-slate-400">{{ item.label }}</span>
+        <span class="text-slate-200 font-medium">{{ item.amount|floatformat:0 }} ₽</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Charts row 2 -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+  <div class="card p-5">
+    <h2 class="text-sm font-semibold text-slate-200 mb-4">Топ ремонтов</h2>
+    <canvas id="repairsChart" height="200"></canvas>
+  </div>
+  <div class="card p-5">
+    <h2 class="text-sm font-semibold text-slate-200 mb-4">Популярные устройства</h2>
+    <canvas id="devicesChart" height="200"></canvas>
+  </div>
+  <div class="card p-5">
+    <h2 class="text-sm font-semibold text-slate-200 mb-4">Прибыль по типам</h2>
+    <canvas id="profitTypeChart" height="200"></canvas>
+  </div>
+</div>
+
+<!-- Top masters table -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  <div class="card">
+    <div class="px-5 py-4 border-b border-slate-800">
+      <h2 class="text-sm font-semibold text-slate-200">Топ мастеров</h2>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead><tr class="border-b border-slate-800 text-xs text-slate-500 uppercase">
+          <th class="text-left px-4 py-2.5">Мастер</th>
+          <th class="text-right px-4 py-2.5">Заказов</th>
+          <th class="text-right px-4 py-2.5">Выручка</th>
+          <th class="text-right px-4 py-2.5">Прибыль</th>
+        </tr></thead>
+        <tbody class="divide-y divide-slate-800/60">
+          {% for m in top_masters %}
+          <tr class="table-row">
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-2">
+                <div class="w-7 h-7 bg-indigo-900 rounded-full flex items-center justify-center text-xs font-bold text-indigo-300">
+                  {{ m.first_name|first|upper }}{{ m.last_name|first|upper }}
+                </div>
+                <span class="text-slate-200">{{ m.get_full_name|default:m.username }}</span>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-right text-slate-300">{{ m.orders_count }}</td>
+            <td class="px-4 py-3 text-right text-white font-medium">{{ m.total_revenue|floatformat:0 }} ₽</td>
+            <td class="px-4 py-3 text-right text-green-400 font-semibold">{{ m.total_profit|floatformat:0 }} ₽</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="px-4 py-8 text-center text-slate-500">Нет данных</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="px-5 py-4 border-b border-slate-800">
+      <h2 class="text-sm font-semibold text-slate-200">Продажи аксессуаров</h2>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead><tr class="border-b border-slate-800 text-xs text-slate-500 uppercase">
+          <th class="text-left px-4 py-2.5">Категория</th>
+          <th class="text-right px-4 py-2.5">Кол-во</th>
+          <th class="text-right px-4 py-2.5">Выручка</th>
+          <th class="text-right px-4 py-2.5">Прибыль</th>
+        </tr></thead>
+        <tbody class="divide-y divide-slate-800/60">
+          {% for cat in accessory_sales %}
+          <tr class="table-row">
+            <td class="px-4 py-3 text-slate-300">{{ cat.category_label }}</td>
+            <td class="px-4 py-3 text-right text-slate-300">{{ cat.total_qty }}</td>
+            <td class="px-4 py-3 text-right text-white font-medium">{{ cat.total_revenue|floatformat:0 }} ₽</td>
+            <td class="px-4 py-3 text-right text-green-400">{{ cat.total_profit|floatformat:0 }} ₽</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="px-4 py-8 text-center text-slate-500">Нет данных</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.borderColor = 'rgba(148,163,184,0.08)';
+
+const makeChart = (id, type, labels, datasets, opts={}) => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  new Chart(el, { type, data: { labels, datasets }, options: { responsive: true, ...opts } });
+};
+
+makeChart('revenueChart', 'bar', {{ chart_labels|safe }}, [
+  { label: 'Выручка', data: {{ chart_revenue|safe }}, backgroundColor: 'rgba(99,102,241,0.7)', borderRadius: 4 },
+  { label: 'Прибыль', data: {{ chart_profit|safe }}, backgroundColor: 'rgba(34,211,238,0.5)', borderRadius: 4 },
+], { plugins: { legend: { position: 'top', labels: { boxWidth: 10 } } }, scales: { x: { grid: { display: false } }, y: { grid: { color: 'rgba(148,163,184,0.06)' } } } });
+
+makeChart('paymentChart', 'doughnut', {{ payment_labels|safe }}, [{
+  data: {{ payment_values|safe }},
+  backgroundColor: ['#6366f1','#22d3ee','#f59e0b','#10b981'],
+  borderWidth: 2, borderColor: '#0f172a',
+}], { cutout: '65%', plugins: { legend: { display: false } } });
+
+makeChart('repairsChart', 'bar', {{ top_repairs_labels|safe }}, [{
+  data: {{ top_repairs_values|safe }},
+  backgroundColor: 'rgba(99,102,241,0.6)', borderRadius: 4,
+}], { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(148,163,184,0.06)' } }, y: { grid: { display: false } } } });
+
+makeChart('devicesChart', 'bar', {{ device_labels|safe }}, [{
+  data: {{ device_values|safe }},
+  backgroundColor: 'rgba(34,211,238,0.5)', borderRadius: 4,
+}], { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(148,163,184,0.06)' } }, y: { grid: { display: false } } } });
+
+makeChart('profitTypeChart', 'doughnut', ['Ремонты', 'Аксессуары'], [{
+  data: {{ profit_type_values|safe }},
+  backgroundColor: ['#6366f1','#f59e0b'],
+  borderWidth: 2, borderColor: '#0f172a',
+}], { cutout: '60%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } } } });
+</script>
+{% endblock %}

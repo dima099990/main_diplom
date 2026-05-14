@@ -1,0 +1,157 @@
+{% extends 'crm/base.html' %}
+{% block title %}Настройки — Kayros CRM{% endblock %}
+{% block page_title %}Настройки{% endblock %}
+
+{% block content %}
+<div class="flex gap-4">
+  <!-- Settings sidebar -->
+  <div class="w-52 flex-shrink-0 hidden lg:block">
+    <div class="card py-2">
+      {% for tab_id, tab_label, tab_url in settings_tabs %}
+      <a href="{{ tab_url }}"
+         class="flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors rounded-lg mx-1 my-0.5
+         {% if current_tab == tab_id %}bg-indigo-600/20 text-indigo-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800{% endif %}">
+        {{ tab_label }}
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Settings content -->
+  <div class="flex-1 min-w-0">
+    <div class="card p-6">
+      <h2 class="text-base font-semibold text-white mb-6">Настройки компании</h2>
+
+      <form method="post" enctype="multipart/form-data" class="space-y-8">
+        {% csrf_token %}
+
+        <!-- General -->
+        <div>
+          <h3 class="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-4 pb-2 border-b border-slate-800">Общие сведения</h3>
+          <div class="grid md:grid-cols-2 gap-4">
+            <div>
+              <label class="text-xs text-slate-400 mb-1 block">Название компании *</label>
+              <input type="text" name="company_name" value="{{ settings.company_name }}" class="input-dark w-full px-3 py-2 text-sm" required>
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 mb-1 block">ИНН</label>
+              <input type="text" name="inn" value="{{ settings.inn }}" class="input-dark w-full px-3 py-2 text-sm font-mono">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 mb-1 block">КПП</label>
+              <input type="text" name="kpp" value="{{ settings.kpp }}" class="input-dark w-full px-3 py-2 text-sm font-mono">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 mb-1 block">ОГРН / ОГРНИП</label>
+              <input type="text" name="ogrn" value="{{ settings.ogrn }}" class="input-dark w-full px-3 py-2 text-sm font-mono">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 mb-1 block">ФИО директора</label>
+              <input type="text" name="director_name" value="{{ settings.director_name }}" class="input-dark w-full px-3 py-2 text-sm">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 mb-1 block">Гарантия (дней по умолчанию)</label>
+              <input type="number" name="warranty_days" value="{{ settings.warranty_days }}" class="input-dark w-full px-3 py-2 text-sm">
+            </div>
+          </div>
+        </div>
+
+        <!-- Contacts -->
+        <div>
+          <h3 class="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-4 pb-2 border-b border-slate-800">Контакты</h3>
+          <div class="grid md:grid-cols-2 gap-4">
+            <div>
+              <label class="text-xs text-slate-400 mb-1 block">Телефон</label>
+              <input type="text" name="phone" value="{{ settings.phone }}" class="input-dark w-full px-3 py-2 text-sm">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 mb-1 block">Email</label>
+              <input type="email" name="email" value="{{ settings.email }}" class="input-dark w-full px-3 py-2 text-sm">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 mb-1 block">Сайт</label>
+              <input type="url" name="website" value="{{ settings.website }}" class="input-dark w-full px-3 py-2 text-sm" placeholder="https://...">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 mb-1 block">Telegram</label>
+              <input type="text" name="telegram" value="{{ settings.telegram }}" class="input-dark w-full px-3 py-2 text-sm" placeholder="@username">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 mb-1 block">WhatsApp</label>
+              <input type="text" name="whatsapp" value="{{ settings.whatsapp }}" class="input-dark w-full px-3 py-2 text-sm" placeholder="+7...">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 mb-1 block">Режим работы</label>
+              <input type="text" name="working_hours" value="{{ settings.working_hours }}" class="input-dark w-full px-3 py-2 text-sm" placeholder="Пн–Сб 10:00–20:00">
+            </div>
+          </div>
+        </div>
+
+        <!-- Address -->
+        <div>
+          <h3 class="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-4 pb-2 border-b border-slate-800">Адреса</h3>
+          <div class="grid md:grid-cols-2 gap-4">
+            <div>
+              <label class="text-xs text-slate-400 mb-1 block">Юридический адрес</label>
+              <textarea name="legal_address" rows="2" class="input-dark w-full px-3 py-2 text-sm resize-none">{{ settings.legal_address }}</textarea>
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 mb-1 block">Фактический адрес</label>
+              <textarea name="actual_address" rows="2" class="input-dark w-full px-3 py-2 text-sm resize-none">{{ settings.actual_address }}</textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bank -->
+        <div>
+          <h3 class="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-4 pb-2 border-b border-slate-800">Банковские реквизиты</h3>
+          <div class="grid md:grid-cols-2 gap-4">
+            <div>
+              <label class="text-xs text-slate-400 mb-1 block">Банк</label>
+              <input type="text" name="bank_name" value="{{ settings.bank_name }}" class="input-dark w-full px-3 py-2 text-sm">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 mb-1 block">БИК</label>
+              <input type="text" name="bik" value="{{ settings.bik }}" class="input-dark w-full px-3 py-2 text-sm font-mono">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 mb-1 block">Расчётный счёт</label>
+              <input type="text" name="account_number" value="{{ settings.account_number }}" class="input-dark w-full px-3 py-2 text-sm font-mono">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 mb-1 block">Корр. счёт</label>
+              <input type="text" name="corr_account" value="{{ settings.corr_account }}" class="input-dark w-full px-3 py-2 text-sm font-mono">
+            </div>
+          </div>
+        </div>
+
+        <!-- Logo & Stamp -->
+        <div>
+          <h3 class="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-4 pb-2 border-b border-slate-800">Логотип и печать</h3>
+          <div class="grid md:grid-cols-2 gap-6">
+            <div>
+              <label class="text-xs text-slate-400 mb-2 block">Логотип</label>
+              {% if settings.logo %}
+              <img src="{{ settings.logo.url }}" alt="Логотип" class="h-16 mb-2 rounded">
+              {% endif %}
+              <input type="file" name="logo" accept="image/*" class="text-sm text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-indigo-600 file:text-white hover:file:bg-indigo-500">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 mb-2 block">Печать / подпись</label>
+              {% if settings.stamp %}
+              <img src="{{ settings.stamp.url }}" alt="Печать" class="h-16 mb-2 rounded">
+              {% endif %}
+              <input type="file" name="stamp" accept="image/*" class="text-sm text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-slate-700 file:text-white hover:file:bg-slate-600">
+            </div>
+          </div>
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <button type="submit" class="btn-primary px-6 py-2.5 text-sm">Сохранить изменения</button>
+          <span class="text-xs text-slate-500 self-center">Данные используются в документах и печатных формах</span>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

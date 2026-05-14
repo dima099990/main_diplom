@@ -1,26 +1,79 @@
 {% load static %}
-<!DOCTYPE html><html lang="ru"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Вход в CRM</title>
-<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'crm/css/crm.css' %}">
-</head><body>
-<div class="login-page">
-  <div class="login-box">
-    <h1>{{ site.company_name }}</h1>
-    <p>Вход в систему управления</p>
-    {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
-    <form method="post">{% csrf_token %}
-      <div class="form-group">
-        <label class="form-label">Логин</label>
-        <input type="text" name="username" class="form-control" autofocus required>
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Вход — Kayros CRM</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Inter', sans-serif; }
+  .input-dark {
+    background: rgb(15 23 42);
+    border: 1px solid rgb(51 65 85);
+    color: rgb(226 232 240);
+    border-radius: 0.5rem;
+    transition: border-color 0.15s;
+  }
+  .input-dark:focus {
+    outline: none;
+    border-color: rgb(99 102 241);
+    box-shadow: 0 0 0 3px rgb(99 102 241 / 0.15);
+  }
+  .input-dark::placeholder { color: rgb(100 116 139); }
+</style>
+</head>
+<body class="bg-slate-950 min-h-screen flex items-center justify-center p-4">
+
+<div class="w-full max-w-sm">
+  <!-- Logo -->
+  <div class="text-center mb-8">
+    <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 mb-4">
+      <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/>
+      </svg>
+    </div>
+    <h1 class="text-xl font-bold text-slate-100">{{ site.company_name }}</h1>
+    <p class="text-sm text-slate-500 mt-1">Система управления сервисным центром</p>
+  </div>
+
+  <!-- Card -->
+  <div class="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
+    <h2 class="text-base font-semibold text-slate-200 mb-6">Вход в систему</h2>
+
+    {% if error %}
+    <div class="mb-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+      {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="post" class="space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="block text-xs font-medium text-slate-400 mb-1.5">Логин</label>
+        <input type="text" name="username" autofocus required
+               class="input-dark w-full px-3 py-2.5 text-sm"
+               placeholder="Введите логин">
       </div>
-      <div class="form-group">
-        <label class="form-label">Пароль</label>
-        <input type="password" name="password" class="form-control" required>
+      <div>
+        <label class="block text-xs font-medium text-slate-400 mb-1.5">Пароль</label>
+        <input type="password" name="password" required
+               class="input-dark w-full px-3 py-2.5 text-sm"
+               placeholder="Введите пароль">
       </div>
-      <button type="submit" class="btn btn-primary btn-lg" style="width:100%;justify-content:center;margin-top:8px">Войти</button>
+      <button type="submit"
+              class="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold
+                     py-2.5 px-4 rounded-lg transition-colors mt-2">
+        Войти
+      </button>
     </form>
   </div>
+
+  <p class="text-center text-xs text-slate-600 mt-6">Kayros CRM &copy; 2025</p>
 </div>
-</body></html>
+
+</body>
+</html>

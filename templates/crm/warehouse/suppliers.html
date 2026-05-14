@@ -1,0 +1,119 @@
+{% extends 'crm/base.html' %}
+{% block title %}Поставщики — Kayros CRM{% endblock %}
+{% block page_title %}Поставщики{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+  <p class="text-sm text-slate-400">Всего: <span class="text-slate-200 font-medium">{{ suppliers.count }}</span></p>
+  <button onclick="document.getElementById('modalCreate').classList.remove('hidden')"
+          class="btn-primary px-4 py-2 text-sm">
+    + Добавить поставщика
+  </button>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+  {% for s in suppliers %}
+  <div class="card p-5">
+    <div class="flex justify-between items-start mb-3">
+      <div>
+        <p class="font-semibold text-slate-200">{{ s.name }}</p>
+        {% if s.contact_person %}
+        <p class="text-xs text-slate-500 mt-0.5">{{ s.contact_person }}</p>
+        {% endif %}
+      </div>
+      <span class="badge {% if s.is_active %}bg-green-500/15 text-green-400 border-green-500/20{% else %}bg-slate-700 text-slate-400{% endif %}">
+        {% if s.is_active %}Активен{% else %}Неактивен{% endif %}
+      </span>
+    </div>
+    <div class="space-y-1.5 text-xs text-slate-400">
+      {% if s.phone %}
+      <div class="flex items-center gap-2">
+        <span class="text-slate-600">📞</span>
+        <a href="tel:{{ s.phone }}" class="hover:text-slate-200">{{ s.phone }}</a>
+      </div>
+      {% endif %}
+      {% if s.email %}
+      <div class="flex items-center gap-2">
+        <span class="text-slate-600">✉️</span>
+        <a href="mailto:{{ s.email }}" class="hover:text-slate-200">{{ s.email }}</a>
+      </div>
+      {% endif %}
+      {% if s.website %}
+      <div class="flex items-center gap-2">
+        <span class="text-slate-600">🌐</span>
+        <a href="{{ s.website }}" target="_blank" class="hover:text-slate-200 truncate">{{ s.website }}</a>
+      </div>
+      {% endif %}
+      {% if s.address %}
+      <div class="flex items-center gap-2">
+        <span class="text-slate-600">📍</span>
+        <span>{{ s.address }}</span>
+      </div>
+      {% endif %}
+    </div>
+    {% if s.notes %}
+    <p class="text-xs text-slate-500 mt-3 border-t border-slate-800 pt-3">{{ s.notes }}</p>
+    {% endif %}
+  </div>
+  {% empty %}
+  <div class="col-span-3">
+    <div class="card p-12 text-center">
+      <p class="text-slate-500 text-sm">Поставщики ещё не добавлены</p>
+      <button onclick="document.getElementById('modalCreate').classList.remove('hidden')"
+              class="mt-4 btn-primary px-4 py-2 text-sm">
+        Добавить первого поставщика
+      </button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Create Modal -->
+<div id="modalCreate" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl">
+    <div class="flex justify-between items-center px-6 py-4 border-b border-slate-800">
+      <h3 class="font-semibold text-slate-200">Новый поставщик</h3>
+      <button onclick="document.getElementById('modalCreate').classList.add('hidden')"
+              class="text-slate-500 hover:text-slate-300 text-xl leading-none">&times;</button>
+    </div>
+    <form method="post" class="p-6 space-y-4">
+      {% csrf_token %}
+      <div class="grid grid-cols-2 gap-4">
+        <div class="col-span-2">
+          <label class="text-xs text-slate-400 mb-1 block">Название *</label>
+          <input type="text" name="name" class="input-dark w-full px-3 py-2 text-sm" required>
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Контактное лицо</label>
+          <input type="text" name="contact_person" class="input-dark w-full px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Телефон</label>
+          <input type="text" name="phone" class="input-dark w-full px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Email</label>
+          <input type="email" name="email" class="input-dark w-full px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Сайт</label>
+          <input type="url" name="website" class="input-dark w-full px-3 py-2 text-sm" placeholder="https://...">
+        </div>
+        <div class="col-span-2">
+          <label class="text-xs text-slate-400 mb-1 block">Адрес</label>
+          <input type="text" name="address" class="input-dark w-full px-3 py-2 text-sm">
+        </div>
+        <div class="col-span-2">
+          <label class="text-xs text-slate-400 mb-1 block">Примечания</label>
+          <textarea name="notes" rows="2" class="input-dark w-full px-3 py-2 text-sm resize-none"></textarea>
+        </div>
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="submit" class="btn-primary px-5 py-2 text-sm">Создать</button>
+        <button type="button" onclick="document.getElementById('modalCreate').classList.add('hidden')"
+                class="btn-secondary px-5 py-2 text-sm">Отмена</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
