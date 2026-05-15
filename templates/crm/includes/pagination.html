@@ -1,0 +1,30 @@
+{% if page_obj.has_other_pages %}
+<div class="flex items-center justify-center gap-1 mt-4">
+  {% if page_obj.has_previous %}
+  <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}"
+     class="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-700 transition-colors">
+    &larr; Пред.
+  </a>
+  {% else %}
+  <span class="px-3 py-1.5 rounded-lg text-sm text-slate-600 border border-slate-800 cursor-not-allowed">&larr; Пред.</span>
+  {% endif %}
+
+  {% for num in page_obj.paginator.page_range %}
+    {% if page_obj.number == num %}
+    <span class="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white border border-indigo-600">{{ num }}</span>
+    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+    <a href="?page={{ num }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}"
+       class="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-700 transition-colors">{{ num }}</a>
+    {% endif %}
+  {% endfor %}
+
+  {% if page_obj.has_next %}
+  <a href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}"
+     class="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-700 transition-colors">
+    След. &rarr;
+  </a>
+  {% else %}
+  <span class="px-3 py-1.5 rounded-lg text-sm text-slate-600 border border-slate-800 cursor-not-allowed">След. &rarr;</span>
+  {% endif %}
+</div>
+{% endif %}

@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>
+  {% if doc_type == 'work_act' %}Акт выполненных работ (пустой)
+  {% elif doc_type == 'warranty' %}Гарантийный талон (пустой)
+  {% elif doc_type == 'refusal' %}Акт отказа (пустой)
+  {% elif doc_type == 'receipt_sale' %}Товарный чек (пустой)
+  {% else %}Акт приёма-передачи (пустой)
+  {% endif %} — {{ site_settings.company_name }}
+</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Times New Roman', serif; font-size: 12pt; color: #000; background: #fff; }
+.page { max-width: 210mm; margin: 0 auto; padding: 15mm 15mm 20mm; }
+h1 { font-size: 16pt; text-align: center; margin-bottom: 4px; }
+.subtitle { text-align: center; font-size: 11pt; margin-bottom: 16px; color: #444; }
+.header { display: flex; justify-content: space-between; margin-bottom: 16px; font-size: 11pt; flex-wrap: wrap; gap: 6px; }
+.info-block { margin-bottom: 14px; }
+.info-block h3 { font-size: 12pt; border-bottom: 1px solid #000; padding-bottom: 3px; margin-bottom: 8px; }
+.info-row { display: flex; gap: 8px; margin-bottom: 8px; font-size: 11pt; align-items: flex-end; }
+.info-row .label { font-weight: bold; min-width: 150px; flex-shrink: 0; white-space: nowrap; }
+.fill-line { flex: 1; border-bottom: 1px solid #000; min-width: 80px; height: 18px; }
+.fill-line-sm { width: 120px; border-bottom: 1px solid #000; height: 18px; }
+.fill-line-lg { flex: 1; border-bottom: 1px solid #000; min-width: 120px; height: 18px; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.services-table { width: 100%; border-collapse: collapse; font-size: 11pt; margin-bottom: 14px; }
+.services-table th, .services-table td { border: 1px solid #000; padding: 6px 8px; }
+.services-table th { background: #f0f0f0; font-weight: bold; }
+.services-table td { height: 28px; vertical-align: bottom; }
+.services-table .num { text-align: right; }
+.sign-block { margin-top: 20px; }
+.sign-row { display: flex; justify-content: space-between; margin-top: 28px; gap: 20px; }
+.sign-col { flex: 1; }
+.sign-line { border-bottom: 1px solid #000; margin-bottom: 3px; min-width: 160px; height: 24px; }
+.sign-hint { font-size: 10pt; color: #444; }
+.notice { background: #f5f5f5; border: 1px solid #ccc; padding: 10px; margin-bottom: 14px; font-size: 10pt; }
+.total-row { font-size: 13pt; font-weight: bold; border-top: 2px solid #000; }
+.warranty-box { border: 2px solid #000; padding: 16px; text-align: center; margin-bottom: 16px; }
+.warranty-box h2 { font-size: 18pt; margin-bottom: 8px; }
+.warranty-big { font-size: 36pt; font-weight: bold; display: block; margin: 12px 0; }
+@media print {
+  body { font-size: 11pt; }
+  .page { padding: 10mm; }
+  .no-print { display: none !important; }
+}
+</style>
+</head>
+<body onload="window.print()">
+<div class="no-print" style="background:#222;color:#fff;padding:10px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+  <button onclick="window.print()" style="background:#4f46e5;color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:14px">🖨 Печать</button>
+  <button onclick="window.close()" style="background:#444;color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:14px">✕ Закрыть</button>
+  <span style="font-size:12px;color:#aaa">
+    Пустой бланк ·
+    <strong style="color:#fff">
+      {% if doc_type == 'work_act' %}Акт выполненных работ
+      {% elif doc_type == 'warranty' %}Гарантийный талон
+      {% elif doc_type == 'refusal' %}Акт отказа от ремонта
+      {% elif doc_type == 'receipt_sale' %}Товарный чек
+      {% else %}Акт приёма-передачи{% endif %}
+    </strong>
+  </span>
+</div>
+<div class="page">
+
+{# ══════════════════════════════ АКТ ПРИЁМА ══════════════════════════════════ #}
+{% if doc_type == 'receipt' %}
+
+<h1>АКТ ПРИЁМА УСТРОЙСТВА В РЕМОНТ</h1>
+<p class="subtitle">{{ site_settings.company_name }}{% if site_settings.legal_address %} | {{ site_settings.legal_address }}{% endif %}{% if site_settings.phone %} | {{ site_settings.phone }}{% endif %}</p>
+
+<div class="header">
+  <div style="display:flex;align-items:flex-end;gap:6px"><strong>Заказ №:</strong><span class="fill-line-sm"></span></div>
+  <div style="display:flex;align-items:flex-end;gap:6px"><strong>Дата:</strong><span class="fill-line-sm"></span></div>
+  <div style="display:flex;align-items:flex-end;gap:6px"><strong>Сотрудник:</strong><span class="fill-line-sm"></span></div>
+</div>
+
+<div class="two-col">
+  <div class="info-block">
+    <h3>Клиент</h3>
+    <div class="info-row"><span class="label">ФИО:</span><span class="fill-line"></span></div>
+    <div class="info-row"><span class="label">Телефон:</span><span class="fill-line"></span></div>
+    <div class="info-row"><span class="label">Email:</span><span class="fill-line"></span></div>
+  </div>
+  <div class="info-block">
+    <h3>Устройство</h3>
+    <div class="info-row"><span class="label">Марка / модель:</span><span class="fill-line"></span></div>
+    <div class="info-row"><span class="label">IMEI / S/N:</span><span class="fill-line"></span></div>
+    <div class="info-row"><span class="label">Пароль:</span><span class="fill-line"></span></div>
+  </div>
+</div>
+
+<div class="info-block">
+  <h3>Внешний вид / комплектация</h3>
+  <div class="info-row"><span class="fill-line-lg"></span></div>
+  <div class="info-row"><span class="fill-line-lg"></span></div>
+</div>
+
+<div class="info-block">
+  <h3>Жалоба / неисправность</h3>
+  <div class="info-row"><span class="fill-line-lg"></span></div>
+  <div class="info-row"><span class="fill-line-lg"></span></div>
+</div>
+
+<div class="info-block">
+  <h3>Планируемые работы</h3>
+  <table class="services-table">
+    <thead><tr><th>Работа / услуга</th><th width="130px" class="num">Стоимость</th></tr></thead>
+    <tbody>
+      <tr><td></td><td></td></tr>
+      <tr><td></td><td></td></tr>
+      <tr><td></td><td></td></tr>
+      <tr style="font-weight:bold;border-top:2px solid #000"><td class="num">Предв. итого:</td><td></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="notice">
+  <strong>Гарантия на выполненные работы: _____ дней</strong><br>
+  Сервисный центр не несёт ответственности за данные на устройстве. Устройство хранится в сервисе не более 30 дней с момента готовности.
+</div>
+
+<div class="sign-block">
+  <div class="sign-row">
+    <div class="sign-col">Клиент передал:<div class="sign-line"></div><div class="sign-hint">(подпись / дата)</div></div>
+    <div class="sign-col">Сотрудник принял:<div class="sign-line"></div><div class="sign-hint">(подпись / дата)</div></div>
+  </div>
+</div>
+
+
+{# ══════════════════════════════ АКТ РАБОТ ═══════════════════════════════════ #}
+{% elif doc_type == 'work_act' %}
+
+<h1>АКТ ВЫПОЛНЕННЫХ РАБОТ</h1>
+<p class="subtitle">{{ site_settings.company_name }}{% if site_settings.legal_address %} | {{ site_settings.legal_address }}{% endif %}{% if site_settings.phone %} | {{ site_settings.phone }}{% endif %}</p>
+
+<div class="header">
+  <div style="display:flex;align-items:flex-end;gap:6px"><strong>Заказ №:</strong><span class="fill-line-sm"></span></div>
+  <div style="display:flex;align-items:flex-end;gap:6px"><strong>Дата:</strong><span class="fill-line-sm"></span></div>
+  <div style="display:flex;align-items:flex-end;gap:6px"><strong>Мастер:</strong><span class="fill-line-sm"></span></div>
+</div>
+
+<div class="two-col">
+  <div class="info-block">
+    <h3>Клиент</h3>
+    <div class="info-row"><span class="label">ФИО:</span><span class="fill-line"></span></div>
+    <div class="info-row"><span class="label">Телефон:</span><span class="fill-line"></span></div>
+  </div>
+  <div class="info-block">
+    <h3>Устройство</h3>
+    <div class="info-row"><span class="label">Марка / модель:</span><span class="fill-line"></span></div>
+    <div class="info-row"><span class="label">IMEI / S/N:</span><span class="fill-line"></span></div>
+  </div>
+</div>
+
+<div class="info-block">
+  <h3>Заявленная неисправность</h3>
+  <div class="info-row"><span class="fill-line-lg"></span></div>
+</div>
+
+<div class="info-block">
+  <h3>Выполненные работы и запчасти</h3>
+  <table class="services-table">
+    <thead><tr><th>№</th><th>Наименование</th><th width="60px" class="num">Кол-во</th><th width="130px" class="num">Сумма</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td></td><td></td><td></td></tr>
+      <tr><td>2</td><td></td><td></td><td></td></tr>
+      <tr><td>3</td><td></td><td></td><td></td></tr>
+      <tr><td>4</td><td></td><td></td><td></td></tr>
+      <tr><td>5</td><td></td><td></td><td></td></tr>
+      <tr class="total-row"><td colspan="3" class="num">ИТОГО К ОПЛАТЕ:</td><td></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="notice">
+  <strong>Гарантия на выполненные работы: _____ дней</strong> с даты выдачи.<br>
+  Гарантия не распространяется на механические повреждения, возникшие после выдачи устройства.
+</div>
+
+<div class="sign-block">
+  <div class="sign-row">
+    <div class="sign-col">Исполнитель сдал:<div class="sign-line"></div><div class="sign-hint">{{ site_settings.company_name }} (подпись / дата)</div></div>
+    <div class="sign-col">Клиент принял:<div class="sign-line"></div><div class="sign-hint">(подпись / дата)</div></div>
+  </div>
+</div>
+
+
+{# ══════════════════════════════ ГАРАНТИЯ ════════════════════════════════════ #}
+{% elif doc_type == 'warranty' %}
+
+<div class="warranty-box">
+  <h2>ГАРАНТИЙНЫЙ ТАЛОН</h2>
+  <p style="font-size:11pt;color:#444">{{ site_settings.company_name }}{% if site_settings.phone %} · {{ site_settings.phone }}{% endif %}</p>
+</div>
+
+<div class="two-col">
+  <div class="info-block">
+    <h3>Клиент</h3>
+    <div class="info-row"><span class="label">ФИО:</span><span class="fill-line"></span></div>
+    <div class="info-row"><span class="label">Телефон:</span><span class="fill-line"></span></div>
+  </div>
+  <div class="info-block">
+    <h3>Устройство</h3>
+    <div class="info-row"><span class="label">Модель:</span><span class="fill-line"></span></div>
+    <div class="info-row"><span class="label">IMEI:</span><span class="fill-line"></span></div>
+  </div>
+</div>
+
+<div class="info-block">
+  <h3>Выполненные работы</h3>
+  <table class="services-table">
+    <thead><tr><th>Работа / услуга</th><th width="130px" class="num">Стоимость</th></tr></thead>
+    <tbody>
+      <tr><td></td><td></td></tr>
+      <tr><td></td><td></td></tr>
+      <tr><td></td><td></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div style="text-align:center;margin:20px 0">
+  <p style="font-size:12pt">Гарантийный срок:</p>
+  <span class="warranty-big">_______ дней</span>
+  <div class="two-col" style="margin-top:8px;text-align:left">
+    <div class="info-row"><span class="label">Дата выдачи:</span><span class="fill-line"></span></div>
+    <div class="info-row"><span class="label">Заказ №:</span><span class="fill-line"></span></div>
+  </div>
+</div>
+
+<div class="notice" style="font-size:10pt">
+  Гарантия распространяется только на выполненные работы и установленные запчасти.<br>
+  Гарантия не действует при: механических повреждениях, следах влаги, несанкционированном вскрытии, программных сбоях.
+</div>
+
+<div class="sign-block">
+  <div class="sign-row">
+    <div class="sign-col">Сотрудник:<div class="sign-line"></div><div class="sign-hint">(подпись / печать)</div></div>
+    <div class="sign-col">Клиент получил:<div class="sign-line"></div><div class="sign-hint">(подпись)</div></div>
+  </div>
+</div>
+
+
+{# ══════════════════════════════ АКТ ОТКАЗА ══════════════════════════════════ #}
+{% elif doc_type == 'refusal' %}
+
+<h1>АКТ ОТКАЗА ОТ РЕМОНТА</h1>
+<p class="subtitle">{{ site_settings.company_name }}{% if site_settings.legal_address %} | {{ site_settings.legal_address }}{% endif %}{% if site_settings.phone %} | {{ site_settings.phone }}{% endif %}</p>
+
+<div class="header">
+  <div style="display:flex;align-items:flex-end;gap:6px"><strong>Заказ №:</strong><span class="fill-line-sm"></span></div>
+  <div style="display:flex;align-items:flex-end;gap:6px"><strong>Дата:</strong><span class="fill-line-sm"></span></div>
+</div>
+
+<div class="two-col">
+  <div class="info-block">
+    <h3>Клиент</h3>
+    <div class="info-row"><span class="label">ФИО:</span><span class="fill-line"></span></div>
+    <div class="info-row"><span class="label">Телефон:</span><span class="fill-line"></span></div>
+    <div class="info-row"><span class="label">Паспорт:</span><span class="fill-line"></span></div>
+  </div>
+  <div class="info-block">
+    <h3>Устройство</h3>
+    <div class="info-row"><span class="label">Модель:</span><span class="fill-line"></span></div>
+    <div class="info-row"><span class="label">IMEI / S/N:</span><span class="fill-line"></span></div>
+    <div class="info-row"><span class="label">Внешний вид:</span><span class="fill-line"></span></div>
+  </div>
+</div>
+
+<div class="info-block">
+  <h3>Заявленная неисправность</h3>
+  <div class="info-row"><span class="fill-line-lg"></span></div>
+  <div class="info-row"><span class="fill-line-lg"></span></div>
+</div>
+
+<div class="info-block">
+  <h3>Результат диагностики</h3>
+  <div class="info-row"><span class="fill-line-lg"></span></div>
+  <div class="info-row"><span class="fill-line-lg"></span></div>
+  <div class="info-row"><span class="fill-line-lg"></span></div>
+</div>
+
+<div class="notice" style="margin-top:14px">
+  Я, _________________________, ознакомлен(а) с результатами диагностики и отказываюсь от проведения ремонта.
+  Устройство получено в состоянии, описанном выше. Претензий к сервисному центру не имею.
+</div>
+
+<div class="sign-block">
+  <div class="sign-row">
+    <div class="sign-col">Представитель сервиса:<div class="sign-line"></div><div class="sign-hint">(подпись / дата)</div></div>
+    <div class="sign-col">Клиент:<div class="sign-line"></div><div class="sign-hint">(подпись / дата)</div></div>
+  </div>
+</div>
+
+
+{# ══════════════════════════════ ТОВАРНЫЙ ЧЕК ════════════════════════════════ #}
+{% elif doc_type == 'receipt_sale' %}
+
+<h1>КАССОВЫЙ / ТОВАРНЫЙ ЧЕК</h1>
+<p class="subtitle">{{ site_settings.company_name }}{% if site_settings.inn %} · ИНН {{ site_settings.inn }}{% endif %}{% if site_settings.phone %} · {{ site_settings.phone }}{% endif %}</p>
+
+<div class="header">
+  <div style="display:flex;align-items:flex-end;gap:6px"><strong>№:</strong><span class="fill-line-sm"></span></div>
+  <div style="display:flex;align-items:flex-end;gap:6px"><strong>Дата:</strong><span class="fill-line-sm"></span></div>
+  <div style="display:flex;align-items:flex-end;gap:6px"><strong>Кассир:</strong><span class="fill-line-sm"></span></div>
+</div>
+
+<div class="info-block">
+  <div class="info-row"><span class="label">Покупатель:</span><span class="fill-line"></span></div>
+  <div class="info-row"><span class="label">Телефон:</span><span class="fill-line"></span></div>
+</div>
+
+<table class="services-table">
+  <thead><tr><th>№</th><th>Наименование</th><th width="60px" class="num">Кол-во</th><th width="100px" class="num">Цена</th><th width="120px" class="num">Сумма</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>2</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>3</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>4</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>5</td><td></td><td></td><td></td><td></td></tr>
+    <tr class="total-row"><td colspan="4" class="num">ИТОГО:</td><td></td></tr>
+  </tbody>
+</table>
+
+<p style="font-size:10pt;text-align:center;margin-top:20px;color:#444">
+  Спасибо за обращение в {{ site_settings.company_name }}!
+</p>
+
+{% endif %}
+
+</div>
+</body>
+</html>

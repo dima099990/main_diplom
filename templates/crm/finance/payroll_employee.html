@@ -1,0 +1,139 @@
+{% extends 'crm/base.html' %}
+{% block title %}Зарплата — {{ emp.get_full_name|default:emp.username }}{% endblock %}
+{% block page_title %}
+  <a href="{% url 'crm:finance' %}" class="text-slate-500 hover:text-slate-300 mr-1">Финансы</a>
+  <span class="text-slate-600 mr-1">/</span>
+  Зарплата: {{ emp.get_full_name|default:emp.username }}
+{% endblock %}
+
+{% block content %}
+{% include 'crm/includes/messages.html' %}
+
+<!-- Period selector -->
+<div class="flex gap-2 mb-6 items-center flex-wrap">
+  {% for m in month_range %}
+  <a href="?year={{ m.year }}&month={{ m.month }}"
+     class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap
+     {% if m.year == year and m.month == month %}bg-indigo-600 text-white{% else %}bg-slate-800 text-slate-400 hover:text-slate-200{% endif %}">
+    {{ m.label }}
+  </a>
+  {% endfor %}
+</div>
+
+<!-- Summary cards -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+  <div class="card p-5">
+    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Начислено</p>
+    <p class="text-3xl font-bold text-green-400">{{ income|floatformat:0 }} ₽</p>
+  </div>
+  <div class="card p-5">
+    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Штрафы</p>
+    <p class="text-3xl font-bold text-red-400">{{ penalty|floatformat:0 }} ₽</p>
+  </div>
+  <div class="card p-5 border-indigo-500/30">
+    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Итого к выплате</p>
+    <p class="text-3xl font-bold text-white">{{ net|floatformat:0 }} ₽</p>
+    <p class="text-xs text-slate-500 mt-1">{{ month }}/{{ year }}</p>
+  </div>
+</div>
+
+<div class="grid md:grid-cols-3 gap-4">
+
+  <!-- Records table -->
+  <div class="md:col-span-2 card">
+    <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+      <h2 class="text-sm font-semibold text-slate-200">Детализация начислений</h2>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead><tr class="border-b border-slate-800 text-xs text-slate-500 uppercase">
+          <th class="text-left px-4 py-3">Дата</th>
+          <th class="text-left px-4 py-3">Тип</th>
+          <th class="text-left px-4 py-3">Описание</th>
+          <th class="text-right px-4 py-3">Сумма</th>
+        </tr></thead>
+        <tbody class="divide-y divide-slate-800/60">
+          {% for r in records %}
+          <tr class="hover:bg-slate-800/30 transition-colors">
+            <td class="px-4 py-3 text-slate-500 text-xs">{{ r.created_at|date:"d.m.Y" }}</td>
+            <td class="px-4 py-3">
+              <span class="badge {% if r.record_type == 'penalty' %}bg-red-500/15 text-red-400 border-red-500/20{% else %}bg-green-500/15 text-green-400 border-green-500/20{% endif %}">
+                {{ r.get_record_type_display }}
+              </span>
+            </td>
+            <td class="px-4 py-3 text-slate-300">{{ r.description|default:"—" }}</td>
+            <td class="px-4 py-3 text-right font-semibold {% if r.record_type == 'penalty' %}text-red-400{% else %}text-green-400{% endif %}">
+              {% if r.record_type == 'penalty' %}−{% else %}+{% endif %}{{ r.amount|floatformat:0 }} ₽
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="px-4 py-12 text-center text-slate-500">
+            Нет начислений за {{ month }}/{{ year }}
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Add record form -->
+  <div class="card p-5">
+    <h3 class="text-sm font-semibold text-slate-200 mb-4">Добавить запись</h3>
+    <form method="post" action="{% url 'crm:payroll_add_record' emp.pk %}" class="space-y-3">
+      {% csrf_token %}
+      <div>
+        <label class="text-xs text-slate-500 mb-1 block">Тип</label>
+        <select name="record_type" class="input-dark w-full px-3 py-2 text-sm">
+          <option value="penalty">❌ Штраф</option>
+          <option value="bonus">⭐ Премия</option>
+          <option value="base_salary">💼 Оклад</option>
+          <option value="repair_bonus">🔧 Бонус за ремонт</option>
+          <option value="sale_bonus">🛍 Бонус за продажу</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs text-slate-500 mb-1 block">Сумма ₽</label>
+        <input type="number" name="amount" step="1" min="0" placeholder="0" required
+               class="input-dark w-full px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="text-xs text-slate-500 mb-1 block">Комментарий</label>
+        <input type="text" name="description" placeholder="Причина..."
+               class="input-dark w-full px-3 py-2 text-sm">
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="text-xs text-slate-500 mb-1 block">Месяц</label>
+          <select name="month" class="input-dark w-full px-2 py-2 text-sm">
+            <option value="1" {% if month == 1 %}selected{% endif %}>Янв</option>
+            <option value="2" {% if month == 2 %}selected{% endif %}>Фев</option>
+            <option value="3" {% if month == 3 %}selected{% endif %}>Мар</option>
+            <option value="4" {% if month == 4 %}selected{% endif %}>Апр</option>
+            <option value="5" {% if month == 5 %}selected{% endif %}>Май</option>
+            <option value="6" {% if month == 6 %}selected{% endif %}>Июн</option>
+            <option value="7" {% if month == 7 %}selected{% endif %}>Июл</option>
+            <option value="8" {% if month == 8 %}selected{% endif %}>Авг</option>
+            <option value="9" {% if month == 9 %}selected{% endif %}>Сен</option>
+            <option value="10" {% if month == 10 %}selected{% endif %}>Окт</option>
+            <option value="11" {% if month == 11 %}selected{% endif %}>Ноя</option>
+            <option value="12" {% if month == 12 %}selected{% endif %}>Дек</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-slate-500 mb-1 block">Год</label>
+          <input type="number" name="year" value="{{ year }}"
+                 class="input-dark w-full px-2 py-2 text-sm">
+        </div>
+      </div>
+      <button type="submit" class="btn-primary w-full py-2.5 text-sm mt-2">
+        Добавить запись
+      </button>
+    </form>
+
+    <div class="mt-4 pt-4 border-t border-slate-800">
+      <p class="text-xs text-slate-600">Добавленная запись отобразится в выбранном периоде сотрудника.</p>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

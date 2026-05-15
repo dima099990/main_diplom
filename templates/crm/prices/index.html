@@ -1,0 +1,331 @@
+{% extends 'crm/base.html' %}
+{% block title %}Прайс-лист — Kayros CRM{% endblock %}
+{% block page_title %}Редактор прайс-листа{% endblock %}
+
+{% block content %}
+<div class="flex gap-6">
+
+  <!-- Левая колонка: бренды -->
+  <div class="w-52 flex-shrink-0 space-y-1">
+    <p class="text-xs text-slate-500 uppercase tracking-wide px-2 mb-3">Марки</p>
+    {% for brand in brands %}
+    <a href="?brand={{ brand.pk }}"
+       class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition-all
+              {% if brand.pk == selected_brand_id %}bg-indigo-600 text-white font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800{% endif %}">
+      <span class="text-lg leading-none">{{ brand.icon }}</span>
+      <span>{{ brand.name }}</span>
+      <span class="ml-auto text-xs {% if brand.pk == selected_brand_id %}text-indigo-200{% else %}text-slate-600{% endif %}">
+        {{ brand.phone_models.count }}
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- Основная часть -->
+  <div class="flex-1 min-w-0">
+
+    {% if not selected_brand %}
+    <div class="card p-12 text-center">
+      <div class="text-5xl mb-4">📋</div>
+      <p class="text-slate-400">Выберите марку слева для редактирования прайса</p>
+    </div>
+    {% else %}
+
+    <!-- Заголовок бренда + добавить модель -->
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-3">
+        <span class="text-3xl">{{ selected_brand.icon }}</span>
+        <div>
+          <h2 class="text-lg font-semibold text-white">{{ selected_brand.name }}</h2>
+          <p class="text-xs text-slate-500">{{ phone_models.count }} моделей · {% with total=0 %}{{ phone_models|length }}{% endwith %} позиций</p>
+        </div>
+      </div>
+      <button onclick="openAddModelModal()" class="btn-primary px-3 py-2 text-sm flex items-center gap-1.5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        Добавить модель
+      </button>
+    </div>
+
+    {% if messages %}
+    {% for msg in messages %}
+    <div class="mb-4 px-4 py-3 rounded-xl text-sm {% if msg.tags == 'error' %}bg-red-500/10 border border-red-500/20 text-red-400{% else %}bg-green-500/10 border border-green-500/20 text-green-400{% endif %}">
+      {{ msg }}
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if not phone_models %}
+    <div class="card p-10 text-center">
+      <p class="text-slate-500 text-sm">Моделей пока нет. Добавьте первую модель.</p>
+    </div>
+    {% endif %}
+
+    <!-- Список моделей -->
+    {% for model in phone_models %}
+    <div class="card mb-3" id="model-{{ model.pk }}">
+      <!-- Шапка модели -->
+      <div class="px-5 py-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-800/30 transition-colors rounded-t-xl"
+           onclick="toggleModel({{ model.pk }})">
+        <div class="flex items-center gap-3">
+          <svg id="arrow-{{ model.pk }}" class="w-4 h-4 text-slate-500 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+          </svg>
+          <span class="font-medium text-slate-200">{{ model.name }}</span>
+          <span class="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">{{ model.services.count }} услуг</span>
+        </div>
+        <div class="flex items-center gap-2" onclick="event.stopPropagation()">
+          <button onclick="openAddServiceModal({{ model.pk }}, '{{ model.name|escapejs }}')"
+                  class="text-xs px-2.5 py-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 transition-colors flex items-center gap-1">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Добавить услугу
+          </button>
+          <form method="post" action="{% url 'crm:price_model_delete' model.pk %}"
+                onsubmit="return confirm('Удалить модель «{{ model.name|escapejs }}» и все её услуги?')">
+            {% csrf_token %}
+            <input type="hidden" name="brand_id" value="{{ selected_brand_id }}">
+            <button type="submit" class="text-xs px-2.5 py-1.5 rounded-lg text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+              Удалить
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Таблица услуг (по умолчанию скрыта) -->
+      <div id="body-{{ model.pk }}" class="hidden">
+        {% if model.services.all %}
+        <div class="overflow-x-auto border-t border-slate-800">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-xs text-slate-600 uppercase border-b border-slate-800">
+                <th class="text-left px-5 py-2.5">Услуга</th>
+                <th class="text-center px-4 py-2.5 w-28">Цена от ₽</th>
+                <th class="text-center px-4 py-2.5 w-28">Цена до ₽</th>
+                <th class="text-center px-4 py-2.5 w-28">Срок</th>
+                <th class="text-center px-4 py-2.5 w-20">★</th>
+                <th class="text-center px-4 py-2.5 w-20">Акт.</th>
+                <th class="px-4 py-2.5 w-24"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/60">
+              {% for svc in model.services.all %}
+              <tr class="hover:bg-slate-800/20 group">
+                <td class="px-5 py-3 text-slate-200">
+                  {{ svc.name }}
+                  {% if svc.description %}<span class="text-xs text-slate-600 ml-1">{{ svc.description }}</span>{% endif %}
+                </td>
+                <td class="px-4 py-3 text-center font-mono text-green-400">{{ svc.price_from }}</td>
+                <td class="px-4 py-3 text-center font-mono text-slate-500">{{ svc.price_to|default:"—" }}</td>
+                <td class="px-4 py-3 text-center text-slate-500 text-xs">{{ svc.duration }}</td>
+                <td class="px-4 py-3 text-center">
+                  {% if svc.is_popular %}<span class="text-yellow-400">★</span>{% else %}<span class="text-slate-700">★</span>{% endif %}
+                </td>
+                <td class="px-4 py-3 text-center">
+                  {% if svc.is_active %}
+                    <span class="inline-block w-2 h-2 rounded-full bg-green-500"></span>
+                  {% else %}
+                    <span class="inline-block w-2 h-2 rounded-full bg-slate-700"></span>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-3 text-right">
+                  <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onclick="openEditServiceModal({{ svc.pk }}, {{ model.pk }}, '{{ model.name|escapejs }}', '{{ svc.name|escapejs }}', {{ svc.price_from }}, {{ svc.price_to|default:'null' }}, '{{ svc.duration|escapejs }}', {{ svc.is_popular|lower }}, {{ svc.is_active|lower }})"
+                            class="p-1.5 rounded-lg hover:bg-slate-700 text-slate-500 hover:text-slate-200 transition-colors" title="Редактировать">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    </button>
+                    <form method="post" action="{% url 'crm:price_service_delete' svc.pk %}" class="inline"
+                          onsubmit="return confirm('Удалить услугу «{{ svc.name|escapejs }}»?')">
+                      {% csrf_token %}
+                      <input type="hidden" name="brand_id" value="{{ selected_brand_id }}">
+                      <button type="submit" class="p-1.5 rounded-lg hover:bg-red-500/10 text-slate-600 hover:text-red-400 transition-colors" title="Удалить">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="px-5 py-6 border-t border-slate-800 text-center">
+          <p class="text-slate-600 text-sm">Нет услуг</p>
+          <button onclick="openAddServiceModal({{ model.pk }}, '{{ model.name|escapejs }}')"
+                  class="mt-2 text-xs text-indigo-400 hover:text-indigo-300">+ Добавить первую услугу</button>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+
+    {% endif %} {# end if selected_brand #}
+  </div>
+</div>
+
+<!-- ═══════════════ MODAL: Добавить/редактировать услугу ═══════════════ -->
+<div id="svcModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeSvcModal()"></div>
+  <div class="relative bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl">
+    <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+      <h3 id="svcModalTitle" class="text-base font-semibold text-white">Добавить услугу</h3>
+      <button onclick="closeSvcModal()" class="text-slate-500 hover:text-slate-300 text-xl leading-none">✕</button>
+    </div>
+    <form method="post" action="{% url 'crm:price_service_save' %}" class="p-6 space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="pk" id="svcPk">
+      <input type="hidden" name="brand_id" value="{{ selected_brand_id }}">
+      <input type="hidden" name="phone_model_id" id="svcModelId">
+
+      <div>
+        <label class="text-xs text-slate-400 mb-1 block">Модель</label>
+        <div id="svcModelName" class="input-dark px-3 py-2 text-sm text-slate-300 rounded-lg bg-slate-800/50"></div>
+      </div>
+
+      <div>
+        <label class="text-xs text-slate-400 mb-1 block">Название услуги <span class="text-red-400">*</span></label>
+        <input type="text" name="name" id="svcName" required placeholder="Замена экрана, Замена батареи..."
+               class="input-dark w-full px-3 py-2 text-sm">
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Цена от ₽ <span class="text-red-400">*</span></label>
+          <input type="number" name="price_from" id="svcPriceFrom" required min="0" placeholder="1500"
+                 class="input-dark w-full px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Цена до ₽ <span class="text-slate-600">(необяз.)</span></label>
+          <input type="number" name="price_to" id="svcPriceTo" min="0" placeholder="3000"
+                 class="input-dark w-full px-3 py-2 text-sm">
+        </div>
+      </div>
+
+      <div>
+        <label class="text-xs text-slate-400 mb-1 block">Срок ремонта</label>
+        <input type="text" name="duration" id="svcDuration" placeholder="1–2 часа"
+               class="input-dark w-full px-3 py-2 text-sm">
+      </div>
+
+      <div class="flex items-center gap-6 pt-1">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" name="is_popular" id="svcPopular" value="1"
+                 class="w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500">
+          <span class="text-sm text-slate-300">⭐ Популярная</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" name="is_active" id="svcActive" value="1" checked
+                 class="w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500">
+          <span class="text-sm text-slate-300">Активна</span>
+        </label>
+      </div>
+
+      <div class="flex gap-3 pt-2">
+        <button type="submit" class="btn-primary flex-1 py-2.5 text-sm">Сохранить</button>
+        <button type="button" onclick="closeSvcModal()" class="btn-secondary px-5 py-2.5 text-sm">Отмена</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ═══════════════ MODAL: Добавить модель ═══════════════ -->
+<div id="modelModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModelModal()"></div>
+  <div class="relative bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm shadow-2xl">
+    <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+      <h3 class="text-base font-semibold text-white">Добавить модель</h3>
+      <button onclick="closeModelModal()" class="text-slate-500 hover:text-slate-300 text-xl leading-none">✕</button>
+    </div>
+    <form method="post" action="{% url 'crm:price_model_save' %}" class="p-6 space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="brand_id" value="{{ selected_brand_id }}">
+      <div>
+        <label class="text-xs text-slate-400 mb-1 block">Название модели <span class="text-red-400">*</span></label>
+        <input type="text" name="name" id="modelName" required placeholder="iPhone 15 Pro Max"
+               class="input-dark w-full px-3 py-2 text-sm" autofocus>
+      </div>
+      <div class="flex gap-3">
+        <button type="submit" class="btn-primary flex-1 py-2.5 text-sm">Добавить</button>
+        <button type="button" onclick="closeModelModal()" class="btn-secondary px-5 py-2.5 text-sm">Отмена</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Раскрытие/скрытие модели
+function toggleModel(pk) {
+  const body = document.getElementById('body-' + pk);
+  const arrow = document.getElementById('arrow-' + pk);
+  const isHidden = body.classList.contains('hidden');
+  body.classList.toggle('hidden', !isHidden);
+  arrow.style.transform = isHidden ? 'rotate(90deg)' : '';
+}
+
+// Сохраняем открытые секции в sessionStorage
+document.querySelectorAll('[id^="model-"]').forEach(el => {
+  const pk = el.id.replace('model-', '');
+  const key = 'price_open_' + pk;
+  if (sessionStorage.getItem(key) === '1') {
+    toggleModel(pk);
+  }
+  el.querySelector('[onclick^="toggleModel"]').addEventListener('click', () => {
+    const isNowHidden = document.getElementById('body-' + pk).classList.contains('hidden');
+    sessionStorage.setItem(key, isNowHidden ? '0' : '1');
+  });
+});
+
+// ──── Modal: Услуга ────
+function openAddServiceModal(modelId, modelName) {
+  document.getElementById('svcModalTitle').textContent = 'Добавить услугу';
+  document.getElementById('svcPk').value = '';
+  document.getElementById('svcModelId').value = modelId;
+  document.getElementById('svcModelName').textContent = modelName;
+  document.getElementById('svcName').value = '';
+  document.getElementById('svcPriceFrom').value = '';
+  document.getElementById('svcPriceTo').value = '';
+  document.getElementById('svcDuration').value = '1–2 часа';
+  document.getElementById('svcPopular').checked = false;
+  document.getElementById('svcActive').checked = true;
+  document.getElementById('svcModal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('svcName').focus(), 50);
+}
+
+function openEditServiceModal(pk, modelId, modelName, name, priceFrom, priceTo, duration, isPopular, isActive) {
+  document.getElementById('svcModalTitle').textContent = 'Редактировать услугу';
+  document.getElementById('svcPk').value = pk;
+  document.getElementById('svcModelId').value = modelId;
+  document.getElementById('svcModelName').textContent = modelName;
+  document.getElementById('svcName').value = name;
+  document.getElementById('svcPriceFrom').value = priceFrom;
+  document.getElementById('svcPriceTo').value = priceTo !== null ? priceTo : '';
+  document.getElementById('svcDuration').value = duration;
+  document.getElementById('svcPopular').checked = isPopular;
+  document.getElementById('svcActive').checked = isActive;
+  document.getElementById('svcModal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('svcName').focus(), 50);
+}
+
+function closeSvcModal() {
+  document.getElementById('svcModal').classList.add('hidden');
+}
+
+// ──── Modal: Модель ────
+function openAddModelModal() {
+  document.getElementById('modelName').value = '';
+  document.getElementById('modelModal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('modelName').focus(), 50);
+}
+
+function closeModelModal() {
+  document.getElementById('modelModal').classList.add('hidden');
+}
+
+// Закрытие по Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeSvcModal(); closeModelModal(); }
+});
+</script>
+{% endblock %}

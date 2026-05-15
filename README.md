@@ -1,71 +1,103 @@
-# Kayros — Сайт сервисного центра (Django)
+# Kayros CRM — система для сервисного центра
 
-## Быстрый старт
+Простая CRM для управления ремонтами, складом, продажами и сотрудниками. Написана на Django.
+
+---
+
+## Как запустить
 
 ```bash
-# 1. Клонировать / распаковать проект
-cd repair_site
+# Клонировать проект
+git clone https://github.com/dima099990/main_diplom
+cd diplom
 
-# 2. Создать виртуальное окружение
-python -m venv venv
-source venv/bin/activate      # Linux/Mac
-venv\Scripts\activate         # Windows
+# Создать виртуальное окружение
+python -m venv .venv
 
-# 3. Установить зависимости
+# Активировать (Linux/Mac)
+source .venv/bin/activate
+
+# Активировать (Windows)
+.venv\Scripts\activate
+
+# Установить зависимости
 pip install -r requirements.txt
 
-# 4. Применить миграции
+# Применить миграции
 python manage.py migrate
 
-# 5. Создать суперпользователя
+# Заполнить тестовыми данными (опционально)
+python manage.py seed_data
+
+# Создать администратора
 python manage.py createsuperuser
 
-# 6. Запустить сервер
+# Запустить сервер
 python manage.py runserver
 ```
 
-Сайт: http://127.0.0.1:8000  
-Админка: http://127.0.0.1:8000/admin  
-(При первом запуске уже есть тестовый логин: admin / admin123)
-## Команды
-```bash
-# 1. Создание зависимостей
-pip freeze > requirements.txt
-```
+Открыть в браузере: http://127.0.0.1:8000
+
+---
 
 ## Страницы
-- `/` — Главная
-- `/about/` — О нас
-- `/prices/` — Прайс-лист
-- `/contacts/` — Контакты
-- `/admin/` — Административная панель
 
-## Настройка через админку
-1. **Настройки сайта** — название, телефон, адрес, ссылка на Telegram-бот, часы работы
-2. **Категории устройств** — iPhone, Samsung, Xiaomi и т.д.
-3. **Прайс-лист** — услуги с ценами, сроками, флагом "Популярная"
-4. **Отзывы** — тексты клиентов, рейтинг, устройство
-5. **Заявки** — входящие заявки с формы сайта
+| Адрес | Что там |
+|---|---|
+| `/` | Публичный сайт (главная, прайс, контакты) |
+| `/crm/` | CRM — вход для сотрудников |
+| `/crm/repairs/` | Заказы на ремонт |
+| `/crm/sales/` | Продажи |
+| `/crm/warehouse/` | Склад (запчасти и аксессуары) |
+| `/crm/finance/` | Финансы и зарплаты |
+| `/crm/documents/` | Печать документов |
+| `/admin/` | Панель Django-администратора |
 
-## Структура
+---
+
+## Роли пользователей
+
+- **admin** — полный доступ, управление зарплатами и штрафами
+- **manager** — доступ к заказам, складу, продажам
+- **employee** — базовый доступ, только свои данные
+
+---
+
+## Настройки
+
+Основные параметры задаются через файл `.env` (или переменные окружения):
+
 ```
-repair_site/
-├── config/          # Настройки Django
-├── core/            # Основное приложение
-│   ├── models.py    # БД: SiteSettings, DeviceCategory, RepairService, Review, ContactRequest
-│   ├── views.py     # Контроллеры страниц
-│   ├── admin.py     # Настройка админ-панели
-│   └── static/      # CSS, JS
-└── templates/core/  # HTML-шаблоны
-    ├── base.html    # Навбар + футер
-    ├── home.html    # Главная
-    ├── about.html   # О нас
-    ├── prices.html  # Прайс-лист
-    └── contacts.html
+SECRET_KEY=your-secret-key
+DEBUG=True
+USE_SQLITE=True
 ```
 
-## Продакшен
-- Сменить `SECRET_KEY` в `settings.py`
-- Установить `DEBUG = False`
-- Настроить `ALLOWED_HOSTS`
-- Подключить PostgreSQL вместо SQLite
+По умолчанию используется SQLite — ничего настраивать не нужно.
+
+---
+
+## Структура проекта
+
+```
+diplom/
+├── config/          # Настройки Django (settings, urls, asgi)
+├── core/            # Публичный сайт
+├── crm/             # CRM: модели, представления, урлы
+├── templates/       # Все HTML-шаблоны
+│   ├── core/        # Шаблоны публичного сайта
+│   └── crm/         # Шаблоны CRM
+├── static/          # CSS, JS, изображения
+├── manage.py
+└── requirements.txt
+```
+
+---
+
+## Перед деплоем
+
+- Поменять `SECRET_KEY` на случайный
+- Установить `DEBUG=False`
+- Прописать `ALLOWED_HOSTS`
+- Переключиться на PostgreSQL (убрать `USE_SQLITE=True`)
+- Настроить Redis для уведомлений
