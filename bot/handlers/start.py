@@ -12,25 +12,25 @@ MAIN_MENU = ReplyKeyboardMarkup(
     resize_keyboard=True,
 )
 
-_CONTACT_KB = ReplyKeyboardMarkup(
-    [[KeyboardButton("📱 Поделиться контактом", request_contact=True)]],
+# Меню для новых пользователей — всё то же самое + кнопка регистрации
+NEW_USER_MENU = ReplyKeyboardMarkup(
+    [
+        [KeyboardButton("💰 Узнать цены"),  KeyboardButton("📅 Записаться")],
+        [KeyboardButton("📞 Контакты"),     KeyboardButton("💬 Задать вопрос")],
+        [KeyboardButton("📱 Зарегистрироваться", request_contact=True)],
+    ],
     resize_keyboard=True,
-    one_time_keyboard=True,
 )
 
 
 # ── Хендлеры ──────────────────────────────────────────────────────────────
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    /start — точка входа.
-    Зарегистрированный клиент → главное меню.
-    Новый → просим поделиться контактом.
-    """
+    """/start — точка входа."""
     from db import get_settings, get_customer_by_telegram
 
     tid = update.effective_user.id
-    s = await get_settings()
+    s   = await get_settings()
     customer = await get_customer_by_telegram(tid)
 
     if customer:
@@ -46,10 +46,11 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             f"👋 Привет{', ' + tg_name if tg_name else ''}!\n\n"
             f"Я бот сервисного центра *{s.company_name}*.\n"
             f"Помогу узнать цены на ремонт и записаться на сервис.\n\n"
-            f"Нажмите кнопку ниже, чтобы поделиться номером — "
-            f"мы создадим вашу карточку клиента:",
+            f"Нажмите *«Зарегистрироваться»* чтобы поделиться номером "
+            f"и мы создадим вашу карточку клиента. "
+            f"Или сразу выберите нужный раздел 👇",
             parse_mode="Markdown",
-            reply_markup=_CONTACT_KB,
+            reply_markup=NEW_USER_MENU,
         )
 
 
@@ -57,19 +58,26 @@ async def handle_registration_contact(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
     """
-    Получаем контакт (кнопка «Поделиться контактом» из /start).
-    Создаём/находим клиента в общей БД и показываем главное меню.
+    Получаем контакт (кнопка «Зарегистрироваться» из /start).
+    Если в процессе ai_book-записи — перекидываем туда.
     """
     from db import get_settings, get_or_create_customer_from_telegram
 
-    contact = update.message.contact
-    s = await get_settings()
+    # Если идёт ai_book-запись и ждём телефон — передаём туда
+    ai_book = context.user_data.get("ai_book")
+    if ai_book and ai_book.get("step") == "ask_phone":
+        from handlers.chat import _finish_ai_book_phone
+        await _finish_ai_book_phone(update, context)
+        return
+
+    contact  = update.message.contact
+    s        = await get_settings()
 
     customer, is_new = await get_or_create_customer_from_telegram(
         telegram_id=update.effective_user.id,
         first_name=contact.first_name or "",
-        last_name=contact.last_name or "",
-        phone=contact.phone_number or "",
+        last_name=contact.last_name  or "",
+        phone=contact.phone_number   or "",
     )
 
     first = customer.name.split()[0] if customer.name else "Клиент"

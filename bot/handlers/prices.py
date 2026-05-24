@@ -2,6 +2,8 @@
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
 
+from handlers.start import MAIN_MENU
+
 # Состояние диалога (диапазон 30)
 WAITING_PRICE_QUERY = 30
 
@@ -19,7 +21,7 @@ async def show_prices(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     from db import search_prices, get_all_prices_text, get_settings
     from ai import get_ai_response
 
-    query = update.message.text.strip()
+    query   = update.message.text.strip()
     results = await search_prices(query)
 
     if results:
@@ -31,10 +33,12 @@ async def show_prices(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
                 f"   {r['service']}: *{r['price']}*{duration}"
             )
         lines.append("\n_Точная стоимость уточняется после диагностики._")
-        await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+        await update.message.reply_text(
+            "\n".join(lines), parse_mode="Markdown", reply_markup=MAIN_MENU
+        )
     else:
         s = await get_settings()
-        if s.bot_deepseek_key or s.bot_ollama_url:
+        if s.bot_deepseek_key:
             await context.bot.send_chat_action(
                 chat_id=update.effective_chat.id, action="typing"
             )
@@ -44,16 +48,15 @@ async def show_prices(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
                 system_prompt=s.bot_prompt,
                 api_key=s.bot_deepseek_key,
                 prices_context=prices_text,
-                base_url=s.bot_ollama_url,
-                model=s.bot_ollama_model,
             )
-            await update.message.reply_text(answer)
+            await update.message.reply_text(answer, reply_markup=MAIN_MENU)
         else:
             await update.message.reply_text(
                 f"По запросу *«{query}»* цену не нашли в базе.\n\n"
                 f"Позвоните — назовём точную стоимость!\n"
                 f"☎️ {s.phone}",
                 parse_mode="Markdown",
+                reply_markup=MAIN_MENU,
             )
 
     return ConversationHandler.END
