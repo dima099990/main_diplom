@@ -132,7 +132,7 @@ CORS_ALLOW_CREDENTIALS = True
 TELEGRAM_BOT_LINK = config('TELEGRAM_BOT_LINK', default='https://t.me/your_bot')
 WARRANTY_DAYS_DEFAULT = 90
 
-# Logging
+# Logging — только консоль, файловый лог не нужен
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -141,15 +141,10 @@ LOGGING = {
     },
     'handlers': {
         'console': {'class': 'logging.StreamHandler', 'formatter': 'verbose'},
-        'file': {
-            'class': 'logging.FileHandler',
-            'filename': BASE_DIR / 'logs' / 'django.log',
-            'formatter': 'verbose',
-        },
     },
     'root': {'handlers': ['console'], 'level': 'INFO'},
     'loggers': {
         'django': {'handlers': ['console'], 'level': 'WARNING', 'propagate': False},
-        'crm': {'handlers': ['console', 'file'], 'level': 'INFO', 'propagate': False},
+        'crm':    {'handlers': ['console'], 'level': 'INFO',    'propagate': False},
     },
 }

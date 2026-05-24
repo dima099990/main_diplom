@@ -33,16 +33,14 @@
       {% endif %}
 
       {% if site.inn or site.ogrn or site.director_name %}
-      <div class="legal-block" style="margin-top:2rem;padding:1.25rem;background:var(--card-bg,#f8f9fa);border-radius:12px;border:1px solid var(--border,#e5e7eb)">
-        <h4 style="font-size:0.85rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.75rem;opacity:.6">Юридическая информация</h4>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem .75rem;font-size:.9rem">
+      <div class="card" style="margin-top:2rem;padding:1.25rem;font-size:.9rem">
+        <h4 style="font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.85rem;opacity:.45;font-weight:600">Юридическая информация</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.45rem .75rem">
           {% if site.director_name %}<div><strong>Директор:</strong> {{ site.director_name }}</div>{% endif %}
           {% if site.inn %}<div><strong>ИНН:</strong> {{ site.inn }}</div>{% endif %}
           {% if site.ogrn %}<div><strong>ОГРН(ИП):</strong> {{ site.ogrn }}</div>{% endif %}
           {% if site.kpp %}<div><strong>КПП:</strong> {{ site.kpp }}</div>{% endif %}
-          {% if site.legal_address %}
-          <div style="grid-column:1/-1"><strong>Юридический адрес:</strong> {{ site.legal_address }}</div>
-          {% endif %}
+          {% if site.legal_address %}<div style="grid-column:1/-1"><strong>Юр. адрес:</strong> {{ site.legal_address }}</div>{% endif %}
         </div>
       </div>
       {% endif %}

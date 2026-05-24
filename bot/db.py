@@ -76,11 +76,9 @@ def _search_prices(query: str) -> list[dict]:
         .filter(is_active=True, phone_model__name__icontains=q)
         | RepairService.objects.select_related("phone_model__brand")
         .filter(is_active=True, name__icontains=q)
+        | RepairService.objects.select_related("phone_model__brand")
+        .filter(is_active=True, phone_model__brand__name__icontains=q)
     )
-    for brand in Brand.objects.filter(is_active=True, name__icontains=q):
-        qs = qs | RepairService.objects.select_related("phone_model__brand").filter(
-            is_active=True, phone_model__brand=brand
-        )
     results = []
     for svc in qs.distinct()[:20]:
         price_str = f"от {svc.price_from} ₽"
@@ -88,13 +86,9 @@ def _search_prices(query: str) -> list[dict]:
             price_str = f"{svc.price_from}–{svc.price_to} ₽"
         results.append({
             "service": svc.name,
-            "model": svc.phone_model.name if svc.phone_model else "—",
-            "brand": (
-                svc.phone_model.brand.name
-                if svc.phone_model and svc.phone_model.brand
-                else "—"
-            ),
-            "price": price_str,
+            "model":   svc.phone_model.name if svc.phone_model else "—",
+            "brand":   svc.phone_model.brand.name if svc.phone_model and svc.phone_model.brand else "—",
+            "price":   price_str,
             "duration": svc.duration or "",
         })
     return results
@@ -103,10 +97,10 @@ def _search_prices(query: str) -> list[dict]:
 def _get_all_prices_text() -> str:
     lines = []
     for brand in Brand.objects.filter(is_active=True).prefetch_related(
-        "phonemodel_set__repair_services"
+        "phone_models__services"          # правильные related_name из models.py
     ):
-        for model in brand.phonemodel_set.filter(is_active=True):
-            services = model.repair_services.filter(is_active=True)
+        for model in brand.phone_models.filter(is_active=True):
+            services = model.services.filter(is_active=True)
             if not services.exists():
                 continue
             lines.append(f"\n{brand.name} {model.name}:")

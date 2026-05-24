@@ -920,6 +920,91 @@ def sale_finalize(request, pk):
 
 # ─── FINANCE ──────────────────────────────────────────────────────────────────
 
+def _calc_payroll(emp, year, month):
+    """
+    Считает зарплату сотрудника за месяц динамически:
+    - Бонусы за ремонты/продажи — из реальных данных × ТЕКУЩИЙ процент
+    - Оклад, премии, штрафы — из PayrollRecord (ручные записи)
+    Благодаря этому изменение процента сразу отражается в расчёте.
+    """
+    import calendar as _cal
+    _, days = _cal.monthrange(year, month)
+    from datetime import date as _date
+    m_start = _date(year, month, 1)
+    m_end   = _date(year, month, days)
+
+    try:
+        profile = emp.profile
+        repair_pct = profile.repair_percent or Decimal('0')
+        sale_pct   = profile.accessory_percent or Decimal('0')
+    except Exception:
+        repair_pct = sale_pct = Decimal('0')
+
+    # ── Динамический бонус за ремонты ─────────────────────────────────────────
+    repair_bonus = Decimal('0')
+    repair_count = 0
+    if repair_pct > 0:
+        paid_repairs = RepairOrder.objects.filter(
+            assigned_to=emp,
+            is_paid=True,
+            paid_at__date__gte=m_start,
+            paid_at__date__lte=m_end,
+        )
+        repair_count = paid_repairs.count()
+        repair_bonus = sum(
+            max(r.profit, Decimal('0')) * repair_pct / 100
+            for r in paid_repairs
+        )
+
+    # ── Динамический бонус за продажи ─────────────────────────────────────────
+    sale_bonus = Decimal('0')
+    sale_count = 0
+    if sale_pct > 0:
+        sales = SaleOrder.objects.filter(
+            created_by=emp,
+            is_finalized=True,
+            created_at__date__gte=m_start,
+            created_at__date__lte=m_end,
+        )
+        sale_count = sales.count()
+        sale_bonus = sum(
+            max(s.profit, Decimal('0')) * sale_pct / 100
+            for s in sales
+        )
+
+    # ── Ручные записи: оклад, премия, штраф ──────────────────────────────────
+    manual_qs = PayrollRecord.objects.filter(
+        employee=emp,
+        period_year=year,
+        period_month=month,
+        record_type__in=['base_salary', 'bonus', 'penalty'],
+    ).order_by('-created_at')
+
+    agg = manual_qs.aggregate(
+        income=Sum('amount', filter=~Q(record_type='penalty')),
+        penalty=Sum('amount', filter=Q(record_type='penalty')),
+    )
+    manual_income = agg['income'] or Decimal('0')
+    penalty       = agg['penalty'] or Decimal('0')
+
+    total_income = repair_bonus + sale_bonus + manual_income
+    net = total_income - penalty
+
+    return {
+        'repair_bonus': repair_bonus,
+        'repair_pct':   repair_pct,
+        'repair_count': repair_count,
+        'sale_bonus':   sale_bonus,
+        'sale_pct':     sale_pct,
+        'sale_count':   sale_count,
+        'manual_income':manual_income,
+        'penalty':      penalty,
+        'total_income': total_income,
+        'net':          net,
+        'manual_records': manual_qs,
+    }
+
+
 @crm_required
 def finance(request):
     now = timezone.now()
@@ -954,50 +1039,44 @@ def finance(request):
         ).aggregate(t=Sum('amount'))['t'] or Decimal('0'),
     }
 
-    # ── Зарплата к выплате: агрегация по сотрудникам ──
-    all_payroll = PayrollRecord.objects.select_related('employee').order_by(
-        'employee__last_name', 'employee__first_name'
-    )
-    emp_map = {}
-    for rec in all_payroll:
-        uid = rec.employee_id
-        if uid not in emp_map:
-            try:
-                role_display = rec.employee.profile.get_role_display()
-            except Exception:
-                role_display = '—'
-            emp_map[uid] = {
-                'employee_pk': uid,
-                'name': rec.employee.get_full_name() or rec.employee.username,
-                'role_display': role_display,
-                'accrued': Decimal('0'),
-                'penalties': Decimal('0'),
-            }
-        if rec.record_type == 'penalty':
-            emp_map[uid]['penalties'] += rec.amount
-        else:
-            emp_map[uid]['accrued'] += rec.amount
-
-    payroll_summary = []
-    total_accrued = Decimal('0')
-    total_penalties = Decimal('0')
-    for row in emp_map.values():
-        row['net'] = row['accrued'] - row['penalties']
-        total_accrued += row['accrued']
-        total_penalties += row['penalties']
-        payroll_summary.append(row)
-    payroll_total = total_accrued - total_penalties
-
     from crm.decorators import get_role
     current_role = get_role(request.user)
 
-    # For admin: pass list of all employees for payroll management
-    all_employees = []
-    if current_role == 'admin':
-        from django.contrib.auth.models import User as AuthUser
-        all_employees = AuthUser.objects.filter(is_active=True).select_related('profile').order_by(
-            'last_name', 'first_name'
-        )
+    # ── Зарплата: динамический расчёт за ТЕКУЩИЙ месяц по актуальным % ──────
+    from django.contrib.auth.models import User as AuthUser
+    cur_year  = now.year
+    cur_month = now.month
+
+    all_employees = AuthUser.objects.filter(
+        is_active=True
+    ).select_related('profile').order_by('last_name', 'first_name')
+
+    payroll_summary  = []
+    total_accrued    = Decimal('0')
+    total_penalties  = Decimal('0')
+
+    for emp in all_employees:
+        data = _calc_payroll(emp, cur_year, cur_month)
+        try:
+            role_display = emp.profile.get_role_display()
+        except Exception:
+            role_display = '—'
+        payroll_summary.append({
+            'employee_pk':  emp.pk,
+            'name':         emp.get_full_name() or emp.username,
+            'role_display': role_display,
+            'accrued':      data['total_income'],
+            'penalties':    data['penalty'],
+            'net':          data['net'],
+        })
+        total_accrued   += data['total_income']
+        total_penalties += data['penalty']
+
+    payroll_total = total_accrued - total_penalties
+
+    # Для модалки "добавить запись" — только для админа
+    if current_role != 'admin':
+        all_employees = []
 
     return render(request, 'crm/finance/index.html', {
         'stats': stats,
@@ -1010,6 +1089,7 @@ def finance(request):
         'payroll_total_penalties': total_penalties,
         'month_label': month_start.strftime('%B %Y'),
         'all_employees': all_employees,
+        'role': current_role,
     })
 
 
@@ -1029,67 +1109,53 @@ def expense_create(request):
 
 @crm_required
 def payroll_my(request):
+    from datetime import date
     now = timezone.now()
-    year = int(request.GET.get('year', now.year))
+    year  = int(request.GET.get('year',  now.year))
     month = int(request.GET.get('month', now.month))
 
-    records = PayrollRecord.objects.filter(
-        employee=request.user, period_year=year, period_month=month
-    ).order_by('-created_at')
+    data = _calc_payroll(request.user, year, month)
 
-    total = records.aggregate(
-        income=Sum('amount', filter=~Q(record_type='penalty')),
-        penalty=Sum('amount', filter=Q(record_type='penalty')),
-    )
-    net = (total['income'] or Decimal('0')) - (total['penalty'] or Decimal('0'))
-
-    # Build last 6 months for selector
     month_range = []
     for i in range(5, -1, -1):
-        from datetime import date
-        import calendar
         d = now.date().replace(day=1)
-        # Go back i months
         m = d.month - i
         y = d.year
         while m <= 0:
             m += 12
             y -= 1
-        month_range.append({
-            'year': y, 'month': m,
-            'label': date(y, m, 1).strftime('%b %Y'),
-        })
+        month_range.append({'year': y, 'month': m, 'label': date(y, m, 1).strftime('%b %Y')})
 
     return render(request, 'crm/finance/payroll_my.html', {
-        'records': records,
-        'year': year, 'month': month,
-        'net': net,
-        'income': total['income'] or Decimal('0'),
-        'penalty': total['penalty'] or Decimal('0'),
-        'month_range': month_range,
+        'records':      data['manual_records'],
+        'year':         year,
+        'month':        month,
+        'repair_bonus': data['repair_bonus'],
+        'repair_pct':   data['repair_pct'],
+        'repair_count': data['repair_count'],
+        'sale_bonus':   data['sale_bonus'],
+        'sale_pct':     data['sale_pct'],
+        'sale_count':   data['sale_count'],
+        'manual_income':data['manual_income'],
+        'income':       data['total_income'],
+        'penalty':      data['penalty'],
+        'net':          data['net'],
+        'month_range':  month_range,
     })
 
 
 @crm_required
 @admin_required
 def payroll_employee(request, employee_pk):
-    """Admin view: detailed payroll for a specific employee."""
+    """Admin view: detailed payroll for a specific employee (dynamic calc)."""
     from django.contrib.auth.models import User as AuthUser
     from datetime import date as date_type
     emp = get_object_or_404(AuthUser, pk=employee_pk)
     now = timezone.now()
-    year = int(request.GET.get('year', now.year))
+    year  = int(request.GET.get('year',  now.year))
     month = int(request.GET.get('month', now.month))
 
-    records = PayrollRecord.objects.filter(
-        employee=emp, period_year=year, period_month=month
-    ).order_by('-created_at')
-
-    total = records.aggregate(
-        income=Sum('amount', filter=~Q(record_type='penalty')),
-        penalty=Sum('amount', filter=Q(record_type='penalty')),
-    )
-    net = (total['income'] or Decimal('0')) - (total['penalty'] or Decimal('0'))
+    data = _calc_payroll(emp, year, month)
 
     month_range = []
     for i in range(5, -1, -1):
@@ -1102,13 +1168,21 @@ def payroll_employee(request, employee_pk):
         month_range.append({'year': y, 'month': m, 'label': date_type(y, m, 1).strftime('%b %Y')})
 
     return render(request, 'crm/finance/payroll_employee.html', {
-        'emp': emp,
-        'records': records,
-        'year': year, 'month': month,
-        'net': net,
-        'income': total['income'] or Decimal('0'),
-        'penalty': total['penalty'] or Decimal('0'),
-        'month_range': month_range,
+        'emp':          emp,
+        'year':         year,
+        'month':        month,
+        'repair_bonus': data['repair_bonus'],
+        'repair_pct':   data['repair_pct'],
+        'repair_count': data['repair_count'],
+        'sale_bonus':   data['sale_bonus'],
+        'sale_pct':     data['sale_pct'],
+        'sale_count':   data['sale_count'],
+        'manual_income':data['manual_income'],
+        'records':      data['manual_records'],
+        'income':       data['total_income'],
+        'penalty':      data['penalty'],
+        'net':          data['net'],
+        'month_range':  month_range,
     })
 
 

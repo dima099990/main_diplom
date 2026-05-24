@@ -21,28 +21,48 @@
 </div>
 
 <!-- Summary cards -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-  <div class="card p-5">
-    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Начислено</p>
-    <p class="text-3xl font-bold text-green-400">{{ income|floatformat:0 }} ₽</p>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  <div class="card p-4">
+    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Бонус ремонты</p>
+    <p class="text-2xl font-bold text-green-400">{{ repair_bonus|floatformat:0 }} ₽</p>
+    <p class="text-xs text-slate-600 mt-1">{{ repair_count }} заказ · {{ repair_pct }}%</p>
   </div>
-  <div class="card p-5">
+  <div class="card p-4">
+    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Бонус продажи</p>
+    <p class="text-2xl font-bold text-green-400">{{ sale_bonus|floatformat:0 }} ₽</p>
+    <p class="text-xs text-slate-600 mt-1">{{ sale_count }} продаж · {{ sale_pct }}%</p>
+  </div>
+  <div class="card p-4">
+    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Оклад + премии</p>
+    <p class="text-2xl font-bold text-green-400">{{ manual_income|floatformat:0 }} ₽</p>
+    <p class="text-xs text-slate-600 mt-1">ручные начисления</p>
+  </div>
+  <div class="card p-4">
     <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Штрафы</p>
-    <p class="text-3xl font-bold text-red-400">{{ penalty|floatformat:0 }} ₽</p>
+    <p class="text-2xl font-bold text-red-400">{{ penalty|floatformat:0 }} ₽</p>
   </div>
-  <div class="card p-5 border-indigo-500/30">
-    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Итого к выплате</p>
-    <p class="text-3xl font-bold text-white">{{ net|floatformat:0 }} ₽</p>
-    <p class="text-xs text-slate-500 mt-1">{{ month }}/{{ year }}</p>
+</div>
+
+<div class="card p-5 mb-6 border-indigo-500/30">
+  <div class="flex items-center justify-between">
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Итого к выплате · {{ month }}/{{ year }}</p>
+      <p class="text-4xl font-bold text-white">{{ net|floatformat:0 }} ₽</p>
+    </div>
+    <div class="text-right text-xs text-slate-500 space-y-1">
+      <div>Начислено: <span class="text-green-400 font-semibold">{{ income|floatformat:0 }} ₽</span></div>
+      <div>Штрафы: <span class="text-red-400 font-semibold">−{{ penalty|floatformat:0 }} ₽</span></div>
+    </div>
   </div>
 </div>
 
 <div class="grid md:grid-cols-3 gap-4">
 
-  <!-- Records table -->
+  <!-- Manual records table -->
   <div class="md:col-span-2 card">
-    <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
-      <h2 class="text-sm font-semibold text-slate-200">Детализация начислений</h2>
+    <div class="px-5 py-4 border-b border-slate-800">
+      <h2 class="text-sm font-semibold text-slate-200">Ручные записи (оклад, премии, штрафы)</h2>
+      <p class="text-xs text-slate-500 mt-0.5">Бонусы за ремонты и продажи считаются автоматически по текущему %</p>
     </div>
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
@@ -67,8 +87,8 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="4" class="px-4 py-12 text-center text-slate-500">
-            Нет начислений за {{ month }}/{{ year }}
+          <tr><td colspan="4" class="px-4 py-10 text-center text-slate-500">
+            Нет ручных записей за {{ month }}/{{ year }}
           </td></tr>
           {% endfor %}
         </tbody>
@@ -87,8 +107,6 @@
           <option value="penalty">❌ Штраф</option>
           <option value="bonus">⭐ Премия</option>
           <option value="base_salary">💼 Оклад</option>
-          <option value="repair_bonus">🔧 Бонус за ремонт</option>
-          <option value="sale_bonus">🛍 Бонус за продажу</option>
         </select>
       </div>
       <div>
@@ -105,7 +123,7 @@
         <div>
           <label class="text-xs text-slate-500 mb-1 block">Месяц</label>
           <select name="month" class="input-dark w-full px-2 py-2 text-sm">
-            <option value="1" {% if month == 1 %}selected{% endif %}>Янв</option>
+              <option value="1" {% if month == 1 %}selected{% endif %}>Янв</option>
             <option value="2" {% if month == 2 %}selected{% endif %}>Фев</option>
             <option value="3" {% if month == 3 %}selected{% endif %}>Мар</option>
             <option value="4" {% if month == 4 %}selected{% endif %}>Апр</option>
@@ -129,9 +147,9 @@
         Добавить запись
       </button>
     </form>
-
-    <div class="mt-4 pt-4 border-t border-slate-800">
-      <p class="text-xs text-slate-600">Добавленная запись отобразится в выбранном периоде сотрудника.</p>
+    <div class="mt-4 pt-4 border-t border-slate-800 text-xs text-slate-600">
+      Бонусы за ремонты ({{ repair_pct }}%) и продажи ({{ sale_pct }}%) считаются автоматически —
+      изменение % в настройках сотрудника сразу меняет итог.
     </div>
   </div>
 

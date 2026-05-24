@@ -42,11 +42,6 @@ h1 { font-size: 15pt; text-align: center; margin-bottom: 4px; }
 .company-name { font-size: 14pt; font-weight: bold; }
 .company-meta { font-size: 9.5pt; color: #444; line-height: 1.5; text-align: right; }
 
-/* ── Реквизиты (подвал документа) ── */
-.requisites { border-top: 1px solid #bbb; margin-top: 18px; padding-top: 10px; font-size: 9pt; color: #555; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; }
-.requisites .req-title { grid-column: 1/-1; font-weight: bold; font-size: 9.5pt; margin-bottom: 4px; color: #333; }
-.req-row { display: flex; gap: 4px; }
-.req-label { font-weight: bold; min-width: 90px; flex-shrink: 0; }
 
 @media print {
   body { font-size: 11pt; }
@@ -95,8 +90,11 @@ h1 { font-size: 15pt; text-align: center; margin-bottom: 4px; }
     {% if s.ogrn %}ОГРН(ИП): {{ s.ogrn }}<br>{% endif %}
     {% if s.kpp %}КПП: {{ s.kpp }}<br>{% endif %}
     {% if s.director_name %}Директор: {{ s.director_name }}<br>{% endif %}
-    {% if s.email %}{{ s.email }}<br>{% endif %}
-    {% if s.website %}{{ s.website }}{% endif %}
+    {% if s.legal_address %}{{ s.legal_address }}<br>{% endif %}
+    {% if s.bank_name %}{{ s.bank_name }}{% if s.bik %} · БИК {{ s.bik }}{% endif %}<br>{% endif %}
+    {% if s.account_number %}Р/с: {{ s.account_number }}<br>{% endif %}
+    {% if s.corr_account %}К/с: {{ s.corr_account }}<br>{% endif %}
+    {% if s.email %}{{ s.email }}{% endif %}
   </div>
 </div>
 {% endwith %}
@@ -398,22 +396,6 @@ h1 { font-size: 15pt; text-align: center; margin-bottom: 4px; }
 {% endif %}
 
 
-{# ── Реквизиты компании (общий подвал для всех документов) ──────────────── #}
-{% with s=site_settings %}
-{% if s.inn or s.ogrn or s.bank_name or s.legal_address %}
-<div class="requisites">
-  <div class="req-title">Реквизиты {{ s.company_name }}</div>
-  {% if s.inn %}<div class="req-row"><span class="req-label">ИНН:</span><span>{{ s.inn }}</span></div>{% endif %}
-  {% if s.ogrn %}<div class="req-row"><span class="req-label">ОГРН(ИП):</span><span>{{ s.ogrn }}</span></div>{% endif %}
-  {% if s.kpp %}<div class="req-row"><span class="req-label">КПП:</span><span>{{ s.kpp }}</span></div>{% endif %}
-  {% if s.director_name %}<div class="req-row"><span class="req-label">Директор:</span><span>{{ s.director_name }}</span></div>{% endif %}
-  {% if s.legal_address %}<div class="req-row" style="grid-column:1/-1"><span class="req-label">Юр. адрес:</span><span>{{ s.legal_address }}</span></div>{% endif %}
-  {% if s.bank_name %}<div class="req-row" style="grid-column:1/-1"><span class="req-label">Банк:</span><span>{{ s.bank_name }}{% if s.bik %} · БИК {{ s.bik }}{% endif %}</span></div>{% endif %}
-  {% if s.account_number %}<div class="req-row"><span class="req-label">Р/счёт:</span><span>{{ s.account_number }}</span></div>{% endif %}
-  {% if s.corr_account %}<div class="req-row"><span class="req-label">К/счёт:</span><span>{{ s.corr_account }}</span></div>{% endif %}
-</div>
-{% endif %}
-{% endwith %}
 
 </div>
 </body>

@@ -14,27 +14,47 @@
   {% endfor %}
 </div>
 
-<!-- Summary -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-  <div class="card p-5">
-    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Начислено</p>
-    <p class="text-3xl font-bold text-green-400">{{ income|floatformat:0 }} ₽</p>
+<!-- Summary cards -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  <div class="card p-4">
+    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Бонус ремонты</p>
+    <p class="text-2xl font-bold text-green-400">{{ repair_bonus|floatformat:0 }} ₽</p>
+    <p class="text-xs text-slate-600 mt-1">{{ repair_count }} заказ · {{ repair_pct }}%</p>
   </div>
-  <div class="card p-5">
+  <div class="card p-4">
+    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Бонус продажи</p>
+    <p class="text-2xl font-bold text-green-400">{{ sale_bonus|floatformat:0 }} ₽</p>
+    <p class="text-xs text-slate-600 mt-1">{{ sale_count }} продаж · {{ sale_pct }}%</p>
+  </div>
+  <div class="card p-4">
+    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Оклад + премии</p>
+    <p class="text-2xl font-bold text-green-400">{{ manual_income|floatformat:0 }} ₽</p>
+    <p class="text-xs text-slate-600 mt-1">ручные начисления</p>
+  </div>
+  <div class="card p-4">
     <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Штрафы</p>
-    <p class="text-3xl font-bold text-red-400">{{ penalty|floatformat:0 }} ₽</p>
-  </div>
-  <div class="card p-5 border-indigo-500/30">
-    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Итого к выплате</p>
-    <p class="text-3xl font-bold text-white">{{ net|floatformat:0 }} ₽</p>
-    <p class="text-xs text-slate-500 mt-1">{{ month }}/{{ year }}</p>
+    <p class="text-2xl font-bold text-red-400">{{ penalty|floatformat:0 }} ₽</p>
   </div>
 </div>
 
-<!-- Breakdown -->
+<div class="card p-5 mb-6 border-indigo-500/30">
+  <div class="flex items-center justify-between">
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Итого к выплате · {{ month }}/{{ year }}</p>
+      <p class="text-4xl font-bold text-white">{{ net|floatformat:0 }} ₽</p>
+    </div>
+    <div class="text-right text-xs text-slate-500 space-y-1">
+      <div>Начислено: <span class="text-green-400 font-semibold">{{ income|floatformat:0 }} ₽</span></div>
+      <div>Штрафы: <span class="text-red-400 font-semibold">−{{ penalty|floatformat:0 }} ₽</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Manual records -->
 <div class="card">
   <div class="px-5 py-4 border-b border-slate-800">
-    <h2 class="text-sm font-semibold text-slate-200">Детализация начислений</h2>
+    <h2 class="text-sm font-semibold text-slate-200">Ручные начисления</h2>
+    <p class="text-xs text-slate-500 mt-0.5">Оклад, премии и штрафы, добавленные администратором</p>
   </div>
   <div class="overflow-x-auto">
     <table class="w-full text-sm">
@@ -42,7 +62,6 @@
         <th class="text-left px-4 py-3">Дата</th>
         <th class="text-left px-4 py-3">Тип</th>
         <th class="text-left px-4 py-3">Описание</th>
-        <th class="text-left px-4 py-3">Заказ</th>
         <th class="text-right px-4 py-3">Сумма</th>
       </tr></thead>
       <tbody class="divide-y divide-slate-800/60">
@@ -55,20 +74,13 @@
             </span>
           </td>
           <td class="px-4 py-3 text-slate-300">{{ r.description|default:"—" }}</td>
-          <td class="px-4 py-3">
-            {% if r.repair_order %}
-            <a href="{% url 'crm:repair_detail' r.repair_order.pk %}" class="text-indigo-400 hover:text-indigo-300 font-mono text-xs">
-              {{ r.repair_order.order_number }}
-            </a>
-            {% else %}—{% endif %}
-          </td>
           <td class="px-4 py-3 text-right font-semibold {% if r.record_type == 'penalty' %}text-red-400{% else %}text-green-400{% endif %}">
             {% if r.record_type == 'penalty' %}−{% else %}+{% endif %}{{ r.amount|floatformat:0 }} ₽
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="5" class="px-4 py-12 text-center text-slate-500">
-          Нет начислений за {{ month }}/{{ year }}
+        <tr><td colspan="4" class="px-4 py-10 text-center text-slate-500">
+          Нет ручных записей за {{ month }}/{{ year }}
         </td></tr>
         {% endfor %}
       </tbody>
