@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(del \"C:\\\\diplom\\\\Dockerfile\" \"C:\\\\diplom\\\\docker-compose.yml\")",
-      "Bash(rmdir /s /q \"C:\\\\diplom\\\\nginx\")"
-    ]
-  }
-}
