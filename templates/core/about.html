@@ -1,25 +1,54 @@
 {% extends 'core/base.html' %}
 {% block title %}О нас — {{ site.company_name }}{% endblock %}
 {% block content %}
+
 <section class="page-hero">
   <div class="container">
     <h1>О компании</h1>
     <p>{{ site.tagline }}</p>
   </div>
 </section>
+
 <section class="section">
   <div class="container about-grid">
     <div class="about-text">
       <h2>{{ site.company_name }}</h2>
       <p>{{ site.about_full_text|default:site.about_text }}</p>
+
       <div class="about-facts">
-        <div class="fact"><span>📍</span><p>{{ site.address }}</p></div>
+        <div class="fact"><span>📍</span><p>{{ site.actual_address|default:site.address }}</p></div>
         <div class="fact"><span>🕐</span><p>{{ site.working_hours }}</p></div>
         <div class="fact"><span>📞</span><p><a href="tel:{{ site.phone }}">{{ site.phone }}</a></p></div>
         <div class="fact"><span>🛡</span><p>Гарантия {{ site.warranty_days }} дней</p></div>
+        {% if site.email %}
+        <div class="fact"><span>✉️</span><p><a href="mailto:{{ site.email }}">{{ site.email }}</a></p></div>
+        {% endif %}
+        {% if site.website %}
+        <div class="fact"><span>🌐</span><p><a href="{{ site.website }}" target="_blank">{{ site.website }}</a></p></div>
+        {% endif %}
       </div>
-      <a href="{{ site.telegram_bot_link }}" target="_blank" class="btn btn-lg">Написать в Telegram</a>
+
+      {% if site.telegram_bot_link %}
+      <a href="{{ site.telegram_bot_link }}" target="_blank" class="btn btn-lg" style="margin-top:1rem">Написать в Telegram</a>
+      {% endif %}
+
+      {% if site.inn or site.ogrn or site.director_name %}
+      <div class="legal-block" style="margin-top:2rem;padding:1.25rem;background:var(--card-bg,#f8f9fa);border-radius:12px;border:1px solid var(--border,#e5e7eb)">
+        <h4 style="font-size:0.85rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.75rem;opacity:.6">Юридическая информация</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem .75rem;font-size:.9rem">
+          {% if site.director_name %}<div><strong>Директор:</strong> {{ site.director_name }}</div>{% endif %}
+          {% if site.inn %}<div><strong>ИНН:</strong> {{ site.inn }}</div>{% endif %}
+          {% if site.ogrn %}<div><strong>ОГРН(ИП):</strong> {{ site.ogrn }}</div>{% endif %}
+          {% if site.kpp %}<div><strong>КПП:</strong> {{ site.kpp }}</div>{% endif %}
+          {% if site.legal_address %}
+          <div style="grid-column:1/-1"><strong>Юридический адрес:</strong> {{ site.legal_address }}</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
     </div>
+
     <div class="about-map">
       {% if site.yandex_map_embed %}
         {{ site.yandex_map_embed|safe }}
@@ -28,10 +57,11 @@
       {% else %}
         <div class="map-placeholder">
           <span>🗺</span>
-          <p>Карта появится после настройки в админ-панели</p>
+          <p>Карта появится после настройки в панели управления</p>
         </div>
       {% endif %}
     </div>
   </div>
 </section>
+
 {% endblock %}

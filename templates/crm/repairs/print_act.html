@@ -13,54 +13,94 @@
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Times New Roman', serif; font-size: 12pt; color: #000; background: #fff; }
-.page { max-width: 210mm; margin: 0 auto; padding: 15mm 15mm 20mm; }
-h1 { font-size: 16pt; text-align: center; margin-bottom: 4px; }
-.subtitle { text-align: center; font-size: 11pt; margin-bottom: 16px; color: #444; }
-.header { display: flex; justify-content: space-between; margin-bottom: 16px; font-size: 11pt; flex-wrap: wrap; gap: 6px; }
-.info-block { margin-bottom: 14px; }
-.info-block h3 { font-size: 12pt; border-bottom: 1px solid #000; padding-bottom: 3px; margin-bottom: 8px; }
-.info-row { display: flex; gap: 8px; margin-bottom: 5px; font-size: 11pt; }
+.page { max-width: 210mm; margin: 0 auto; padding: 12mm 15mm 18mm; }
+h1 { font-size: 15pt; text-align: center; margin-bottom: 4px; }
+.subtitle { text-align: center; font-size: 10pt; margin-bottom: 14px; color: #555; }
+.header { display: flex; justify-content: space-between; margin-bottom: 14px; font-size: 11pt; flex-wrap: wrap; gap: 6px; }
+.info-block { margin-bottom: 12px; }
+.info-block h3 { font-size: 11pt; border-bottom: 1px solid #000; padding-bottom: 3px; margin-bottom: 7px; }
+.info-row { display: flex; gap: 8px; margin-bottom: 4px; font-size: 11pt; }
 .info-row .label { font-weight: bold; min-width: 150px; flex-shrink: 0; }
-.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.services-table { width: 100%; border-collapse: collapse; font-size: 11pt; margin-bottom: 14px; }
-.services-table th, .services-table td { border: 1px solid #000; padding: 5px 8px; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.services-table { width: 100%; border-collapse: collapse; font-size: 11pt; margin-bottom: 12px; }
+.services-table th, .services-table td { border: 1px solid #000; padding: 4px 7px; }
 .services-table th { background: #f0f0f0; font-weight: bold; }
 .services-table .num { text-align: right; }
-.sign-block { margin-top: 20px; }
-.sign-row { display: flex; justify-content: space-between; margin-top: 28px; gap: 20px; }
+.sign-block { margin-top: 18px; }
+.sign-row { display: flex; justify-content: space-between; margin-top: 26px; gap: 20px; }
 .sign-col { flex: 1; }
 .sign-line { border-bottom: 1px solid #000; margin-bottom: 3px; min-width: 160px; height: 24px; }
-.sign-hint { font-size: 10pt; color: #444; }
-.notice { background: #f5f5f5; border: 1px solid #ccc; padding: 10px; margin-bottom: 14px; font-size: 10pt; }
+.sign-hint { font-size: 10pt; color: #555; }
+.notice { background: #f7f7f7; border: 1px solid #ccc; padding: 9px; margin-bottom: 12px; font-size: 10pt; }
 .total-row { font-size: 13pt; font-weight: bold; border-top: 2px solid #000; }
-.ok-sym { color: #166534; font-weight: bold; }
-.bad-sym { color: #991b1b; font-weight: bold; }
-.na-sym { color: #6b7280; }
-.warranty-box { border: 2px solid #000; padding: 16px; text-align: center; margin-bottom: 16px; }
-.warranty-box h2 { font-size: 18pt; margin-bottom: 8px; }
-.warranty-big { font-size: 36pt; font-weight: bold; display: block; margin: 12px 0; }
+.warranty-box { border: 2px solid #000; padding: 14px; text-align: center; margin-bottom: 14px; }
+.warranty-box h2 { font-size: 17pt; margin-bottom: 7px; }
+.warranty-big { font-size: 34pt; font-weight: bold; display: block; margin: 10px 0; }
+
+/* ── Шапка компании ── */
+.company-header { border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.company-name { font-size: 14pt; font-weight: bold; }
+.company-meta { font-size: 9.5pt; color: #444; line-height: 1.5; text-align: right; }
+
+/* ── Реквизиты (подвал документа) ── */
+.requisites { border-top: 1px solid #bbb; margin-top: 18px; padding-top: 10px; font-size: 9pt; color: #555; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; }
+.requisites .req-title { grid-column: 1/-1; font-weight: bold; font-size: 9.5pt; margin-bottom: 4px; color: #333; }
+.req-row { display: flex; gap: 4px; }
+.req-label { font-weight: bold; min-width: 90px; flex-shrink: 0; }
+
 @media print {
   body { font-size: 11pt; }
-  .page { padding: 10mm; }
+  .page { padding: 8mm 12mm; }
   .no-print { display: none !important; }
 }
 </style>
 </head>
 <body onload="window.print()">
-<div class="no-print" style="background:#222;color:#fff;padding:10px 20px;display:flex;align-items:center;gap:12px;">
+
+<!-- Панель управления (не печатается) -->
+<div class="no-print" style="background:#1e1e2e;color:#fff;padding:10px 20px;display:flex;align-items:center;gap:12px;">
   <button onclick="window.print()" style="background:#4f46e5;color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:14px">🖨 Печать</button>
-  <button onclick="window.close()" style="background:#444;color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:14px">✕ Закрыть</button>
-  <span style="margin-left:12px;font-size:13px;color:#aaa">
-    Тип документа: <strong style="color:#fff">
+  <button onclick="window.close()" style="background:#444;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:14px">✕ Закрыть</button>
+  <span style="margin-left:10px;font-size:13px;color:#aaa">Документ:
+    <strong style="color:#fff">
       {% if doc_type == 'work_act' %}Акт выполненных работ
       {% elif doc_type == 'warranty' %}Гарантийный талон
       {% elif doc_type == 'refusal' %}Акт отказа от ремонта
       {% elif doc_type == 'receipt_sale' %}Товарный чек
       {% else %}Акт приёма-передачи{% endif %}
     </strong>
+    · {{ repair.order_number }}
   </span>
 </div>
+
 <div class="page">
+
+{# ── Общая шапка компании (на всех документах) ────────────────────────── #}
+{% with s=site_settings %}
+<div class="company-header">
+  <div>
+    <div class="company-name">{{ s.company_name }}</div>
+    {% if s.actual_address or s.address %}
+    <div style="font-size:10pt;margin-top:3px;color:#444">📍 {{ s.actual_address|default:s.address }}</div>
+    {% endif %}
+    {% if s.phone %}
+    <div style="font-size:10pt;color:#444">📞 {{ s.phone }}</div>
+    {% endif %}
+    {% if s.working_hours %}
+    <div style="font-size:10pt;color:#444">🕐 {{ s.working_hours }}</div>
+    {% endif %}
+  </div>
+  <div class="company-meta">
+    {% if s.inn %}ИНН: {{ s.inn }}<br>{% endif %}
+    {% if s.ogrn %}ОГРН(ИП): {{ s.ogrn }}<br>{% endif %}
+    {% if s.kpp %}КПП: {{ s.kpp }}<br>{% endif %}
+    {% if s.director_name %}Директор: {{ s.director_name }}<br>{% endif %}
+    {% if s.email %}{{ s.email }}<br>{% endif %}
+    {% if s.website %}{{ s.website }}{% endif %}
+  </div>
+</div>
+{% endwith %}
+
 
 {# ═══════════════════════════════════════════════════════════════ #}
 {# ── АКТ ПРИЁМА-ПЕРЕДАЧИ ────────────────────────────────────── #}
@@ -68,12 +108,10 @@ h1 { font-size: 16pt; text-align: center; margin-bottom: 4px; }
 {% if doc_type == 'receipt' %}
 
 <h1>АКТ ПРИЁМА УСТРОЙСТВА В РЕМОНТ</h1>
-<p class="subtitle">{{ site_settings.company_name }}{% if site_settings.legal_address %} | {{ site_settings.legal_address }}{% endif %}{% if site_settings.phone %} | {{ site_settings.phone }}{% endif %}</p>
-
 <div class="header">
   <div><strong>Заказ №:</strong> {{ repair.order_number }}</div>
   <div><strong>Дата:</strong> {{ print_date|date:"d.m.Y H:i" }}</div>
-  <div><strong>Сотрудник:</strong> {% if repair.created_by %}{{ repair.created_by.get_full_name|default:repair.created_by.username }}{% else %}—{% endif %}</div>
+  <div><strong>Принял:</strong> {% if repair.created_by %}{{ repair.created_by.get_full_name|default:repair.created_by.username }}{% else %}—{% endif %}</div>
 </div>
 
 <div class="two-col">
@@ -86,7 +124,7 @@ h1 { font-size: 16pt; text-align: center; margin-bottom: 4px; }
   <div class="info-block">
     <h3>Устройство</h3>
     <div class="info-row"><span class="label">Марка / модель:</span><span>{{ repair.brand.name }} {{ repair.phone_model.name }}</span></div>
-    {% if repair.imei %}<div class="info-row"><span class="label">IMEI / S/N:</span><span class="mono">{{ repair.imei }}</span></div>{% endif %}
+    {% if repair.imei %}<div class="info-row"><span class="label">IMEI / S/N:</span><span style="font-family:monospace">{{ repair.imei }}</span></div>{% endif %}
     <div class="info-row"><span class="label">Пароль:</span><span>{% if repair.device_password %}{{ repair.device_password }}{% else %}не предоставлен{% endif %}</span></div>
   </div>
 </div>
@@ -109,7 +147,7 @@ h1 { font-size: 16pt; text-align: center; margin-bottom: 4px; }
 <div class="info-block">
   <h3>Планируемые работы</h3>
   <table class="services-table">
-    <thead><tr><th>Работа / услуга</th><th width="120px" class="num">Стоимость</th></tr></thead>
+    <thead><tr><th>Работа / услуга</th><th width="130px" class="num">Стоимость</th></tr></thead>
     <tbody>
     {% for s in services %}<tr><td>{{ s.name }}</td><td class="num">{{ s.price|floatformat:0 }} ₽</td></tr>{% endfor %}
     </tbody>
@@ -118,14 +156,14 @@ h1 { font-size: 16pt; text-align: center; margin-bottom: 4px; }
 {% endif %}
 
 {% if repair.estimated_cost %}
-<div class="info-row" style="font-size:12pt;font-weight:bold;margin-bottom:14px">
+<div class="info-row" style="font-size:12pt;font-weight:bold;margin-bottom:12px">
   <span class="label">Предв. стоимость:</span><span>{{ repair.estimated_cost|floatformat:0 }} ₽</span>
 </div>
 {% endif %}
 
 <div class="notice">
-  <strong>Гарантия на выполненные работы: {{ repair.warranty_days }} дней</strong><br>
-  Сервисный центр не несёт ответственности за данные на устройстве. Устройство хранится в сервисе не более 30 дней с момента готовности.
+  <strong>Гарантия на выполненные работы: {{ repair.warranty_days }} дней.</strong><br>
+  Сервисный центр не несёт ответственности за данные на устройстве. Устройство хранится не более 30 дней с момента готовности.
 </div>
 
 <div class="sign-block">
@@ -142,11 +180,9 @@ h1 { font-size: 16pt; text-align: center; margin-bottom: 4px; }
 {% elif doc_type == 'work_act' %}
 
 <h1>АКТ ВЫПОЛНЕННЫХ РАБОТ</h1>
-<p class="subtitle">{{ site_settings.company_name }}{% if site_settings.legal_address %} | {{ site_settings.legal_address }}{% endif %}{% if site_settings.phone %} | {{ site_settings.phone }}{% endif %}</p>
-
 <div class="header">
   <div><strong>Заказ №:</strong> {{ repair.order_number }}</div>
-  <div><strong>Дата выдачи:</strong> {% if repair.paid_at %}{{ repair.paid_at|date:"d.m.Y" }}{% else %}{{ print_date|date:"d.m.Y" }}{% endif %}</div>
+  <div><strong>Дата:</strong> {% if repair.paid_at %}{{ repair.paid_at|date:"d.m.Y" }}{% else %}{{ print_date|date:"d.m.Y" }}{% endif %}</div>
   <div><strong>Мастер:</strong> {% if repair.assigned_to %}{{ repair.assigned_to.get_full_name|default:repair.assigned_to.username }}{% else %}—{% endif %}</div>
 </div>
 
@@ -173,16 +209,16 @@ h1 { font-size: 16pt; text-align: center; margin-bottom: 4px; }
 <div class="info-block">
   <h3>Выполненные работы и запчасти</h3>
   <table class="services-table">
-    <thead><tr><th>№</th><th>Наименование</th><th width="60px" class="num">Кол-во</th><th width="120px" class="num">Сумма</th></tr></thead>
+    <thead><tr><th>№</th><th>Наименование</th><th width="60px" class="num">Кол.</th><th width="120px" class="num">Сумма</th></tr></thead>
     <tbody>
     {% for s in services %}
     <tr><td>{{ forloop.counter }}</td><td>{{ s.name }}</td><td class="num">1</td><td class="num">{{ s.price|floatformat:0 }} ₽</td></tr>
     {% endfor %}
     {% for op in parts %}
-    <tr><td>{{ forloop.counter|add:services|length }}</td><td>{{ op.part.name }}</td><td class="num">{{ op.quantity }}</td><td class="num">{{ op.total|floatformat:0 }} ₽</td></tr>
+    <tr><td>{{ forloop.counter }}</td><td>{{ op.part.name }}</td><td class="num">{{ op.quantity }}</td><td class="num">{{ op.total|floatformat:0 }} ₽</td></tr>
     {% endfor %}
     {% if not services and not parts %}
-    <tr><td colspan="4" style="text-align:center;color:#666">Нет записей</td></tr>
+    <tr><td colspan="4" style="text-align:center;color:#666">Нет позиций</td></tr>
     {% endif %}
     </tbody>
     {% if repair.discount %}
@@ -193,7 +229,7 @@ h1 { font-size: 16pt; text-align: center; margin-bottom: 4px; }
 </div>
 
 {% if repair.is_paid %}
-<div class="info-row" style="margin-bottom:14px">
+<div class="info-row" style="margin-bottom:12px">
   <span class="label">Статус оплаты:</span>
   <strong style="color:#166534">✓ ОПЛАЧЕНО {{ repair.paid_at|date:"d.m.Y" }}</strong>
 </div>
@@ -201,7 +237,7 @@ h1 { font-size: 16pt; text-align: center; margin-bottom: 4px; }
 
 <div class="notice">
   <strong>Гарантия на выполненные работы: {{ repair.warranty_days }} дней</strong> с даты выдачи.<br>
-  Гарантия не распространяется на механические повреждения, возникшие после выдачи устройства.
+  Гарантия не распространяется на механические повреждения, следы влаги и программные сбои.
 </div>
 
 <div class="sign-block">
@@ -219,7 +255,7 @@ h1 { font-size: 16pt; text-align: center; margin-bottom: 4px; }
 
 <div class="warranty-box">
   <h2>ГАРАНТИЙНЫЙ ТАЛОН</h2>
-  <p style="font-size:11pt;color:#444">{{ site_settings.company_name }}{% if site_settings.phone %} · {{ site_settings.phone }}{% endif %}</p>
+  <p style="font-size:10pt;color:#555">{{ site_settings.company_name }}{% if site_settings.phone %} · {{ site_settings.phone }}{% endif %}</p>
 </div>
 
 <div class="two-col">
@@ -238,7 +274,7 @@ h1 { font-size: 16pt; text-align: center; margin-bottom: 4px; }
 <div class="info-block">
   <h3>Выполненные работы</h3>
   <table class="services-table">
-    <thead><tr><th>Работа / услуга</th><th width="120px" class="num">Стоимость</th></tr></thead>
+    <thead><tr><th>Работа / услуга</th><th width="130px" class="num">Стоимость</th></tr></thead>
     <tbody>
     {% for s in services %}<tr><td>{{ s.name }}</td><td class="num">{{ s.price|floatformat:0 }} ₽</td></tr>{% endfor %}
     {% if not services %}<tr><td colspan="2" style="text-align:center;color:#666">—</td></tr>{% endif %}
@@ -246,17 +282,16 @@ h1 { font-size: 16pt; text-align: center; margin-bottom: 4px; }
   </table>
 </div>
 
-<div style="text-align:center;margin:20px 0">
-  <p style="font-size:12pt">Гарантийный срок:</p>
+<div style="text-align:center;margin:16px 0">
+  <p style="font-size:11pt">Гарантийный срок:</p>
   <span class="warranty-big">{{ repair.warranty_days }} дней</span>
-  <p style="font-size:11pt">Дата выдачи: <strong>{% if repair.paid_at %}{{ repair.paid_at|date:"d.m.Y" }}{% else %}{{ print_date|date:"d.m.Y" }}{% endif %}</strong></p>
-  <p style="font-size:11pt">Гарантия действует до: <strong>{% if repair.paid_at %}{{ repair.paid_at|date:"d.m.Y" }}{% else %}{{ print_date|date:"d.m.Y" }}{% endif %}</strong></p>
+  <p>Дата выдачи: <strong>{% if repair.paid_at %}{{ repair.paid_at|date:"d.m.Y" }}{% else %}{{ print_date|date:"d.m.Y" }}{% endif %}</strong></p>
+  <p>Заказ №: <strong>{{ repair.order_number }}</strong> · Мастер: {% if repair.assigned_to %}{{ repair.assigned_to.get_full_name|default:repair.assigned_to.username }}{% else %}—{% endif %}</p>
 </div>
 
 <div class="notice" style="font-size:10pt">
   Гарантия распространяется только на выполненные работы и установленные запчасти.<br>
-  Гарантия не действует при: механических повреждениях, следах влаги, несанкционированном вскрытии, программных сбоях.<br>
-  Заказ №: <strong>{{ repair.order_number }}</strong> · Мастер: {% if repair.assigned_to %}{{ repair.assigned_to.get_full_name|default:repair.assigned_to.username }}{% else %}—{% endif %}
+  Гарантия не действует при: механических повреждениях, следах влаги, несанкционированном вскрытии.
 </div>
 
 <div class="sign-block">
@@ -273,8 +308,6 @@ h1 { font-size: 16pt; text-align: center; margin-bottom: 4px; }
 {% elif doc_type == 'refusal' %}
 
 <h1>АКТ ОТКАЗА ОТ РЕМОНТА</h1>
-<p class="subtitle">{{ site_settings.company_name }}{% if site_settings.legal_address %} | {{ site_settings.legal_address }}{% endif %}{% if site_settings.phone %} | {{ site_settings.phone }}{% endif %}</p>
-
 <div class="header">
   <div><strong>Заказ №:</strong> {{ repair.order_number }}</div>
   <div><strong>Дата:</strong> {{ print_date|date:"d.m.Y" }}</div>
@@ -285,7 +318,6 @@ h1 { font-size: 16pt; text-align: center; margin-bottom: 4px; }
     <h3>Клиент</h3>
     <div class="info-row"><span class="label">ФИО:</span><span>{{ repair.customer.name }}</span></div>
     <div class="info-row"><span class="label">Телефон:</span><span>{{ repair.customer.phone }}</span></div>
-    {% if repair.customer.passport %}<div class="info-row"><span class="label">Паспорт:</span><span>{{ repair.customer.passport }}</span></div>{% endif %}
   </div>
   <div class="info-block">
     <h3>Устройство</h3>
@@ -298,14 +330,13 @@ h1 { font-size: 16pt; text-align: center; margin-bottom: 4px; }
   <h3>Заявленная неисправность</h3>
   <p style="font-size:11pt">{{ repair.complaint|default:"—" }}</p>
 </div>
-
 <div class="info-block">
   <h3>Результат диагностики</h3>
-  <p style="font-size:11pt;min-height:60px">{{ repair.notes|default:"" }}</p>
+  <p style="font-size:11pt;min-height:50px">{{ repair.notes|default:"" }}</p>
 </div>
 
-<div class="notice" style="margin-top:14px">
-  Я, <strong>{{ repair.customer.name }}</strong>, ознакомлен(а) с результатами диагностики и отказываюсь от проведения ремонта.
+<div class="notice">
+  Я, <strong>{{ repair.customer.name }}</strong>, ознакомлен(а) с результатами диагностики и отказываюсь от ремонта.
   Устройство получено в состоянии, описанном выше. Претензий к сервисному центру не имею.
 </div>
 
@@ -323,8 +354,6 @@ h1 { font-size: 16pt; text-align: center; margin-bottom: 4px; }
 {% elif doc_type == 'receipt_sale' %}
 
 <h1>КАССОВЫЙ / ТОВАРНЫЙ ЧЕК</h1>
-<p class="subtitle">{{ site_settings.company_name }}{% if site_settings.inn %} · ИНН {{ site_settings.inn }}{% endif %}{% if site_settings.phone %} · {{ site_settings.phone }}{% endif %}</p>
-
 <div class="header">
   <div><strong>Заказ №:</strong> {{ repair.order_number }}</div>
   <div><strong>Дата:</strong> {% if repair.paid_at %}{{ repair.paid_at|date:"d.m.Y H:i" }}{% else %}{{ print_date|date:"d.m.Y H:i" }}{% endif %}</div>
@@ -337,7 +366,7 @@ h1 { font-size: 16pt; text-align: center; margin-bottom: 4px; }
 </div>
 
 <table class="services-table">
-  <thead><tr><th>№</th><th>Наименование</th><th width="60px" class="num">Кол-во</th><th width="100px" class="num">Цена</th><th width="120px" class="num">Сумма</th></tr></thead>
+  <thead><tr><th>№</th><th>Наименование</th><th width="60px" class="num">Кол.</th><th width="100px" class="num">Цена</th><th width="120px" class="num">Сумма</th></tr></thead>
   <tbody>
   {% for s in services %}
   <tr><td>{{ forloop.counter }}</td><td>{{ s.name }}</td><td class="num">1</td><td class="num">{{ s.price|floatformat:0 }} ₽</td><td class="num">{{ s.price|floatformat:0 }} ₽</td></tr>
@@ -356,17 +385,35 @@ h1 { font-size: 16pt; text-align: center; margin-bottom: 4px; }
 </table>
 
 {% if repair.is_paid %}
-<div class="info-row" style="margin-bottom:14px">
+<div class="info-row" style="margin-bottom:12px">
   <span class="label">Оплачено:</span>
-  <strong style="color:#166534">✓ {{ repair.final_cost|floatformat:0 }} ₽</strong>
+  <strong style="color:#166534">✓ {{ repair.final_cost|floatformat:0 }} ₽ · {{ repair.paid_at|date:"d.m.Y" }}</strong>
 </div>
 {% endif %}
 
-<p style="font-size:10pt;text-align:center;margin-top:20px;color:#444">
+<p style="font-size:10pt;text-align:center;margin-top:18px;color:#555">
   Спасибо за обращение в {{ site_settings.company_name }}!
 </p>
 
 {% endif %}
+
+
+{# ── Реквизиты компании (общий подвал для всех документов) ──────────────── #}
+{% with s=site_settings %}
+{% if s.inn or s.ogrn or s.bank_name or s.legal_address %}
+<div class="requisites">
+  <div class="req-title">Реквизиты {{ s.company_name }}</div>
+  {% if s.inn %}<div class="req-row"><span class="req-label">ИНН:</span><span>{{ s.inn }}</span></div>{% endif %}
+  {% if s.ogrn %}<div class="req-row"><span class="req-label">ОГРН(ИП):</span><span>{{ s.ogrn }}</span></div>{% endif %}
+  {% if s.kpp %}<div class="req-row"><span class="req-label">КПП:</span><span>{{ s.kpp }}</span></div>{% endif %}
+  {% if s.director_name %}<div class="req-row"><span class="req-label">Директор:</span><span>{{ s.director_name }}</span></div>{% endif %}
+  {% if s.legal_address %}<div class="req-row" style="grid-column:1/-1"><span class="req-label">Юр. адрес:</span><span>{{ s.legal_address }}</span></div>{% endif %}
+  {% if s.bank_name %}<div class="req-row" style="grid-column:1/-1"><span class="req-label">Банк:</span><span>{{ s.bank_name }}{% if s.bik %} · БИК {{ s.bik }}{% endif %}</span></div>{% endif %}
+  {% if s.account_number %}<div class="req-row"><span class="req-label">Р/счёт:</span><span>{{ s.account_number }}</span></div>{% endif %}
+  {% if s.corr_account %}<div class="req-row"><span class="req-label">К/счёт:</span><span>{{ s.corr_account }}</span></div>{% endif %}
+</div>
+{% endif %}
+{% endwith %}
 
 </div>
 </body>

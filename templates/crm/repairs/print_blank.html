@@ -64,6 +64,24 @@ h1 { font-size: 16pt; text-align: center; margin-bottom: 4px; }
 </div>
 <div class="page">
 
+{# ── Шапка компании ── #}
+{% with s=site_settings %}
+<div style="border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px">
+  <div>
+    <div style="font-size:14pt;font-weight:bold">{{ s.company_name }}</div>
+    {% if s.actual_address or s.address %}<div style="font-size:10pt;margin-top:3px;color:#444">📍 {{ s.actual_address|default:s.address }}</div>{% endif %}
+    {% if s.phone %}<div style="font-size:10pt;color:#444">📞 {{ s.phone }}</div>{% endif %}
+    {% if s.working_hours %}<div style="font-size:10pt;color:#444">🕐 {{ s.working_hours }}</div>{% endif %}
+  </div>
+  <div style="font-size:9.5pt;color:#444;text-align:right;line-height:1.5">
+    {% if s.inn %}ИНН: {{ s.inn }}<br>{% endif %}
+    {% if s.ogrn %}ОГРН(ИП): {{ s.ogrn }}<br>{% endif %}
+    {% if s.director_name %}Директор: {{ s.director_name }}<br>{% endif %}
+    {% if s.email %}{{ s.email }}{% endif %}
+  </div>
+</div>
+{% endwith %}
+
 {# ══════════════════════════════ АКТ ПРИЁМА ══════════════════════════════════ #}
 {% if doc_type == 'receipt' %}
 

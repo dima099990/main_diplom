@@ -1,25 +1,59 @@
 {% extends 'core/base.html' %}
 {% block title %}Контакты — {{ site.company_name }}{% endblock %}
 {% block content %}
+
 <section class="page-hero">
   <div class="container">
     <h1>Контакты</h1>
     <p>Мы всегда на связи</p>
   </div>
 </section>
+
 <section class="section">
   <div class="container contacts-grid">
     <div>
       <div class="contact-block card">
         <h3>Как нас найти</h3>
         <div class="contact-list">
-          <div class="contact-item"><span>📍</span><div><strong>Адрес</strong><p>{{ site.address }}</p></div></div>
-          <div class="contact-item"><span>🕐</span><div><strong>Режим работы</strong><p>{{ site.working_hours }}</p></div></div>
-          <div class="contact-item"><span>📞</span><div><strong>Телефон</strong><p><a href="tel:{{ site.phone }}">{{ site.phone }}</a></p></div></div>
+          <div class="contact-item">
+            <span>📍</span>
+            <div><strong>Адрес</strong><p>{{ site.actual_address|default:site.address }}</p></div>
+          </div>
+          <div class="contact-item">
+            <span>🕐</span>
+            <div><strong>Режим работы</strong><p>{{ site.working_hours }}</p></div>
+          </div>
+          <div class="contact-item">
+            <span>📞</span>
+            <div><strong>Телефон</strong><p><a href="tel:{{ site.phone }}">{{ site.phone }}</a></p></div>
+          </div>
+          {% if site.email %}
+          <div class="contact-item">
+            <span>✉️</span>
+            <div><strong>Email</strong><p><a href="mailto:{{ site.email }}">{{ site.email }}</a></p></div>
+          </div>
+          {% endif %}
+          {% if site.whatsapp %}
+          <div class="contact-item">
+            <span>💬</span>
+            <div><strong>WhatsApp</strong><p>{{ site.whatsapp }}</p></div>
+          </div>
+          {% endif %}
+          {% if site.telegram %}
+          <div class="contact-item">
+            <span>✈️</span>
+            <div><strong>Telegram</strong><p>{{ site.telegram }}</p></div>
+          </div>
+          {% endif %}
         </div>
+
         <div class="contact-actions">
+          {% if site.telegram_bot_link %}
           <a href="{{ site.telegram_bot_link }}" target="_blank" class="btn btn-lg">Telegram-бот</a>
-          {% if site.telegram_channel %}<a href="{{ site.telegram_channel }}" target="_blank" class="btn btn-outline">Канал</a>{% endif %}
+          {% endif %}
+          {% if site.telegram_channel %}
+          <a href="{{ site.telegram_channel }}" target="_blank" class="btn btn-outline">Наш канал</a>
+          {% endif %}
         </div>
       </div>
 
@@ -33,14 +67,31 @@
           <button type="submit" class="btn btn-lg" style="width:100%">Отправить</button>
         </form>
       </div>
+
+      {% if site.inn or site.ogrn %}
+      <div class="card" style="margin-top:1.5rem;font-size:.9rem">
+        <h4 style="font-size:.8rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.75rem;opacity:.5">Реквизиты</h4>
+        <div style="display:grid;gap:.35rem">
+          {% if site.company_name %}<div><strong>Компания:</strong> {{ site.company_name }}</div>{% endif %}
+          {% if site.director_name %}<div><strong>Директор:</strong> {{ site.director_name }}</div>{% endif %}
+          {% if site.inn %}<div><strong>ИНН:</strong> {{ site.inn }}</div>{% endif %}
+          {% if site.ogrn %}<div><strong>ОГРН(ИП):</strong> {{ site.ogrn }}</div>{% endif %}
+          {% if site.legal_address %}<div><strong>Юр. адрес:</strong> {{ site.legal_address }}</div>{% endif %}
+          {% if site.email %}<div><strong>Email:</strong> <a href="mailto:{{ site.email }}">{{ site.email }}</a></div>{% endif %}
+        </div>
+      </div>
+      {% endif %}
+
     </div>
+
     <div class="contacts-map">
       {% if site.yandex_map_embed %}{{ site.yandex_map_embed|safe }}
       {% elif site.google_map_embed %}{{ site.google_map_embed|safe }}
       {% else %}
-        <div class="map-placeholder"><span>🗺</span><p>Карта появится после настройки</p></div>
+        <div class="map-placeholder"><span>🗺</span><p>Карта появится после настройки в панели управления</p></div>
       {% endif %}
     </div>
   </div>
 </section>
+
 {% endblock %}

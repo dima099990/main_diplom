@@ -41,17 +41,38 @@ class Command(BaseCommand):
 
         self.stdout.write('Создаю тестовые данные...')
 
-        # ── Site settings
-        settings, _ = SiteSettings.objects.get_or_create(pk=1, defaults={
-            'company_name': 'Kayros Service',
-            'phone': '+7 (495) 123-45-67',
-            'address': 'г. Москва, ул. Примерная, д. 1',
-            'working_hours': 'Пн–Сб 10:00–20:00',
-            'warranty_days': 90,
-        })
-        if not settings.company_name:
+        # ── Site settings (полные, включая юридическую информацию)
+        settings, created = SiteSettings.objects.get_or_create(pk=1)
+        if created or options.get('clear'):
             settings.company_name = 'Kayros Service'
+            settings.tagline = 'Профессиональный ремонт телефонов'
+            settings.phone = '+7 (495) 123-45-67'
+            settings.address = 'г. Москва, ул. Примерная, д. 1'
+            settings.working_hours = 'Пн–Сб 10:00–20:00'
+            settings.warranty_days = 90
+            settings.about_text = 'Профессиональный сервисный центр по ремонту смартфонов.'
+            settings.about_full_text = (
+                'Kayros Service — сервисный центр с многолетним опытом ремонта смартфонов.\n'
+                'Работаем с устройствами Apple, Samsung, Xiaomi, Huawei и другими брендами.\n'
+                'Все работы выполняются с гарантией. Оригинальные запчасти.'
+            )
+            # Юридическая информация
+            settings.inn = '770123456789'
+            settings.ogrn = '321774600123456'
+            settings.kpp = ''
+            settings.director_name = 'Иванов Иван Иванович'
+            settings.email = 'info@kayros-service.ru'
+            settings.website = 'https://kayros-service.ru'
+            settings.telegram = '@kayros_service'
+            settings.legal_address = 'г. Москва, ул. Примерная, д. 1, оф. 5'
+            settings.actual_address = 'г. Москва, ул. Примерная, д. 1'
+            # Банковские реквизиты
+            settings.bank_name = 'ПАО Сбербанк'
+            settings.bik = '044525225'
+            settings.account_number = '40802810938000123456'
+            settings.corr_account = '30101810400000000225'
             settings.save()
+            self.stdout.write('  Настройки сайта обновлены')
 
         # ── Brands & models
         brands_data = {

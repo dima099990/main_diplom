@@ -1,2 +1,30 @@
-__pycache__
-*.pyc
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Виртуальное окружение
+.venv/
+venv/
+env/
+
+# Django
+*.log
+logs/
+db.sqlite3
+media/
+staticfiles/
+
+# Переменные окружения
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
