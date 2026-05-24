@@ -3,7 +3,7 @@
 Запуск сайта + Telegram-бота одновременно.
 
 Использование:
-    python run.py                              # сайт + бот (localhost:8000)
+    python run.py                              # сайт + бот
     python run.py --host 0.0.0.0 --port 8000  # доступен снаружи
     python run.py --site-only                  # только сайт
     python run.py --bot-only                   # только бот
@@ -26,10 +26,9 @@ def _stream(proc, prefix):
 
 
 def run_site(host: str, port: str):
-    bind = f"{host}:{port}"
-    print(f"[САЙТ] Запуск на {bind} ...", flush=True)
+    print(f"[САЙТ] Запуск на {host}:{port} ...", flush=True)
     proc = subprocess.Popen(
-        [PYTHON, "-u", "manage.py", "runserver", bind],
+        [PYTHON, "-u", "manage.py", "runserver", f"{host}:{port}"],
         cwd=ROOT,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -53,13 +52,11 @@ def run_bot():
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Kayros CRM — запуск")
-    parser.add_argument("--host",      default="127.0.0.1",
-                        help="IP для привязки (по умолч. 127.0.0.1, для сервера — 0.0.0.0)")
-    parser.add_argument("--port",      default="8000",
-                        help="Порт (по умолч. 8000)")
-    parser.add_argument("--site-only", action="store_true", help="Только сайт")
-    parser.add_argument("--bot-only",  action="store_true", help="Только бот")
+    parser = argparse.ArgumentParser(description="Kayros CRM")
+    parser.add_argument("--host",      default="127.0.0.1")
+    parser.add_argument("--port",      default="8000")
+    parser.add_argument("--site-only", action="store_true")
+    parser.add_argument("--bot-only",  action="store_true")
     args = parser.parse_args()
 
     display_host = args.host if args.host != "0.0.0.0" else "<ваш-ip>"

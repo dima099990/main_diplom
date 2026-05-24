@@ -1,14 +1,10 @@
 import sys
-import time
 import logging
-import traceback
 from pathlib import Path
 
-# ── Инициализация Django (ПЕРВЫМ, до любых импортов моделей) ──────────────
 sys.path.insert(0, str(Path(__file__).parent))
 import django_setup  # noqa
 
-# ── Импорты бота ──────────────────────────────────────────────────────────
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -18,12 +14,9 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
-from telegram.request import HTTPXRequest
 
 from db import _get_settings as get_settings_sync
-from proxy import load_proxies, find_working_proxy, ProxyRotator
-
-from handlers.start import cmd_start, handle_registration_contact, MAIN_MENU
+from handlers.start import cmd_start, handle_registration_contact
 from handlers.prices import ask_price_query, show_prices, WAITING_PRICE_QUERY
 from handlers.booking import (
     start_booking, got_name, got_phone, got_device,
@@ -47,24 +40,13 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
         )
 
 
-def build_app(token: str, proxy: str | None = None) -> Application:
-    """Собирает Application, опционально с прокси."""
-    builder = Application.builder().token(token)
-
-    if proxy:
-        builder = builder.request(HTTPXRequest(proxy=proxy))
-        logger.info(f"[БОТ] Прокси: {proxy}")
-    else:
-        logger.info("[БОТ] Прокси не используется")
-
-    app = builder.build()
+def build_app(token: str) -> Application:
+    app = Application.builder().token(token).build()
     app.add_error_handler(error_handler)
 
-    # /start
     app.add_handler(CommandHandler("start", cmd_start))
 
-    # Запись на ремонт
-    booking_conv = ConversationHandler(
+    app.add_handler(ConversationHandler(
         entry_points=[
             MessageHandler(filters.Regex("^📅 Записаться$"), start_booking),
             CommandHandler("book", start_booking),
@@ -81,11 +63,9 @@ def build_app(token: str, proxy: str | None = None) -> Application:
         },
         fallbacks=[CommandHandler("cancel", cancel_booking)],
         allow_reentry=True,
-    )
-    app.add_handler(booking_conv)
+    ))
 
-    # Цены
-    prices_conv = ConversationHandler(
+    app.add_handler(ConversationHandler(
         entry_points=[
             MessageHandler(filters.Regex("^💰 Узнать цены$"), ask_price_query),
             CommandHandler("prices", ask_price_query),
@@ -97,75 +77,22 @@ def build_app(token: str, proxy: str | None = None) -> Application:
         },
         fallbacks=[CommandHandler("cancel", cancel_booking)],
         allow_reentry=True,
-    )
-    app.add_handler(prices_conv)
+    ))
 
-    # Контакт (регистрация)
     app.add_handler(MessageHandler(filters.CONTACT, handle_registration_contact))
-
-    # Контакты компании
     app.add_handler(MessageHandler(filters.Regex("^📞 Контакты$"), handle_contacts))
-
-    # Свободный чат с ИИ
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_chat))
 
     return app
 
 
 def main() -> None:
-    s     = get_settings_sync()
-    token = s.bot_token
-
-    if not token:
-        logger.error(
-            "Токен бота не задан!\n"
-            "Откройте CRM → Настройки → Telegram-бот и введите токен."
-        )
+    s = get_settings_sync()
+    if not s.bot_token:
+        logger.error("Токен бота не задан! CRM → Настройки → Telegram-бот")
         sys.exit(1)
-
     logger.info(f"Запуск бота для '{s.company_name}'...")
-
-    # ── Прокси ────────────────────────────────────────────────────────────
-    proxies  = load_proxies()
-    rotator  = ProxyRotator(proxies)
-    proxy    = find_working_proxy(proxies)
-    rotator.set_current(proxy)
-
-    # ── Цикл запуска с автоматической сменой прокси при сбое ─────────────
-    MAX_RETRIES = 10
-    attempt     = 0
-
-    while attempt < MAX_RETRIES:
-        attempt += 1
-        try:
-            app = build_app(token, rotator.current)
-            app.run_polling(drop_pending_updates=True)
-            break  # нормальное завершение (Ctrl+C)
-
-        except KeyboardInterrupt:
-            logger.info("Бот остановлен пользователем")
-            break
-
-        except Exception as e:
-            err = str(e).lower()
-            is_network = any(x in err for x in [
-                "timed out", "connect", "network", "proxy", "socks"
-            ])
-
-            if is_network and proxies:
-                logger.warning(
-                    f"[БОТ] Сетевая ошибка (попытка {attempt}/{MAX_RETRIES}): {e}\n"
-                    f"Переключаю прокси..."
-                )
-                rotator.next()
-                time.sleep(3)
-            else:
-                logger.error(f"[БОТ] Критическая ошибка: {e}")
-                traceback.print_exc()
-                time.sleep(5)
-
-    if attempt >= MAX_RETRIES:
-        logger.error(f"[БОТ] Исчерпано {MAX_RETRIES} попыток. Бот остановлен.")
+    build_app(s.bot_token).run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":

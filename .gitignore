@@ -29,5 +29,3 @@ staticfiles/
 .DS_Store
 Thumbs.db
 
-# Прокси (большой файл, не нужен в git)
-bot/proxies.csv
