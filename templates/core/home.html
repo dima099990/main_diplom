@@ -24,18 +24,27 @@
     </div>
 
     <div class="hero-form card" data-animate data-delay="150">
-      <h3>Оставить заявку</h3>
+      <h3>Записаться на ремонт</h3>
       <p class="form-sub">Перезвоним в течение 15 минут</p>
       <form action="{% url 'contact_request' %}" method="post" class="contact-form" id="heroForm">
         {% csrf_token %}
         <input type="text" name="name" placeholder="Ваше имя" required>
         <input type="text" name="phone" placeholder="Телефон или Telegram" required>
-        <textarea name="message" placeholder="Что случилось с устройством?" rows="3"></textarea>
-        <button type="submit" class="btn btn-lg" style="width:100%">Отправить заявку</button>
+        <input type="text" name="device" placeholder="Устройство (напр. iPhone 14)">
+        <textarea name="message" placeholder="Опишите проблему" rows="2"></textarea>
+        {% if branches %}
+        <select name="branch_id" style="width:100%;padding:10px 14px;border-radius:10px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;font-size:15px;">
+          <option value="">Выбрать филиал (необязательно)</option>
+          {% for b in branches %}
+          <option value="{{ b.pk }}">{{ b.name }}{% if b.address %} — {{ b.address }}{% endif %}</option>
+          {% endfor %}
+        </select>
+        {% endif %}
+        <button type="submit" class="btn btn-lg" style="width:100%">Записаться</button>
       </form>
       <div class="form-success" id="formSuccess" style="display:none">
         <div class="success-icon">✓</div>
-        <p>Заявка принята! Ожидайте звонка.</p>
+        <p>Запись принята! Мы свяжемся с вами.</p>
       </div>
     </div>
   </div>

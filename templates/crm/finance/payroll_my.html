@@ -22,9 +22,14 @@
     <p class="text-xs text-slate-600 mt-1">{{ repair_count }} заказ · {{ repair_pct }}%</p>
   </div>
   <div class="card p-4">
-    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Бонус продажи</p>
-    <p class="text-2xl font-bold text-green-400">{{ sale_bonus|floatformat:0 }} ₽</p>
-    <p class="text-xs text-slate-600 mt-1">{{ sale_count }} продаж · {{ sale_pct }}%</p>
+    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Бонус аксессуары</p>
+    <p class="text-2xl font-bold text-purple-400">{{ sale_bonus|floatformat:0 }} ₽</p>
+    <p class="text-xs text-slate-600 mt-1">
+      {{ sale_count }} продаж · {{ sale_pct }}%
+      {% if accessory_in_repair_bonus %}
+      <span class="text-slate-500 block">+ {{ accessory_in_repair_bonus|floatformat:0 }} ₽ из ремонтов</span>
+      {% endif %}
+    </p>
   </div>
   <div class="card p-4">
     <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Оклад + премии</p>

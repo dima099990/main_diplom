@@ -11,14 +11,14 @@
     <p class="text-xs text-slate-500 mt-1">{{ month_label }}</p>
   </div>
   <div class="card p-4">
-    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Прибыль за месяц</p>
-    <p class="text-2xl font-bold text-green-400">{{ stats.profit_month|floatformat:0 }} ₽</p>
-    <p class="text-xs text-slate-500 mt-1">после расходов</p>
+    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Валовая маржа</p>
+    <p class="text-2xl font-bold text-blue-400">{{ stats.gross_margin_month|floatformat:0 }} ₽</p>
+    <p class="text-xs text-slate-500 mt-1">−{{ stats.cost_month|floatformat:0 }} ₽ себестоимость</p>
   </div>
   <div class="card p-4">
-    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Расходы за месяц</p>
-    <p class="text-2xl font-bold text-red-400">{{ stats.expenses_month|floatformat:0 }} ₽</p>
-    <p class="text-xs text-slate-500 mt-1">всего</p>
+    <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Прибыль за месяц</p>
+    <p class="text-2xl font-bold text-green-400">{{ stats.profit_month|floatformat:0 }} ₽</p>
+    <p class="text-xs text-slate-500 mt-1">−{{ stats.expenses_month|floatformat:0 }} ₽ расходы</p>
   </div>
   <div class="card p-4">
     <p class="text-xs text-slate-500 mb-1 uppercase tracking-wide">Касса (наличные)</p>

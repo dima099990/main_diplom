@@ -17,7 +17,7 @@ from .decorators import admin_required, crm_required, manager_required
 from .models import (
     Accessory, Appointment, Branch, Customer, Expense,
     Notification, OrderHistory, Part, PaymentRecord, PayrollRecord,
-    RepairOrder, RepairOrderPart, RepairOrderService, SaleOrder,
+    RepairOrder, RepairOrderAccessory, RepairOrderPart, RepairOrderService, SaleOrder,
     SaleOrderItem, StockMovement, Supplier, Task, UserProfile,
 )
 
@@ -231,11 +231,40 @@ def customer_search_api(request):
 @crm_required
 def repair_list(request):
     qs = RepairOrder.objects.select_related(
-        'customer', 'brand', 'phone_model', 'assigned_to', 'created_by'
+        'customer', 'brand', 'phone_model', 'assigned_to', 'created_by', 'branch'
     )
     profile = getattr(request.user, 'profile', None)
-    if profile and profile.role == 'master':
-        qs = qs.filter(assigned_to=request.user)
+    is_admin_or_manager = profile and profile.role in ('admin', 'manager')
+
+    # Доступные для этого пользователя филиалы
+    if is_admin_or_manager:
+        available_branches = Branch.objects.filter(is_active=True)
+    else:
+        # Сотрудник видит только свои назначенные филиалы
+        assigned_branch_ids = list(
+            profile.branches.values_list('id', flat=True)
+        ) if profile else []
+        available_branches = Branch.objects.filter(id__in=assigned_branch_ids, is_active=True)
+
+        # По умолчанию фильтруем по активному филиалу сотрудника
+        if profile and profile.branch:
+            qs = qs.filter(branch=profile.branch)
+        elif assigned_branch_ids:
+            qs = qs.filter(branch_id__in=assigned_branch_ids)
+        else:
+            qs = qs.none()  # Нет назначенных филиалов — пусто
+
+    # Явный выбор филиала из фильтра переопределяет дефолт
+    branch_filter = request.GET.get('branch', '')
+    if branch_filter == 'all' and is_admin_or_manager:
+        pass  # Показать все — не фильтруем
+    elif branch_filter:
+        # Проверяем что у сотрудника есть доступ к этому филиалу
+        if is_admin_or_manager or available_branches.filter(pk=branch_filter).exists():
+            qs = qs.filter(branch_id=branch_filter)
+    elif is_admin_or_manager and not branch_filter:
+        # Для admins/managers — по умолчанию все, если нет фильтра
+        pass
 
     q = request.GET.get('q', '')
     if q:
@@ -247,20 +276,19 @@ def repair_list(request):
         qs = qs.filter(status=request.GET['status'])
     if request.GET.get('master'):
         qs = qs.filter(assigned_to_id=request.GET['master'])
-    if request.GET.get('branch'):
-        qs = qs.filter(branch_id=request.GET['branch'])
     if request.GET.get('date_from'):
         qs = qs.filter(created_at__date__gte=request.GET['date_from'])
     if request.GET.get('date_to'):
         qs = qs.filter(created_at__date__lte=request.GET['date_to'])
 
-    # Status tabs counts
+    # Status tabs counts (по видимым заказам)
+    base_qs = qs  # сохраняем для counts
     status_tabs = []
     for val, label in RepairOrder.STATUS_CHOICES:
-        cnt = RepairOrder.objects.filter(status=val).count()
+        cnt = base_qs.filter(status=val).count()
         status_tabs.append((val, label, cnt))
 
-    total_count = RepairOrder.objects.count()
+    total_count = qs.count()
     page = Paginator(qs, 30).get_page(request.GET.get('page'))
 
     return render(request, 'crm/repairs/list.html', {
@@ -269,7 +297,10 @@ def repair_list(request):
         'status_tabs': status_tabs,
         'total_count': total_count,
         'masters': User.objects.filter(profile__role__in=['master', 'employee', 'manager']),
-        'branches': Branch.objects.filter(is_active=True),
+        'branches': available_branches,
+        'branch_filter': branch_filter,
+        'is_admin_or_manager': is_admin_or_manager,
+        'active_branch': profile.branch if profile else None,
     })
 
 
@@ -331,12 +362,20 @@ def repair_create(request):
 
 
 def _repair_create_ctx(request):
+    profile = getattr(request.user, 'profile', None)
+    # Доступные филиалы для нового заказа
+    if profile and profile.role in ('admin', 'manager'):
+        available_branches = Branch.objects.filter(is_active=True)
+    else:
+        assigned_ids = list(profile.branches.values_list('id', flat=True)) if profile else []
+        available_branches = Branch.objects.filter(id__in=assigned_ids, is_active=True)
     return render(request, 'crm/repairs/create.html', {
         'brands': Brand.objects.filter(is_active=True).order_by('order', 'name'),
         'masters': User.objects.filter(
             profile__role__in=['master', 'employee'], profile__is_active=True
         ),
-        'branches': Branch.objects.filter(is_active=True),
+        'branches': available_branches,
+        'active_branch': profile.branch if profile else None,
     })
 
 
@@ -345,11 +384,15 @@ def repair_detail(request, pk):
     repair = get_object_or_404(
         RepairOrder.objects.select_related(
             'customer', 'brand', 'phone_model', 'assigned_to', 'created_by', 'branch'
-        ).prefetch_related('order_services__service', 'order_parts__part', 'history__user'),
+        ).prefetch_related(
+            'order_services__service', 'order_parts__part',
+            'order_accessories__accessory', 'history__user'
+        ),
         pk=pk,
     )
     services_total = sum(s.price for s in repair.order_services.all())
     parts_total = sum(p.total for p in repair.order_parts.all())
+    accessories_total = sum(a.total for a in repair.order_accessories.all())
 
     available_services = RepairService.objects.filter(
         phone_model=repair.phone_model, is_active=True
@@ -359,6 +402,8 @@ def repair_detail(request, pk):
         phone_model=repair.phone_model, quantity__gt=0
     ).order_by('name')
     all_parts = Part.objects.filter(quantity__gt=0).order_by('name')
+    # Аксессуары на складе
+    available_accessories = Accessory.objects.filter(quantity__gt=0).order_by('name')
 
     tabs = [
         ('info', 'Информация'),
@@ -366,17 +411,27 @@ def repair_detail(request, pk):
         ('comment', 'Комментарий'),
     ]
 
+    all_brands = Brand.objects.filter(is_active=True).order_by('order', 'name')
+    brand_models = {
+        b.pk: list(b.phone_models.filter(is_active=True).order_by('order', 'name').values('id', 'name'))
+        for b in all_brands
+    }
+
     return render(request, 'crm/repairs/detail.html', {
         'repair': repair,
         'services_total': services_total,
         'parts_total': parts_total,
+        'accessories_total': accessories_total,
         'available_services': available_services,
         'available_parts': all_parts,
         'parts_for_model': parts_for_model,
+        'available_accessories': available_accessories,
         'masters': User.objects.filter(profile__role__in=['master', 'employee', 'admin', 'manager']),
         'status_choices': RepairOrder.STATUS_CHOICES,
         'history': repair.history.order_by('created_at'),
         'tabs': tabs,
+        'all_brands': all_brands,
+        'brand_models_json': brand_models,
     })
 
 
@@ -415,6 +470,45 @@ def repair_update_assigned(request, pk):
     )
     messages.success(request, f'Мастер назначен: {name}')
     return redirect('crm:repair_detail', pk)
+
+
+@crm_required
+@require_POST
+def repair_update_device(request, pk):
+    """Смена марки и модели телефона в ремонте."""
+    repair = get_object_or_404(RepairOrder, pk=pk)
+    brand_id = request.POST.get('brand_id')
+    model_id = request.POST.get('phone_model_id')
+    if not brand_id or not model_id:
+        messages.error(request, 'Выберите марку и модель')
+        return redirect('crm:repair_detail', pk)
+    brand = get_object_or_404(Brand, pk=brand_id)
+    model = get_object_or_404(PhoneModel, pk=model_id, brand=brand)
+    old = f'{repair.brand.name} {repair.phone_model.name}'
+    repair.brand = brand
+    repair.phone_model = model
+    repair.save(update_fields=['brand', 'phone_model', 'updated_at'])
+    OrderHistory.objects.create(
+        order=repair, event_type='note',
+        description=f'Устройство изменено: {old} → {brand.name} {model.name}',
+        user=request.user,
+    )
+    messages.success(request, f'Устройство изменено: {brand.name} {model.name}')
+    return redirect('crm:repair_detail', pk)
+
+
+@crm_required
+def models_by_brand_api(request):
+    """JSON: список моделей для выбранной марки."""
+    brand_id = request.GET.get('brand_id')
+    if not brand_id:
+        return JsonResponse([], safe=False)
+    models = list(
+        PhoneModel.objects.filter(brand_id=brand_id, is_active=True)
+        .order_by('order', 'name')
+        .values('id', 'name')
+    )
+    return JsonResponse(models, safe=False)
 
 
 @crm_required
@@ -496,6 +590,49 @@ def repair_remove_part(request, pk, part_pk):
     OrderHistory.objects.create(
         order=repair, event_type='part_removed',
         description=f'Удалена запчасть: {name}',
+        user=request.user,
+    )
+    return redirect('crm:repair_detail', pk)
+
+
+@crm_required
+@require_POST
+def repair_add_accessory(request, pk):
+    repair = get_object_or_404(RepairOrder, pk=pk)
+    accessory_id = request.POST.get('accessory_id')
+    quantity = int(request.POST.get('quantity', 1) or 1)
+    price = request.POST.get('price', '').strip()
+
+    accessory = get_object_or_404(Accessory, pk=accessory_id)
+    if not price:
+        price = accessory.sale_price
+
+    RepairOrderAccessory.objects.create(
+        order=repair,
+        accessory=accessory,
+        quantity=quantity,
+        price=Decimal(str(price)),
+    )
+    repair.recalculate_final_cost()
+    OrderHistory.objects.create(
+        order=repair, event_type='accessory_added',
+        description=f'Добавлен аксессуар: {accessory.name} x{quantity} — {price} ₽',
+        user=request.user,
+    )
+    return redirect('crm:repair_detail', pk)
+
+
+@crm_required
+@require_POST
+def repair_remove_accessory(request, pk, accessory_pk):
+    repair = get_object_or_404(RepairOrder, pk=pk)
+    oa = get_object_or_404(RepairOrderAccessory, pk=accessory_pk, order=repair)
+    name = oa.accessory.name
+    oa.delete()
+    repair.recalculate_final_cost()
+    OrderHistory.objects.create(
+        order=repair, event_type='accessory_removed',
+        description=f'Удалён аксессуар: {name}',
         user=request.user,
     )
     return redirect('crm:repair_detail', pk)
@@ -602,6 +739,7 @@ def repair_print(request, pk):
     if doc_type not in valid_types:
         doc_type = 'receipt'
 
+    has_parts = repair.order_parts.exists()
     return render(request, 'crm/repairs/print_act.html', {
         'repair': repair,
         'site_settings': site_settings,
@@ -609,6 +747,8 @@ def repair_print(request, pk):
         'doc_type': doc_type,
         'services': repair.order_services.all(),
         'parts': repair.order_parts.select_related('part').all(),
+        'accessories': repair.order_accessories.select_related('accessory').all(),
+        'has_parts': has_parts,
         'print_date': timezone.now(),
     })
 
@@ -852,7 +992,7 @@ def sale_detail(request, pk):
         if action == 'add_item':
             acc_id = request.POST.get('accessory_id')
             qty = int(request.POST.get('quantity', 1))
-            price = request.POST.get('price')
+            price = request.POST.get('price', '').replace(',', '.').strip()
             if acc_id:
                 try:
                     acc = Accessory.objects.get(pk=acc_id)
@@ -861,9 +1001,11 @@ def sale_detail(request, pk):
                         order=sale, accessory=acc,
                         quantity=qty, price=price,
                     )
+                    # Перечитываем sale без prefetch-кеша — иначе новый товар не виден
+                    sale = SaleOrder.objects.get(pk=sale.pk)
                     sale.recalculate_total()
-                except (Accessory.DoesNotExist, Exception):
-                    messages.error(request, 'Ошибка добавления товара')
+                except (Accessory.DoesNotExist, Exception) as e:
+                    messages.error(request, f'Ошибка добавления товара: {e}')
         elif action == 'set_payment':
             sale.payment_method = request.POST.get('payment_method', 'cash')
             sale.save(update_fields=['payment_method'])
@@ -940,23 +1082,35 @@ def _calc_payroll(emp, year, month):
     except Exception:
         repair_pct = sale_pct = Decimal('0')
 
-    # ── Динамический бонус за ремонты ─────────────────────────────────────────
+    # ── Динамический бонус за ремонты (без аксессуаров) ──────────────────────
     repair_bonus = Decimal('0')
     repair_count = 0
-    if repair_pct > 0:
-        paid_repairs = RepairOrder.objects.filter(
-            assigned_to=emp,
-            is_paid=True,
-            paid_at__date__gte=m_start,
-            paid_at__date__lte=m_end,
-        )
-        repair_count = paid_repairs.count()
-        repair_bonus = sum(
-            max(r.profit, Decimal('0')) * repair_pct / 100
-            for r in paid_repairs
-        )
+    accessory_in_repair_bonus = Decimal('0')
 
-    # ── Динамический бонус за продажи ─────────────────────────────────────────
+    paid_repairs = RepairOrder.objects.filter(
+        assigned_to=emp,
+        is_paid=True,
+        paid_at__date__gte=m_start,
+        paid_at__date__lte=m_end,
+    ).prefetch_related('order_services', 'order_parts__part', 'order_accessories__accessory')
+
+    repair_count = paid_repairs.count()
+    for r in paid_repairs:
+        # Маржа от ремонта = услуги − закупочная стоимость запчастей − скидка
+        # (цена услуги уже включает стоимость запчасти для клиента)
+        services_sum = sum(s.price for s in r.order_services.all())
+        parts_cost   = sum(p.part.purchase_price * p.quantity for p in r.order_parts.all())
+        repair_margin = max(services_sum - parts_cost - r.discount, Decimal('0'))
+
+        # Маржа от аксессуаров в ремонте (отдельно, по проценту аксессуаров)
+        acc_profit = max(sum(a.profit for a in r.order_accessories.all()), Decimal('0'))
+
+        if repair_pct > 0:
+            repair_bonus += repair_margin * repair_pct / 100
+        if sale_pct > 0:
+            accessory_in_repair_bonus += acc_profit * sale_pct / 100
+
+    # ── Динамический бонус за продажи аксессуаров ─────────────────────────────
     sale_bonus = Decimal('0')
     sale_count = 0
     if sale_pct > 0:
@@ -971,6 +1125,9 @@ def _calc_payroll(emp, year, month):
             max(s.profit, Decimal('0')) * sale_pct / 100
             for s in sales
         )
+
+    # Суммарный бонус за всё что связано с аксессуарами
+    total_accessory_bonus = sale_bonus + accessory_in_repair_bonus
 
     # ── Ручные записи: оклад, премия, штраф ──────────────────────────────────
     manual_qs = PayrollRecord.objects.filter(
@@ -987,16 +1144,17 @@ def _calc_payroll(emp, year, month):
     manual_income = agg['income'] or Decimal('0')
     penalty       = agg['penalty'] or Decimal('0')
 
-    total_income = repair_bonus + sale_bonus + manual_income
+    total_income = repair_bonus + total_accessory_bonus + manual_income
     net = total_income - penalty
 
     return {
         'repair_bonus': repair_bonus,
         'repair_pct':   repair_pct,
         'repair_count': repair_count,
-        'sale_bonus':   sale_bonus,
+        'sale_bonus':   total_accessory_bonus,
         'sale_pct':     sale_pct,
         'sale_count':   sale_count,
+        'accessory_in_repair_bonus': accessory_in_repair_bonus,
         'manual_income':manual_income,
         'penalty':      penalty,
         'total_income': total_income,
@@ -1028,10 +1186,22 @@ def finance(request):
         date__gte=month_start
     ).aggregate(t=Sum('amount'))['t'] or Decimal('0')
 
-    profit_month = revenue_month - expenses_month
+    # Валовая маржа = выручка − закупочная себестоимость (запчасти + аксессуары)
+    repair_cost_month = RepairOrder.objects.filter(
+        is_paid=True, paid_at__date__gte=month_start
+    ).aggregate(t=Sum('cost_price'))['t'] or Decimal('0')
+
+    sale_cost_month = SaleOrder.objects.filter(
+        is_finalized=True, created_at__date__gte=month_start
+    ).aggregate(t=Sum('cost_price'))['t'] or Decimal('0')
+
+    gross_margin_month = revenue_month - repair_cost_month - sale_cost_month
+    profit_month = gross_margin_month - expenses_month
 
     stats = {
         'revenue_month': revenue_month,
+        'cost_month': repair_cost_month + sale_cost_month,
+        'gross_margin_month': gross_margin_month,
         'profit_month': profit_month,
         'expenses_month': expenses_month,
         'cash_balance': PaymentRecord.objects.filter(
@@ -1445,16 +1615,16 @@ def employee_create(request):
                 last_name=request.POST.get('last_name', ''),
                 email=request.POST.get('email', ''),
             )
-            UserProfile.objects.create(
-                user=user,
-                role=request.POST.get('role', 'employee'),
-                phone=request.POST.get('phone', ''),
-                repair_percent=Decimal(request.POST.get('repair_percent') or '0'),
-                accessory_percent=Decimal(request.POST.get('accessory_percent') or '0'),
-                base_salary=Decimal(request.POST.get('base_salary') or '0'),
-                branch_id=request.POST.get('branch') or None,
-            )
-            messages.success(request, f'Сотрудник {user.get_full_name()} создан')
+            # Сигнал мог уже создать профиль — обновляем его, не создаём заново
+            profile, _ = UserProfile.objects.get_or_create(user=user)
+            profile.role              = request.POST.get('role', 'employee')
+            profile.phone             = request.POST.get('phone', '')
+            profile.repair_percent    = Decimal(request.POST.get('repair_percent') or '0')
+            profile.accessory_percent = Decimal(request.POST.get('accessory_percent') or '0')
+            profile.base_salary       = Decimal(request.POST.get('base_salary') or '0')
+            profile.branch_id         = request.POST.get('branch') or None
+            profile.save()
+            messages.success(request, f'Сотрудник {user.get_full_name() or username} создан')
             return redirect('crm:employee_list')
     return render(request, 'crm/employees/form.html', {
         'roles': UserProfile.ROLES,
@@ -1502,7 +1672,7 @@ def employee_edit(request, pk):
 @crm_required
 @admin_required
 def branch_list(request):
-    branches = Branch.objects.prefetch_related('employees__user').all()
+    branches = Branch.objects.prefetch_related('staff_profiles__user').all()
     all_employees = User.objects.select_related('profile').filter(
         profile__is_active=True
     ).order_by('first_name', 'last_name')
@@ -1540,12 +1710,23 @@ def branch_save(request):
         branch = Branch.objects.create(name=name, address=address, phone=phone, email=email)
         messages.success(request, f'Филиал «{name}» создан')
 
-    # Назначаем сотрудников: сначала снимаем всех с этого филиала,
-    # потом назначаем выбранных
-    UserProfile.objects.filter(branch=branch).update(branch=None)
-    selected_ids = request.POST.getlist('employees')
-    if selected_ids:
-        UserProfile.objects.filter(user_id__in=selected_ids).update(branch=branch)
+    # Назначаем сотрудников через M2M (доступные филиалы)
+    selected_ids = [int(x) for x in request.POST.getlist('employees') if x.isdigit()]
+    # Убираем этот филиал у тех, кого не выбрали
+    profiles_to_remove = UserProfile.objects.filter(branches=branch).exclude(user_id__in=selected_ids)
+    for p in profiles_to_remove:
+        p.branches.remove(branch)
+        # Если это был их активный филиал — сбрасываем
+        if p.branch == branch:
+            p.branch = None
+            p.save(update_fields=['branch'])
+    # Добавляем выбранных
+    for uid in selected_ids:
+        try:
+            p = UserProfile.objects.get(user_id=uid)
+            p.branches.add(branch)
+        except UserProfile.DoesNotExist:
+            pass
 
     return redirect('crm:branch_list')
 
@@ -1615,10 +1796,32 @@ def my_profile(request):
                 update_session_auth_hash(request, user)
                 messages.success(request, 'Пароль успешно изменён')
 
+        elif action == 'switch_branch':
+            if profile:
+                branch_id = request.POST.get('branch_id') or None
+                if branch_id:
+                    # Убеждаемся, что сотрудник закреплён за этим филиалом
+                    try:
+                        new_branch = Branch.objects.get(pk=branch_id)
+                        if new_branch in profile.branches.all() or profile.role == 'admin':
+                            profile.branch = new_branch
+                            profile.save(update_fields=['branch'])
+                            messages.success(request, f'Активный филиал: {new_branch.name}')
+                        else:
+                            messages.error(request, 'Нет доступа к этому филиалу')
+                    except Branch.DoesNotExist:
+                        messages.error(request, 'Филиал не найден')
+                else:
+                    profile.branch = None
+                    profile.save(update_fields=['branch'])
+                    messages.success(request, 'Активный филиал сброшен')
+
         return redirect('crm:my_profile')
 
+    my_branches = profile.branches.all() if profile else []
     return render(request, 'crm/employees/profile.html', {
         'profile': profile,
+        'my_branches': my_branches,
     })
 
 
@@ -1734,20 +1937,60 @@ def call_request_update(request, pk):
 
 @crm_required
 def appointment_list(request):
+    profile = getattr(request.user, 'profile', None)
+    is_admin_or_manager = profile and profile.role in ('admin', 'manager')
+
+    appts = Appointment.objects.select_related('branch').all()
+
+    # Фильтрация по филиалу
+    if is_admin_or_manager:
+        available_branches = Branch.objects.filter(is_active=True)
+    else:
+        assigned_ids = list(profile.branches.values_list('id', flat=True)) if profile else []
+        available_branches = Branch.objects.filter(id__in=assigned_ids, is_active=True)
+        if profile and profile.branch:
+            appts = appts.filter(branch=profile.branch)
+        elif assigned_ids:
+            appts = appts.filter(branch_id__in=assigned_ids)
+        else:
+            appts = appts.none()
+
+    branch_filter = request.GET.get('branch', '')
+    if branch_filter == 'all' and is_admin_or_manager:
+        pass
+    elif branch_filter:
+        if is_admin_or_manager or available_branches.filter(pk=branch_filter).exists():
+            appts = appts.filter(branch_id=branch_filter)
+
     status_filter = request.GET.get('status', '')
-    appts = Appointment.objects.all()
+    source_filter = request.GET.get('source', '')
     if status_filter:
         appts = appts.filter(status=status_filter)
+    if source_filter:
+        appts = appts.filter(source=source_filter)
+
+    new_appointments_count = Appointment.objects.filter(
+        status='new', source__in=('website', 'telegram')
+    ).count()
+
     return render(request, 'crm/appointments/list.html', {
         'appointments': appts,
         'status_filter': status_filter,
+        'source_filter': source_filter,
+        'branch_filter': branch_filter,
         'status_choices': Appointment.STATUS_CHOICES,
+        'branches': available_branches,
+        'is_admin_or_manager': is_admin_or_manager,
+        'active_branch': profile.branch if profile else None,
+        'new_appointments_count': new_appointments_count,
     })
 
 
 @crm_required
 def appointment_create(request):
+    profile = getattr(request.user, 'profile', None)
     if request.method == 'POST':
+        branch_id = request.POST.get('branch') or None
         appt = Appointment.objects.create(
             name=request.POST.get('name', '').strip(),
             phone=request.POST.get('phone', '').strip(),
@@ -1758,19 +2001,29 @@ def appointment_create(request):
             notes=request.POST.get('notes', '').strip(),
             source='crm',
             status='new',
+            branch_id=branch_id,
         )
         messages.success(request, f'Запись для {appt.name} создана')
         return redirect('crm:appointment_list')
+    # Предлагаем доступные филиалы
+    if profile and profile.role in ('admin', 'manager'):
+        branches = Branch.objects.filter(is_active=True)
+    else:
+        assigned_ids = list(profile.branches.values_list('id', flat=True)) if profile else []
+        branches = Branch.objects.filter(id__in=assigned_ids, is_active=True)
     return render(request, 'crm/appointments/form.html', {
         'title': 'Новая запись',
         'status_choices': Appointment.STATUS_CHOICES,
         'source_choices': Appointment.SOURCE_CHOICES,
+        'branches': branches,
+        'active_branch': profile.branch if profile else None,
     })
 
 
 @crm_required
 def appointment_edit(request, pk):
     appt = get_object_or_404(Appointment, pk=pk)
+    profile = getattr(request.user, 'profile', None)
     if request.method == 'POST':
         appt.name = request.POST.get('name', '').strip() or appt.name
         appt.phone = request.POST.get('phone', '').strip() or appt.phone
@@ -1781,14 +2034,21 @@ def appointment_edit(request, pk):
         appt.preferred_date = request.POST.get('preferred_date') or None
         appt.preferred_time = request.POST.get('preferred_time') or None
         appt.notes = request.POST.get('notes', '').strip()
+        appt.branch_id = request.POST.get('branch') or None
         appt.save()
         messages.success(request, f'Запись для {appt.name} обновлена')
         return redirect('crm:appointment_list')
+    if profile and profile.role in ('admin', 'manager'):
+        branches = Branch.objects.filter(is_active=True)
+    else:
+        assigned_ids = list(profile.branches.values_list('id', flat=True)) if profile else []
+        branches = Branch.objects.filter(id__in=assigned_ids, is_active=True)
     return render(request, 'crm/appointments/form.html', {
         'title': f'Редактировать запись #{appt.pk}',
         'appointment': appt,
         'status_choices': Appointment.STATUS_CHOICES,
         'source_choices': Appointment.SOURCE_CHOICES,
+        'branches': branches,
     })
 
 
@@ -1864,7 +2124,6 @@ def api_models_for_brand(request, brand_id):
 # ─── Price List Editor ────────────────────────────────────────────────────────
 
 @crm_required
-@manager_required
 def price_list(request):
     brands = Brand.objects.filter(is_active=True).prefetch_related(
         'phone_models__services'
@@ -1964,14 +2223,24 @@ def price_model_save(request):
     if request.method != 'POST':
         return redirect('crm:price_list')
 
-    brand_id = request.POST.get('brand_id')
-    name = request.POST.get('name', '').strip()
+    brand_id  = request.POST.get('brand_id')
+    pk        = request.POST.get('pk')
+    name      = request.POST.get('name', '').strip()
+    is_active = request.POST.get('is_active', '1') == '1'
+
     if not name or not brand_id:
         messages.error(request, 'Укажите название модели')
         return redirect(f'/crm/prices/?brand={brand_id}')
 
-    PhoneModel.objects.create(brand_id=brand_id, name=name)
-    messages.success(request, f'Модель «{name}» добавлена')
+    if pk:
+        model = get_object_or_404(PhoneModel, pk=pk)
+        model.name      = name
+        model.is_active = is_active
+        model.save()
+        messages.success(request, f'Модель «{name}» обновлена')
+    else:
+        PhoneModel.objects.create(brand_id=brand_id, name=name, is_active=is_active)
+        messages.success(request, f'Модель «{name}» добавлена')
     return redirect(f'/crm/prices/?brand={brand_id}')
 
 

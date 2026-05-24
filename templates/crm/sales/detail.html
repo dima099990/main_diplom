@@ -1,4 +1,5 @@
 {% extends 'crm/base.html' %}
+{% load l10n %}
 {% block title %}{{ sale.order_number }} — Продажа{% endblock %}
 {% block page_title %}
   <a href="{% url 'crm:sale_list' %}" class="text-slate-500 hover:text-slate-300 mr-1">Продажи</a>
@@ -83,7 +84,7 @@
                   data-name="{{ a.name|lower }}"
                   data-id="{{ a.pk }}"
                   data-label="{{ a.name|escapejs }}"
-                  data-price="{{ a.sale_price }}"
+                  data-price="{{ a.sale_price|unlocalize }}"
                   data-stock="{{ a.quantity }}"
                   onclick="selectAccessory(this)">
             <div class="flex justify-between items-start">

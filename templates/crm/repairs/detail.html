@@ -135,7 +135,14 @@
           </div>
 
           <div class="space-y-4">
-            <h3 class="text-xs text-slate-500 uppercase tracking-wide font-semibold">Устройство</h3>
+            <div class="flex items-center justify-between">
+              <h3 class="text-xs text-slate-500 uppercase tracking-wide font-semibold">Устройство</h3>
+              <button onclick="openDeviceModal()"
+                      class="text-xs px-2 py-1 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-700 transition-colors flex items-center gap-1">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                Изменить
+              </button>
+            </div>
             <div class="space-y-3">
               <div>
                 <label class="text-xs text-slate-500">Бренд / модель</label>
@@ -286,7 +293,10 @@
 
           <!-- ── ЗАПЧАСТИ ── -->
           <div>
-            <h3 class="text-sm font-semibold text-slate-200 mb-3">Запчасти</h3>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-semibold text-slate-200">Запчасти</h3>
+              <span class="text-xs text-slate-500 bg-slate-800/60 px-2 py-0.5 rounded-full" title="Стоимость запчастей включена в цену услуги. Закупочная цена учитывается в себестоимости.">в себестоимости, не добавляются к итогу</span>
+            </div>
 
             <!-- Добавленные запчасти -->
             <div class="space-y-2 mb-4">
@@ -294,9 +304,9 @@
               <div class="flex items-center gap-3 bg-slate-800/50 rounded-lg px-3 py-2.5">
                 <div class="flex-1 min-w-0">
                   <p class="text-sm text-slate-200 truncate">{{ op.part.name }}</p>
-                  <p class="text-xs text-slate-500">{{ op.quantity }} шт × {{ op.price|floatformat:0 }} ₽</p>
+                  <p class="text-xs text-slate-500">{{ op.quantity }} шт · закуп. {{ op.part.purchase_price|floatformat:0 }} ₽/шт</p>
                 </div>
-                <span class="text-white font-semibold text-sm whitespace-nowrap">{{ op.total|floatformat:0 }} ₽</span>
+                <span class="text-slate-500 text-sm whitespace-nowrap">−{{ op.part.purchase_price|floatformat:0 }} ₽</span>
                 <form method="post" action="{% url 'crm:repair_remove_part' repair.pk op.pk %}">
                   {% csrf_token %}
                   <button type="submit" class="text-slate-600 hover:text-red-400 transition-colors">
@@ -305,7 +315,7 @@
                 </form>
               </div>
               {% empty %}
-              <p class="text-xs text-slate-600 italic">Пока ничего не добавлено</p>
+              <p class="text-xs text-slate-600 italic">Запчасти не добавлены (ремонт без запчасти)</p>
               {% endfor %}
             </div>
 
@@ -364,29 +374,106 @@
               </div>
             </form>
           </div>
+
+          <!-- ── АКСЕССУАРЫ ── -->
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-semibold text-slate-200">Аксессуары</h3>
+              <span class="text-xs text-slate-500 bg-slate-800/60 px-2 py-0.5 rounded-full">продаются вместе с ремонтом</span>
+            </div>
+
+            <!-- Добавленные аксессуары -->
+            <div class="space-y-2 mb-4">
+              {% for oa in repair.order_accessories.all %}
+              <div class="flex items-center gap-3 bg-slate-800/50 rounded-lg px-3 py-2.5">
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm text-slate-200 truncate">{{ oa.accessory.name }}</p>
+                  <p class="text-xs text-slate-500">{{ oa.quantity }} шт × {{ oa.price|floatformat:0 }} ₽</p>
+                </div>
+                <span class="text-purple-300 font-semibold text-sm whitespace-nowrap">{{ oa.total|floatformat:0 }} ₽</span>
+                <form method="post" action="{% url 'crm:repair_remove_accessory' repair.pk oa.pk %}">
+                  {% csrf_token %}
+                  <button type="submit" class="text-slate-600 hover:text-red-400 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                  </button>
+                </form>
+              </div>
+              {% empty %}
+              <p class="text-xs text-slate-600 italic">Аксессуары не добавлены</p>
+              {% endfor %}
+            </div>
+
+            <!-- Поиск аксессуара -->
+            <p class="text-xs text-slate-500 mb-1.5">Добавить аксессуар из склада:</p>
+            <form method="post" action="{% url 'crm:repair_add_accessory' repair.pk %}" class="space-y-2" id="accAddForm">
+              {% csrf_token %}
+              <div class="relative">
+                <input type="text" id="accSearch" placeholder="Поиск аксессуара..."
+                       class="input-dark w-full px-3 py-2 text-sm" autocomplete="off">
+                <div id="accDropdown" class="hidden absolute z-10 w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                  {% for acc in available_accessories %}
+                  <div class="acc-option px-3 py-2.5 cursor-pointer hover:bg-slate-700 transition-colors border-b border-slate-700/50 last:border-0"
+                       data-id="{{ acc.pk }}"
+                       data-name="{{ acc.name }}"
+                       data-price="{{ acc.sale_price }}"
+                       data-qty="{{ acc.quantity }}"
+                       data-name-lower="{{ acc.name|lower }}">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm text-slate-200">{{ acc.name }}</span>
+                      <span class="text-xs text-slate-500 ml-2 whitespace-nowrap">{{ acc.quantity }} шт · <span class="text-purple-400 font-semibold">{{ acc.sale_price|floatformat:0 }} ₽</span></span>
+                    </div>
+                    {% if acc.category %}<span class="text-xs text-slate-600">{{ acc.category }}</span>{% endif %}
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+              <input type="hidden" name="accessory_id" id="selectedAccId">
+              <div id="accFormFields" class="hidden flex gap-2">
+                <div class="flex-1 bg-slate-800/50 rounded-lg px-3 py-2 text-sm text-slate-300 truncate" id="selectedAccName">—</div>
+                <input type="number" name="quantity" id="accQty" value="1" min="1"
+                       class="input-dark w-16 px-2 py-2 text-sm text-center">
+                <input type="number" name="price" id="accPrice" placeholder="₽"
+                       class="input-dark w-24 px-3 py-2 text-sm">
+                <button type="submit" class="btn-primary px-3 py-2 text-sm">+</button>
+              </div>
+            </form>
+          </div>
+
         </div>
 
         <!-- Cost summary -->
         <div class="mt-6 flex justify-end">
-          <div class="bg-slate-800/60 rounded-xl p-4 w-64 space-y-2">
+          <div class="bg-slate-800/60 rounded-xl p-4 w-72 space-y-2">
             <div class="flex justify-between text-sm">
               <span class="text-slate-400">Работы</span>
-              <span class="text-slate-200">{{ services_total }} ₽</span>
+              <span class="text-slate-200">{{ services_total|floatformat:0 }} ₽</span>
             </div>
+            {% if accessories_total %}
             <div class="flex justify-between text-sm">
-              <span class="text-slate-400">Запчасти</span>
-              <span class="text-slate-200">{{ parts_total }} ₽</span>
+              <span class="text-slate-400">Аксессуары</span>
+              <span class="text-purple-300">{{ accessories_total|floatformat:0 }} ₽</span>
             </div>
+            {% endif %}
             {% if repair.discount %}
             <div class="flex justify-between text-sm">
               <span class="text-slate-400">Скидка</span>
-              <span class="text-yellow-400">−{{ repair.discount }} ₽</span>
+              <span class="text-yellow-400">−{{ repair.discount|floatformat:0 }} ₽</span>
             </div>
             {% endif %}
             <div class="border-t border-slate-700 pt-2 flex justify-between font-bold">
-              <span class="text-white">Итого</span>
-              <span class="text-white text-lg">{{ repair.final_cost }} ₽</span>
+              <span class="text-white">Итого к оплате</span>
+              <span class="text-white text-lg">{{ repair.final_cost|floatformat:0 }} ₽</span>
             </div>
+            {% if repair.cost_price %}
+            <div class="flex justify-between text-xs pt-1 border-t border-slate-800">
+              <span class="text-slate-600">Себестоимость (запчасти)</span>
+              <span class="text-slate-600">{{ repair.cost_price|floatformat:0 }} ₽</span>
+            </div>
+            <div class="flex justify-between text-xs">
+              <span class="text-slate-600">Маржа</span>
+              <span class="text-emerald-600/70">{{ repair.profit|floatformat:0 }} ₽</span>
+            </div>
+            {% endif %}
           </div>
         </div>
       </div>
@@ -490,9 +577,69 @@
     </form>
   </div>
 </div>
+<!-- ═══ MODAL: Изменить марку / модель ═══ -->
+<div id="deviceModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeDeviceModal()"></div>
+  <div class="relative bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm shadow-2xl">
+    <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+      <h3 class="text-base font-semibold text-white">Изменить устройство</h3>
+      <button onclick="closeDeviceModal()" class="text-slate-500 hover:text-slate-300 text-xl leading-none">✕</button>
+    </div>
+    <form method="post" action="{% url 'crm:repair_update_device' repair.pk %}" class="p-6 space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="text-xs text-slate-400 mb-1 block">Марка</label>
+        <select id="deviceBrandSelect" name="brand_id" class="input-dark w-full px-3 py-2 text-sm" onchange="updateDeviceModels(this.value)">
+          {% for brand in all_brands %}
+          <option value="{{ brand.pk }}" {% if brand.pk == repair.brand_id %}selected{% endif %}>
+            {{ brand.icon }} {{ brand.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="text-xs text-slate-400 mb-1 block">Модель</label>
+        <select id="deviceModelSelect" name="phone_model_id" class="input-dark w-full px-3 py-2 text-sm">
+          {% for model in repair.brand.phone_models.all %}
+          <option value="{{ model.pk }}" {% if model.pk == repair.phone_model_id %}selected{% endif %}>{{ model.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="flex gap-3 pt-1">
+        <button type="submit" class="btn-primary flex-1 py-2.5 text-sm">Сохранить</button>
+        <button type="button" onclick="closeDeviceModal()" class="btn-secondary px-5 py-2.5 text-sm">Отмена</button>
+      </div>
+    </form>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
+<script>
+const BRAND_MODELS = {{ brand_models_json|safe }};
+
+function openDeviceModal() {
+  document.getElementById('deviceModal').classList.remove('hidden');
+}
+function closeDeviceModal() {
+  document.getElementById('deviceModal').classList.add('hidden');
+}
+function updateDeviceModels(brandId) {
+  const sel = document.getElementById('deviceModelSelect');
+  sel.innerHTML = '';
+  const models = BRAND_MODELS[brandId] || [];
+  models.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.id;
+    opt.textContent = m.name;
+    sel.appendChild(opt);
+  });
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeDeviceModal();
+});
+</script>
+
 <script>
 /* ── Поиск запчастей ── */
 (function () {
@@ -561,6 +708,80 @@
       if (!emptyHint) {
         emptyHint = document.createElement('div');
         emptyHint.className = 'part-empty-hint px-3 py-2.5 text-xs text-slate-500 italic';
+        emptyHint.textContent = 'Ничего не найдено';
+        dropdown.appendChild(emptyHint);
+      }
+      emptyHint.style.display = '';
+    } else if (emptyHint) {
+      emptyHint.style.display = 'none';
+    }
+  }
+})();
+</script>
+
+<script>
+/* ── Поиск аксессуаров ── */
+(function () {
+  const searchInput = document.getElementById('accSearch');
+  const dropdown    = document.getElementById('accDropdown');
+  const hiddenId    = document.getElementById('selectedAccId');
+  const formFields  = document.getElementById('accFormFields');
+  const nameDisplay = document.getElementById('selectedAccName');
+  const priceInput  = document.getElementById('accPrice');
+  const qtyInput    = document.getElementById('accQty');
+
+  if (!searchInput) return;
+
+  searchInput.addEventListener('focus', function () {
+    filterAcc(this.value);
+    dropdown.classList.remove('hidden');
+  });
+
+  searchInput.addEventListener('input', function () {
+    filterAcc(this.value);
+    dropdown.classList.remove('hidden');
+    hiddenId.value = '';
+    formFields.classList.add('hidden');
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+      dropdown.classList.add('hidden');
+    }
+  });
+
+  dropdown.addEventListener('click', function (e) {
+    const option = e.target.closest('.acc-option');
+    if (!option) return;
+
+    const id    = option.dataset.id;
+    const name  = option.dataset.name;
+    const price = option.dataset.price;
+    const qty   = parseInt(option.dataset.qty, 10);
+
+    hiddenId.value          = id;
+    nameDisplay.textContent = name;
+    priceInput.value        = parseFloat(price);
+    qtyInput.max            = qty;
+    searchInput.value       = name;
+
+    formFields.classList.remove('hidden');
+    dropdown.classList.add('hidden');
+  });
+
+  function filterAcc(query) {
+    const q = query.trim().toLowerCase();
+    let anyVisible = false;
+    document.querySelectorAll('#accDropdown .acc-option').forEach(function (opt) {
+      const match = !q || opt.dataset.nameLower.includes(q);
+      opt.style.display = match ? '' : 'none';
+      if (match) anyVisible = true;
+    });
+    let emptyHint = dropdown.querySelector('.acc-empty-hint');
+    if (!anyVisible) {
+      if (!emptyHint) {
+        emptyHint = document.createElement('div');
+        emptyHint.className = 'acc-empty-hint px-3 py-2.5 text-xs text-slate-500 italic';
         emptyHint.textContent = 'Ничего не найдено';
         dropdown.appendChild(emptyHint);
       }

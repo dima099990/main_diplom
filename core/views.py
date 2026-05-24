@@ -3,12 +3,18 @@ from django.contrib import messages
 from django.http import JsonResponse
 from django.db.models import Q
 from .models import SiteSettings, Brand, PhoneModel, RepairService, Review, CallRequest
+from crm.models import Appointment, Branch
 
 
 def home(request):
     reviews = Review.objects.filter(is_active=True)[:6]
-    popular_services = RepairService.objects.filter(is_popular=True, is_active=True).select_related('phone_model__brand')[:6]
-    return render(request, 'core/home.html', {'reviews': reviews, 'popular_services': popular_services})
+    popular_services = RepairService.objects.filter(is_popular=True, is_active=True, phone_model__is_active=True).select_related('phone_model__brand')[:6]
+    branches = Branch.objects.filter(is_active=True)
+    return render(request, 'core/home.html', {
+        'reviews': reviews,
+        'popular_services': popular_services,
+        'branches': branches,
+    })
 
 
 def about(request):
@@ -50,19 +56,35 @@ def about_page(request):
 
 
 def contacts(request):
-    return render(request, 'core/contacts.html')
+    branches = Branch.objects.filter(is_active=True)
+    return render(request, 'core/contacts.html', {'branches': branches})
 
 
 def contact_request(request):
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
         phone = request.POST.get('phone', '').strip()
-        message = request.POST.get('message', '').strip()
+        device = request.POST.get('device', '').strip()
+        problem = request.POST.get('message', '').strip()
+        branch_id = request.POST.get('branch_id') or None
         if name and phone:
-            CallRequest.objects.create(name=name, phone=phone, message=message)
+            branch = None
+            if branch_id:
+                try:
+                    branch = Branch.objects.get(pk=branch_id, is_active=True)
+                except Branch.DoesNotExist:
+                    pass
+            Appointment.objects.create(
+                name=name,
+                phone=phone,
+                device=device,
+                problem=problem,
+                source='website',
+                branch=branch,
+            )
             if request.headers.get('x-requested-with') == 'XMLHttpRequest':
                 return JsonResponse({'ok': True})
-            messages.success(request, 'Заявка отправлена! Мы свяжемся с вами.')
+            messages.success(request, 'Запись принята! Мы свяжемся с вами в ближайшее время.')
         else:
             if request.headers.get('x-requested-with') == 'XMLHttpRequest':
                 return JsonResponse({'ok': False, 'error': 'Заполните имя и телефон'})

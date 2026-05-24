@@ -78,8 +78,9 @@
           <th class="text-left px-4 py-3 font-medium">Устройство</th>
           <th class="text-left px-4 py-3 font-medium hidden lg:table-cell">Неисправность</th>
           <th class="text-left px-4 py-3 font-medium hidden md:table-cell">Мастер</th>
+          <th class="text-left px-4 py-3 font-medium hidden lg:table-cell">Филиал</th>
           <th class="text-right px-4 py-3 font-medium">Сумма</th>
-          <th class="text-right px-4 py-3 font-medium hidden lg:table-cell">Прибыль</th>
+          {% if is_manager %}<th class="text-right px-4 py-3 font-medium hidden lg:table-cell">Прибыль</th>{% endif %}
           <th class="text-left px-4 py-3 font-medium hidden xl:table-cell">Дата</th>
           <th class="px-4 py-3"></th>
         </tr>
@@ -115,15 +116,24 @@
           <td class="px-4 py-3 hidden md:table-cell text-slate-400 text-xs">
             {% if order.assigned_to %}{{ order.assigned_to.get_full_name|default:order.assigned_to.username }}{% else %}—{% endif %}
           </td>
+          <td class="px-4 py-3 hidden lg:table-cell text-xs">
+            {% if order.branch %}
+            <span class="text-slate-400">{{ order.branch.name }}</span>
+            {% else %}
+            <span class="text-slate-600">—</span>
+            {% endif %}
+          </td>
           <td class="px-4 py-3 text-right font-semibold text-white">
             {{ order.final_cost|floatformat:0 }} ₽
             {% if order.is_paid %}<span class="block text-xs text-green-400">✓ оплачен</span>{% endif %}
           </td>
+          {% if is_manager %}
           <td class="px-4 py-3 text-right hidden lg:table-cell">
             <span class="{% if order.profit > 0 %}text-green-400{% else %}text-red-400{% endif %} font-medium">
               {{ order.profit|floatformat:0 }} ₽
             </span>
           </td>
+          {% endif %}
           <td class="px-4 py-3 hidden xl:table-cell text-slate-500 text-xs">
             {{ order.created_at|date:"d.m.Y H:i" }}
           </td>

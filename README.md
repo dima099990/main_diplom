@@ -73,6 +73,8 @@ python run.py
 | `python manage.py migrate` | Применить все миграции |
 | `python manage.py makemigrations` | Создать новые миграции после изменений моделей |
 | `python manage.py seed_data` | Заполнить БД тестовыми данными (бренды, прайс, сотрудники, 40 заказов) |
+| `python manage.py seed_iphone_prices` | Загрузить цены на ремонт iPhone (33 модели, 743 услуги, данные с mobi-service.com) |
+| `python manage.py seed_iphone_prices --yes` | То же без запроса подтверждения |
 | `python manage.py clear_db` | Очистить транзакционные данные (заказы, клиенты, склад, продажи) |
 | `python manage.py clear_db --all` | Очистить всё включая справочники и пользователей |
 | `python manage.py clear_db --yes` | Очистить без запроса подтверждения |

@@ -6,23 +6,72 @@
 {% include 'crm/includes/messages.html' %}
 
 <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-  <!-- Фильтр по статусу -->
+  <!-- Фильтры -->
   <div class="flex gap-2 flex-wrap">
-    <a href="{% url 'crm:appointment_list' %}"
+    <!-- Статус -->
+    <a href="{% url 'crm:appointment_list' %}{% if source_filter %}?source={{ source_filter }}{% endif %}"
        class="px-3 py-1.5 rounded-lg text-sm border transition-all
               {% if not status_filter %}bg-indigo-600 text-white border-indigo-500
               {% else %}bg-slate-800 text-slate-400 border-slate-700 hover:text-white{% endif %}">
-      Все
+      Все статусы
     </a>
     {% for val, label in status_choices %}
-    <a href="?status={{ val }}"
+    <a href="?status={{ val }}{% if source_filter %}&source={{ source_filter }}{% endif %}"
        class="px-3 py-1.5 rounded-lg text-sm border transition-all
               {% if status_filter == val %}bg-indigo-600 text-white border-indigo-500
               {% else %}bg-slate-800 text-slate-400 border-slate-700 hover:text-white{% endif %}">
       {{ label }}
     </a>
     {% endfor %}
+
+    <span class="border-l border-slate-700 mx-1"></span>
+
+    <!-- Источник -->
+    <a href="{% url 'crm:appointment_list' %}{% if status_filter %}?status={{ status_filter }}{% endif %}"
+       class="px-3 py-1.5 rounded-lg text-sm border transition-all
+              {% if not source_filter %}bg-slate-700 text-white border-slate-600
+              {% else %}bg-slate-800 text-slate-400 border-slate-700 hover:text-white{% endif %}">
+      Все источники
+    </a>
+    <a href="?source=website{% if status_filter %}&status={{ status_filter }}{% endif %}"
+       class="px-3 py-1.5 rounded-lg text-sm border transition-all
+              {% if source_filter == 'website' %}bg-emerald-700 text-white border-emerald-600
+              {% else %}bg-slate-800 text-slate-400 border-slate-700 hover:text-white{% endif %}">
+      🌐 Сайт
+    </a>
+    <a href="?source=telegram{% if status_filter %}&status={{ status_filter }}{% endif %}"
+       class="px-3 py-1.5 rounded-lg text-sm border transition-all
+              {% if source_filter == 'telegram' %}bg-blue-700 text-white border-blue-600
+              {% else %}bg-slate-800 text-slate-400 border-slate-700 hover:text-white{% endif %}">
+      ✈ Telegram
+    </a>
+    <a href="?source=crm{% if status_filter %}&status={{ status_filter }}{% endif %}"
+       class="px-3 py-1.5 rounded-lg text-sm border transition-all
+              {% if source_filter == 'crm' %}bg-slate-600 text-white border-slate-500
+              {% else %}bg-slate-800 text-slate-400 border-slate-700 hover:text-white{% endif %}">
+      🖥 CRM
+    </a>
   </div>
+  <!-- Фильтр по филиалу (для Admin/Manager) -->
+  {% if is_admin_or_manager and branches %}
+  <div class="flex gap-2 flex-wrap">
+    <a href="?{% if status_filter %}status={{ status_filter }}&{% endif %}{% if source_filter %}source={{ source_filter }}&{% endif %}branch=all"
+       class="px-3 py-1.5 rounded-lg text-sm border transition-all
+              {% if branch_filter == 'all' or not branch_filter %}bg-slate-700 text-white border-slate-600
+              {% else %}bg-slate-800 text-slate-400 border-slate-700 hover:text-white{% endif %}">
+      Все филиалы
+    </a>
+    {% for b in branches %}
+    <a href="?{% if status_filter %}status={{ status_filter }}&{% endif %}{% if source_filter %}source={{ source_filter }}&{% endif %}branch={{ b.pk }}"
+       class="px-3 py-1.5 rounded-lg text-sm border transition-all
+              {% if branch_filter == b.pk|stringformat:'s' %}bg-indigo-700 text-white border-indigo-600
+              {% else %}bg-slate-800 text-slate-400 border-slate-700 hover:text-white{% endif %}">
+      {{ b.name }}
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   <a href="{% url 'crm:appointment_create' %}"
      class="btn-primary px-4 py-2 text-sm flex items-center gap-2">
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -41,6 +90,7 @@
         <th class="text-left px-4 py-3 hidden md:table-cell">Дата / время</th>
         <th class="text-left px-4 py-3">Статус</th>
         <th class="text-left px-4 py-3 hidden lg:table-cell">Источник</th>
+        <th class="text-left px-4 py-3 hidden xl:table-cell">Филиал</th>
         <th class="px-4 py-3"></th>
       </tr>
     </thead>
@@ -85,11 +135,20 @@
         <!-- Источник -->
         <td class="px-4 py-3 text-xs hidden lg:table-cell">
           {% if appt.source == 'telegram' %}
-          <span class="text-blue-400">✈ Telegram</span>
-          {% elif appt.source == 'crm' %}
-          <span class="text-slate-500">🖥 CRM</span>
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-900/40 text-blue-400 border border-blue-800/50">✈ Telegram</span>
+          {% elif appt.source == 'website' %}
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 border border-emerald-800/50">🌐 Сайт</span>
           {% else %}
-          <span class="text-slate-500">🌐 Сайт</span>
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800 text-slate-500 border border-slate-700">🖥 CRM</span>
+          {% endif %}
+        </td>
+
+        <!-- Филиал -->
+        <td class="px-4 py-3 text-xs hidden xl:table-cell">
+          {% if appt.branch %}
+          <span class="text-slate-400">{{ appt.branch.name }}</span>
+          {% else %}
+          <span class="text-slate-600">—</span>
           {% endif %}
         </td>
 

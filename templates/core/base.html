@@ -26,6 +26,7 @@
       <li><a href="{% url 'about' %}" {% if request.resolver_match.url_name == 'about' %}class="active"{% endif %}>О нас</a></li>
       <li><a href="{% url 'prices' %}" {% if request.resolver_match.url_name == 'prices' %}class="active"{% endif %}>Цены</a></li>
       <li><a href="{% url 'contacts' %}" {% if request.resolver_match.url_name == 'contacts' %}class="active"{% endif %}>Контакты</a></li>
+      <li><a href="{% url 'contacts' %}#booking-form" class="btn btn-sm" style="padding:.4rem 1rem">Записаться</a></li>
       <li><a href="tel:{{ site.phone }}" class="nav-phone">{{ site.phone }}</a></li>
     </ul>
   </div>

@@ -8,8 +8,7 @@ def site_settings(request):
 def crm_context(request):
     if not request.user.is_authenticated or not request.path.startswith('/crm/'):
         return {}
-    from crm.models import Notification, RepairOrder, UserProfile
-    from core.models import CallRequest
+    from crm.models import Notification, RepairOrder, UserProfile, Appointment
 
     try:
         profile = request.user.profile
@@ -29,10 +28,20 @@ def crm_context(request):
         user=request.user, is_read=False
     ).count()
 
+    # Новые записи (с сайта + из Telegram) для значка в сайдбаре
+    new_appointments_count = Appointment.objects.filter(
+        status='new', source__in=('website', 'telegram')
+    ).count() if role in ('admin', 'manager') else 0
+
+    is_admin   = role == 'admin'
+    is_manager = role in ('admin', 'manager')  # admin тоже считается менеджером
+
     return {
         'role': role,
+        'is_admin': is_admin,
+        'is_manager': is_manager,
         'user_role_display': role_display,
-        'call_req_count': CallRequest.objects.filter(is_processed=False).count() if role in ('admin', 'manager') else 0,
         'open_orders_count': open_orders_count,
         'unread_notifications_count': unread_notifications_count,
+        'new_appointments_count': new_appointments_count,
     }

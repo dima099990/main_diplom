@@ -39,7 +39,9 @@ class UserProfile(models.Model):
     telegram = models.CharField("Telegram", max_length=100, blank=True)
     notes    = models.TextField("Заметки (только для админа)", blank=True)
     branch   = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True,
-                                 related_name='employees', verbose_name="Филиал")
+                                 related_name='active_employees', verbose_name="Активный филиал сегодня")
+    branches = models.ManyToManyField(Branch, blank=True,
+                                      related_name='staff_profiles', verbose_name="Доступные филиалы")
     photo    = models.ImageField("Фото", upload_to='employees/', blank=True, null=True)
     # Salary settings
     repair_percent = models.DecimalField("% с ремонтов", max_digits=5, decimal_places=2, default=Decimal('0'))
@@ -333,11 +335,14 @@ class RepairOrder(models.Model):
         return False
 
     def recalculate_final_cost(self):
-        services_total = sum(s.price for s in self.order_services.all())
-        parts_total = sum(p.price * p.quantity for p in self.order_parts.all())
-        cost_total = sum(p.part.purchase_price * p.quantity for p in self.order_parts.all())
-        self.final_cost = services_total + parts_total - self.discount
-        self.cost_price = cost_total
+        # Запчасти НЕ добавляют к итогу — их стоимость уже заложена в цену услуги.
+        # Закупочная цена запчастей идёт в себестоимость для расчёта маржи и зарплаты.
+        services_total    = sum(s.price for s in self.order_services.all())
+        accessories_total = sum(a.price * a.quantity for a in self.order_accessories.all())
+        parts_cost        = sum(p.part.purchase_price * p.quantity for p in self.order_parts.all())
+        accessories_cost  = sum(a.accessory.purchase_price * a.quantity for a in self.order_accessories.all())
+        self.final_cost  = services_total + accessories_total - self.discount
+        self.cost_price  = parts_cost + accessories_cost
         self.save(update_fields=['final_cost', 'cost_price'])
 
 
@@ -350,6 +355,8 @@ class OrderHistory(models.Model):
         ('service_removed', 'Удалена услуга'),
         ('part_added', 'Добавлена запчасть'),
         ('part_removed', 'Удалена запчасть'),
+        ('accessory_added', 'Добавлен аксессуар'),
+        ('accessory_removed', 'Удалён аксессуар'),
         ('master_assigned', 'Назначен мастер'),
         ('payment', 'Оплата'),
         ('comment', 'Комментарий'),
@@ -401,6 +408,31 @@ class RepairOrderPart(models.Model):
     @property
     def total(self):
         return self.price * self.quantity
+
+
+# ─── Accessories in repair order ─────────────────────────────────────────────
+
+class RepairOrderAccessory(models.Model):
+    order = models.ForeignKey(RepairOrder, on_delete=models.CASCADE, related_name='order_accessories',
+                              verbose_name="Заказ")
+    accessory = models.ForeignKey('Accessory', on_delete=models.PROTECT, verbose_name="Аксессуар")
+    quantity = models.PositiveIntegerField("Количество", default=1)
+    price = models.DecimalField("Цена за шт.", max_digits=10, decimal_places=2)
+
+    class Meta:
+        verbose_name = "Аксессуар в заказе"
+        verbose_name_plural = "Аксессуары в заказе"
+
+    def __str__(self):
+        return f"{self.accessory.name} x{self.quantity}"
+
+    @property
+    def total(self):
+        return self.price * self.quantity
+
+    @property
+    def profit(self):
+        return (self.price - self.accessory.purchase_price) * self.quantity
 
 
 # ─── Finance: Payments ───────────────────────────────────────────────────────
@@ -652,6 +684,8 @@ class Appointment(models.Model):
     preferred_time = models.TimeField("Желаемое время", null=True, blank=True)
     status = models.CharField("Статус", max_length=20, choices=STATUS_CHOICES, default='new')
     source = models.CharField("Источник", max_length=20, choices=SOURCE_CHOICES, default='crm')
+    branch = models.ForeignKey('Branch', on_delete=models.SET_NULL, null=True, blank=True,
+                               verbose_name="Филиал", related_name='appointments')
     telegram_chat_id = models.CharField("Telegram chat ID", max_length=50, blank=True)
     notes = models.TextField("Примечания (внутренние)", blank=True)
     created_order = models.ForeignKey(
