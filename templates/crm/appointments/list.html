@@ -1,0 +1,145 @@
+{% extends 'crm/base.html' %}
+{% block title %}Записи{% endblock %}
+{% block page_title %}Записи на ремонт{% endblock %}
+
+{% block content %}
+{% include 'crm/includes/messages.html' %}
+
+<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+  <!-- Фильтр по статусу -->
+  <div class="flex gap-2 flex-wrap">
+    <a href="{% url 'crm:appointment_list' %}"
+       class="px-3 py-1.5 rounded-lg text-sm border transition-all
+              {% if not status_filter %}bg-indigo-600 text-white border-indigo-500
+              {% else %}bg-slate-800 text-slate-400 border-slate-700 hover:text-white{% endif %}">
+      Все
+    </a>
+    {% for val, label in status_choices %}
+    <a href="?status={{ val }}"
+       class="px-3 py-1.5 rounded-lg text-sm border transition-all
+              {% if status_filter == val %}bg-indigo-600 text-white border-indigo-500
+              {% else %}bg-slate-800 text-slate-400 border-slate-700 hover:text-white{% endif %}">
+      {{ label }}
+    </a>
+    {% endfor %}
+  </div>
+  <a href="{% url 'crm:appointment_create' %}"
+     class="btn-primary px-4 py-2 text-sm flex items-center gap-2">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+    </svg>
+    Новая запись
+  </a>
+</div>
+
+<div class="card overflow-hidden">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="text-xs text-slate-500 uppercase border-b border-slate-800">
+        <th class="text-left px-4 py-3">Клиент</th>
+        <th class="text-left px-4 py-3 hidden sm:table-cell">Устройство</th>
+        <th class="text-left px-4 py-3 hidden md:table-cell">Дата / время</th>
+        <th class="text-left px-4 py-3">Статус</th>
+        <th class="text-left px-4 py-3 hidden lg:table-cell">Источник</th>
+        <th class="px-4 py-3"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-800/60">
+      {% for appt in appointments %}
+      <tr class="hover:bg-slate-800/30 transition-colors">
+
+        <!-- Клиент -->
+        <td class="px-4 py-3">
+          <p class="font-medium text-slate-200">{{ appt.name }}</p>
+          <a href="tel:{{ appt.phone }}" class="text-xs text-indigo-400 hover:text-indigo-300">{{ appt.phone }}</a>
+          {% if appt.problem %}
+          <p class="text-xs text-slate-500 mt-0.5 truncate max-w-[200px]">{{ appt.problem }}</p>
+          {% endif %}
+          {% if appt.notes %}
+          <p class="text-xs text-amber-500/70 mt-0.5 truncate max-w-[200px]">📝 {{ appt.notes }}</p>
+          {% endif %}
+        </td>
+
+        <!-- Устройство -->
+        <td class="px-4 py-3 text-slate-400 text-xs hidden sm:table-cell">
+          {{ appt.device|default:"—" }}
+        </td>
+
+        <!-- Дата -->
+        <td class="px-4 py-3 text-xs hidden md:table-cell">
+          {% if appt.preferred_date %}
+          <p class="text-slate-300">{{ appt.preferred_date|date:"d.m.Y" }}</p>
+          {% if appt.preferred_time %}
+          <p class="text-slate-500">{{ appt.preferred_time|time:"H:i" }}</p>
+          {% endif %}
+          {% else %}
+          <span class="text-slate-600">—</span>
+          {% endif %}
+        </td>
+
+        <!-- Статус -->
+        <td class="px-4 py-3">
+          <span class="badge {{ appt.status_badge }}">{{ appt.get_status_display }}</span>
+        </td>
+
+        <!-- Источник -->
+        <td class="px-4 py-3 text-xs hidden lg:table-cell">
+          {% if appt.source == 'telegram' %}
+          <span class="text-blue-400">✈ Telegram</span>
+          {% elif appt.source == 'crm' %}
+          <span class="text-slate-500">🖥 CRM</span>
+          {% else %}
+          <span class="text-slate-500">🌐 Сайт</span>
+          {% endif %}
+        </td>
+
+        <!-- Действия -->
+        <td class="px-4 py-3">
+          <div class="flex items-center justify-end gap-1.5">
+
+            {% if not appt.created_order %}
+            <!-- В заказ -->
+            <a href="{% url 'crm:appointment_to_order' appt.pk %}"
+               onclick="return confirm('Создать заказ из этой записи?')"
+               class="px-2.5 py-1.5 rounded-lg bg-indigo-600/20 text-indigo-300
+                      hover:bg-indigo-600/40 border border-indigo-500/30 text-xs
+                      whitespace-nowrap transition-all"
+               title="Создать заказ">
+              ➕ В заказ
+            </a>
+            {% else %}
+            <!-- Перейти к заказу -->
+            <a href="{% url 'crm:repair_detail' appt.created_order.pk %}"
+               class="px-2.5 py-1.5 rounded-lg bg-green-600/20 text-green-300
+                      hover:bg-green-600/40 border border-green-500/30 text-xs
+                      whitespace-nowrap transition-all"
+               title="Открыть заказ">
+              📋 {{ appt.created_order.order_number }}
+            </a>
+            {% endif %}
+
+            <!-- Редактировать -->
+            <a href="{% url 'crm:appointment_edit' appt.pk %}"
+               class="px-2.5 py-1.5 rounded-lg bg-slate-700 text-slate-300
+                      hover:bg-slate-600 border border-slate-600 text-xs
+                      transition-all"
+               title="Редактировать">
+              ✏️ Изменить
+            </a>
+
+          </div>
+        </td>
+
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6">
+          {% include 'crm/includes/empty_state.html' with icon="📅" title="Записей нет" subtitle="Создайте первую запись или дождитесь заявок из Telegram" %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

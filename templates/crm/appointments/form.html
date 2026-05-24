@@ -1,0 +1,146 @@
+{% extends 'crm/base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+{% include 'crm/includes/messages.html' %}
+
+<div class="max-w-2xl">
+  <div class="card p-6">
+    <form method="post">
+      {% csrf_token %}
+      <div class="space-y-5">
+
+        <!-- Имя + Телефон -->
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs text-slate-500 uppercase tracking-wide mb-1.5">Имя клиента *</label>
+            <input type="text" name="name" required
+                   value="{{ appointment.name|default:'' }}"
+                   class="input-dark w-full px-3 py-2"
+                   placeholder="Иван Иванов">
+          </div>
+          <div>
+            <label class="block text-xs text-slate-500 uppercase tracking-wide mb-1.5">Телефон *</label>
+            <input type="text" name="phone" required
+                   value="{{ appointment.phone|default:'' }}"
+                   class="input-dark w-full px-3 py-2"
+                   placeholder="+7 (999) 000-00-00">
+          </div>
+        </div>
+
+        <!-- Устройство -->
+        <div>
+          <label class="block text-xs text-slate-500 uppercase tracking-wide mb-1.5">Устройство</label>
+          <input type="text" name="device"
+                 value="{{ appointment.device|default:'' }}"
+                 class="input-dark w-full px-3 py-2"
+                 placeholder="iPhone 15 Pro, Samsung Galaxy S24...">
+        </div>
+
+        <!-- Описание проблемы -->
+        <div>
+          <label class="block text-xs text-slate-500 uppercase tracking-wide mb-1.5">Описание проблемы</label>
+          <textarea name="problem" rows="3"
+                    class="input-dark w-full px-3 py-2 resize-none"
+                    placeholder="Разбит экран, не включается, не держит зарядку...">{{ appointment.problem|default:'' }}</textarea>
+        </div>
+
+        <!-- Дата + Время -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs text-slate-500 uppercase tracking-wide mb-1.5">Желаемая дата</label>
+            <input type="date" name="preferred_date"
+                   value="{{ appointment.preferred_date|date:'Y-m-d'|default:'' }}"
+                   class="input-dark w-full px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-xs text-slate-500 uppercase tracking-wide mb-1.5">Время</label>
+            <input type="time" name="preferred_time"
+                   value="{{ appointment.preferred_time|time:'H:i'|default:'' }}"
+                   class="input-dark w-full px-3 py-2">
+          </div>
+        </div>
+
+        {% if appointment %}
+        <!-- Статус + Источник — только при редактировании -->
+        <div class="grid sm:grid-cols-2 gap-4 pt-1 border-t border-slate-800">
+          <div>
+            <label class="block text-xs text-slate-500 uppercase tracking-wide mb-1.5">Статус</label>
+            <select name="status" class="input-dark w-full px-3 py-2">
+              {% for val, label in status_choices %}
+              <option value="{{ val }}" {% if appointment.status == val %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-slate-500 uppercase tracking-wide mb-1.5">Источник</label>
+            <select name="source" class="input-dark w-full px-3 py-2">
+              {% for val, label in source_choices %}
+              <option value="{{ val }}" {% if appointment.source == val %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Примечание -->
+        <div>
+          <label class="block text-xs text-slate-500 uppercase tracking-wide mb-1.5">Примечание (внутреннее)</label>
+          <textarea name="notes" rows="2"
+                    class="input-dark w-full px-3 py-2 resize-none"
+                    placeholder="Заметка для сотрудников...">{{ appointment.notes|default:'' }}</textarea>
+        </div>
+
+      </div>
+
+      <!-- Кнопки -->
+      <div class="flex items-center justify-between mt-6 pt-4 border-t border-slate-800">
+        <div class="flex gap-3">
+          <button type="submit" class="btn-primary px-6 py-2">
+            {% if appointment %}Сохранить изменения{% else %}Создать запись{% endif %}
+          </button>
+          <a href="{% url 'crm:appointment_list' %}" class="btn-secondary px-6 py-2">Отмена</a>
+        </div>
+        {% if appointment %}
+        <form method="post" action="{% url 'crm:appointment_delete' appointment.pk %}"
+              onsubmit="return confirm('Удалить запись для {{ appointment.name }}?')">
+          {% csrf_token %}
+          <button type="submit"
+                  class="px-4 py-2 rounded-lg text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 transition-all">
+            Удалить запись
+          </button>
+        </form>
+        {% endif %}
+      </div>
+
+    </form>
+  </div>
+
+  {% if appointment %}
+  <!-- Мета-информация -->
+  <div class="mt-4 grid sm:grid-cols-3 gap-3 text-xs text-slate-500">
+    <div class="card px-4 py-3">
+      <p class="text-slate-600 mb-1">Создана</p>
+      <p class="text-slate-400">{{ appointment.created_at|date:"d.m.Y H:i" }}</p>
+    </div>
+    <div class="card px-4 py-3">
+      <p class="text-slate-600 mb-1">Обновлена</p>
+      <p class="text-slate-400">{{ appointment.updated_at|date:"d.m.Y H:i" }}</p>
+    </div>
+    <div class="card px-4 py-3">
+      <p class="text-slate-600 mb-1">Связанный заказ</p>
+      {% if appointment.created_order %}
+      <a href="{% url 'crm:repair_detail' appointment.created_order.pk %}"
+         class="text-indigo-400 hover:text-indigo-300">
+        {{ appointment.created_order.order_number }}
+      </a>
+      {% else %}
+      <p class="text-slate-600">Не создан</p>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
