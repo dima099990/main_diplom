@@ -16,7 +16,7 @@ media/
 staticfiles/
 
 # Переменные окружения
-.env
+#.env
 .claude
 
 # IDE
