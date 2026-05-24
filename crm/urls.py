@@ -83,6 +83,14 @@ urlpatterns = [
     path('documents/', views.document_list, name='document_list'),
     path('documents/blank/<str:doc_type>/', views.document_blank_print, name='document_blank_print'),
 
+    # Appointments
+    path('appointments/', views.appointment_list, name='appointment_list'),
+    path('appointments/new/', views.appointment_create, name='appointment_create'),
+    path('appointments/<int:pk>/edit/', views.appointment_edit, name='appointment_edit'),
+    path('appointments/<int:pk>/delete/', views.appointment_delete, name='appointment_delete'),
+    path('appointments/<int:pk>/status/', views.appointment_update_status, name='appointment_update_status'),
+    path('appointments/<int:pk>/to-order/', views.appointment_to_order, name='appointment_to_order'),
+
     # Call requests
     path('call-requests/', views.call_request_list, name='call_request_list'),
     path('call-requests/<int:pk>/update/', views.call_request_update, name='call_request_update'),

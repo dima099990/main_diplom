@@ -15,7 +15,7 @@ from django.views.decorators.http import require_POST
 from core.models import Brand, CallRequest, PhoneModel, RepairService, SiteSettings
 from .decorators import admin_required, crm_required, manager_required
 from .models import (
-    Accessory, Branch, Customer, Expense,
+    Accessory, Appointment, Branch, Customer, Expense,
     Notification, OrderHistory, Part, PaymentRecord, PayrollRecord,
     RepairOrder, RepairOrderPart, RepairOrderService, SaleOrder,
     SaleOrderItem, StockMovement, Supplier, Task, UserProfile,
@@ -1438,7 +1438,8 @@ def settings_company(request):
         for field in ['inn', 'kpp', 'ogrn', 'director_name', 'email', 'website',
                       'telegram', 'whatsapp', 'legal_address', 'actual_address',
                       'bank_name', 'bik', 'account_number', 'corr_account',
-                      'warranty_days']:
+                      'warranty_days', 'bot_token', 'bot_deepseek_key', 'bot_prompt',
+                      'bot_ollama_url', 'bot_ollama_model']:
             if hasattr(settings_obj, field):
                 setattr(settings_obj, field, request.POST.get(field, ''))
         if 'logo' in request.FILES:
@@ -1521,6 +1522,113 @@ def call_request_update(request, pk):
     cr.save()
     messages.success(request, 'Заявка отмечена обработанной')
     return redirect('crm:call_request_list')
+
+
+# ─── APPOINTMENTS ─────────────────────────────────────────────────────────────
+
+@crm_required
+def appointment_list(request):
+    status_filter = request.GET.get('status', '')
+    appts = Appointment.objects.all()
+    if status_filter:
+        appts = appts.filter(status=status_filter)
+    return render(request, 'crm/appointments/list.html', {
+        'appointments': appts,
+        'status_filter': status_filter,
+        'status_choices': Appointment.STATUS_CHOICES,
+    })
+
+
+@crm_required
+def appointment_create(request):
+    if request.method == 'POST':
+        appt = Appointment.objects.create(
+            name=request.POST.get('name', '').strip(),
+            phone=request.POST.get('phone', '').strip(),
+            device=request.POST.get('device', '').strip(),
+            problem=request.POST.get('problem', '').strip(),
+            preferred_date=request.POST.get('preferred_date') or None,
+            preferred_time=request.POST.get('preferred_time') or None,
+            notes=request.POST.get('notes', '').strip(),
+            source='crm',
+            status='new',
+        )
+        messages.success(request, f'Запись для {appt.name} создана')
+        return redirect('crm:appointment_list')
+    return render(request, 'crm/appointments/form.html', {
+        'title': 'Новая запись',
+        'status_choices': Appointment.STATUS_CHOICES,
+        'source_choices': Appointment.SOURCE_CHOICES,
+    })
+
+
+@crm_required
+def appointment_edit(request, pk):
+    appt = get_object_or_404(Appointment, pk=pk)
+    if request.method == 'POST':
+        appt.name = request.POST.get('name', '').strip() or appt.name
+        appt.phone = request.POST.get('phone', '').strip() or appt.phone
+        appt.device = request.POST.get('device', '').strip()
+        appt.problem = request.POST.get('problem', '').strip()
+        appt.status = request.POST.get('status', appt.status)
+        appt.source = request.POST.get('source', appt.source)
+        appt.preferred_date = request.POST.get('preferred_date') or None
+        appt.preferred_time = request.POST.get('preferred_time') or None
+        appt.notes = request.POST.get('notes', '').strip()
+        appt.save()
+        messages.success(request, f'Запись для {appt.name} обновлена')
+        return redirect('crm:appointment_list')
+    return render(request, 'crm/appointments/form.html', {
+        'title': f'Редактировать запись #{appt.pk}',
+        'appointment': appt,
+        'status_choices': Appointment.STATUS_CHOICES,
+        'source_choices': Appointment.SOURCE_CHOICES,
+    })
+
+
+@crm_required
+def appointment_delete(request, pk):
+    appt = get_object_or_404(Appointment, pk=pk)
+    if request.method == 'POST':
+        name = appt.name
+        appt.delete()
+        messages.success(request, f'Запись для {name} удалена')
+    return redirect('crm:appointment_list')
+
+
+@crm_required
+def appointment_update_status(request, pk):
+    appt = get_object_or_404(Appointment, pk=pk)
+    if request.method == 'POST':
+        appt.status = request.POST.get('status', appt.status)
+        appt.notes = request.POST.get('notes', appt.notes)
+        appt.save()
+        messages.success(request, 'Статус записи обновлён')
+    return redirect('crm:appointment_list')
+
+
+@crm_required
+def appointment_to_order(request, pk):
+    """Convert appointment to a repair order — redirect to repair_create with pre-filled data."""
+    from urllib.parse import urlencode
+    from django.urls import reverse
+    appt = get_object_or_404(Appointment, pk=pk)
+    if appt.created_order:
+        return redirect('crm:repair_detail', pk=appt.created_order.pk)
+
+    # Find or create customer by phone so repair_create can pre-select them
+    customer, _ = Customer.objects.get_or_create(
+        phone=appt.phone,
+        defaults={'name': appt.name}
+    )
+
+    params = urlencode({
+        'customer_id': customer.pk,
+        'complaint': appt.problem or f'Запись от {appt.created_at.strftime("%d.%m.%Y")}',
+        'from_appointment': appt.pk,
+    })
+    messages.info(request, f'Заполните устройство и бренд для записи от {appt.name}')
+    return redirect(reverse('crm:repair_create') + '?' + params)
 
 
 # ─── LEGACY ALIASES (keep old URL names working) ──────────────────────────────

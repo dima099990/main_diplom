@@ -113,6 +113,57 @@
           </div>
         </div>
 
+        <!-- Telegram Bot -->
+        {% if request.user.profile.is_admin %}
+        <div>
+          <h3 class="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-4 pb-2 border-b border-slate-800">🤖 Telegram-бот</h3>
+          <div class="space-y-4">
+
+            {{-- Токен и DeepSeek API --}}
+            <div class="grid md:grid-cols-2 gap-4">
+              <div>
+                <label class="text-xs text-slate-400 mb-1 block">Токен бота (от @BotFather)</label>
+                <input type="text" name="bot_token" value="{{ settings.bot_token }}" class="input-dark w-full px-3 py-2 text-sm font-mono" placeholder="1234567890:AAF...">
+              </div>
+              <div>
+                <label class="text-xs text-slate-400 mb-1 block">DeepSeek API Key <span class="text-slate-600">(облако)</span></label>
+                <input type="text" name="bot_deepseek_key" value="{{ settings.bot_deepseek_key }}" class="input-dark w-full px-3 py-2 text-sm font-mono" placeholder="sk-...">
+              </div>
+            </div>
+
+            {{-- Ollama (локальная модель) --}}
+            <div class="rounded-lg border border-slate-800 p-4 space-y-3">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-xs font-semibold text-slate-300">Локальная модель через Ollama</span>
+                <span class="text-xs bg-slate-800 text-slate-500 px-2 py-0.5 rounded">опционально</span>
+              </div>
+              <p class="text-xs text-slate-600">
+                Альтернатива DeepSeek API — запустите модель локально.
+                Установите <a href="https://ollama.com" target="_blank" class="text-indigo-400 hover:underline">ollama.com</a>,
+                выполните <code class="bg-slate-800 px-1 rounded">ollama pull deepseek-r1:7b</code> и укажите URL ниже.
+                Если заполнен DeepSeek API Key — он в приоритете.
+              </p>
+              <div class="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label class="text-xs text-slate-400 mb-1 block">Ollama URL</label>
+                  <input type="text" name="bot_ollama_url" value="{{ settings.bot_ollama_url }}" class="input-dark w-full px-3 py-2 text-sm font-mono" placeholder="http://localhost:11434/v1">
+                </div>
+                <div>
+                  <label class="text-xs text-slate-400 mb-1 block">Модель</label>
+                  <input type="text" name="bot_ollama_model" value="{{ settings.bot_ollama_model }}" class="input-dark w-full px-3 py-2 text-sm font-mono" placeholder="deepseek-r1:7b">
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label class="text-xs text-slate-400 mb-1 block">Системный промпт бота</label>
+              <p class="text-xs text-slate-600 mb-2">Опишите бизнес, правила общения, что бот должен знать. Цены подтягиваются из базы автоматически.</p>
+              <textarea name="bot_prompt" rows="6" class="input-dark w-full px-3 py-2 text-sm resize-none font-mono">{{ settings.bot_prompt }}</textarea>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
         <!-- Logo & Stamp -->
         <div>
           <h3 class="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-4 pb-2 border-b border-slate-800">Логотип и печать</h3>

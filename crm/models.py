@@ -71,6 +71,7 @@ class Customer(models.Model):
     phone = models.CharField("Телефон", max_length=30)
     email = models.EmailField("Email", blank=True)
     notes = models.TextField("Примечания", blank=True)
+    telegram_id = models.CharField("Telegram ID", max_length=50, blank=True, db_index=True)
     branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True,
                                related_name='customers', verbose_name="Филиал")
     created_at = models.DateTimeField("Дата добавления", auto_now_add=True)
@@ -624,3 +625,54 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.user.username} | {self.title}"
+
+
+# ─── Appointment (Запись на ремонт) ──────────────────────────────────────────
+
+class Appointment(models.Model):
+    STATUS_CHOICES = [
+        ('new', 'Новая'),
+        ('confirmed', 'Подтверждена'),
+        ('completed', 'Завершена'),
+        ('cancelled', 'Отменена'),
+    ]
+    SOURCE_CHOICES = [
+        ('crm', 'CRM'),
+        ('telegram', 'Telegram'),
+        ('website', 'Сайт'),
+    ]
+
+    name = models.CharField("Имя клиента", max_length=200)
+    phone = models.CharField("Телефон", max_length=30)
+    device = models.CharField("Устройство", max_length=200, blank=True)
+    problem = models.TextField("Описание проблемы", blank=True)
+    preferred_date = models.DateField("Желаемая дата", null=True, blank=True)
+    preferred_time = models.TimeField("Желаемое время", null=True, blank=True)
+    status = models.CharField("Статус", max_length=20, choices=STATUS_CHOICES, default='new')
+    source = models.CharField("Источник", max_length=20, choices=SOURCE_CHOICES, default='crm')
+    telegram_chat_id = models.CharField("Telegram chat ID", max_length=50, blank=True)
+    notes = models.TextField("Примечания (внутренние)", blank=True)
+    created_order = models.ForeignKey(
+        'RepairOrder', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='from_appointment',
+        verbose_name="Созданный заказ"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Запись"
+        verbose_name_plural = "Записи"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name} | {self.phone} | {self.get_status_display()}"
+
+    @property
+    def status_badge(self):
+        return {
+            'new': 'badge-new',
+            'confirmed': 'badge-in_progress',
+            'completed': 'badge-done',
+            'cancelled': 'badge-cancelled',
+        }.get(self.status, 'badge-new')
