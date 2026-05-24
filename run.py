@@ -1,11 +1,9 @@
 #!/usr/bin/env python
 """
-Запуск сайта + Telegram-бота + Ollama одновременно.
+Запуск сайта + Telegram-бота одновременно.
 
 Использование:
     python run.py                              # сайт + бот (localhost:8000)
-    python run.py --ollama                     # сайт + бот + Ollama
-    python run.py --ollama --bot-only          # только бот + Ollama
     python run.py --host 0.0.0.0 --port 8000  # доступен снаружи
     python run.py --site-only                  # только сайт
     python run.py --bot-only                   # только бот
@@ -15,7 +13,6 @@ import os
 import subprocess
 import threading
 import argparse
-import shutil
 from pathlib import Path
 
 ROOT   = Path(__file__).parent
@@ -23,7 +20,6 @@ PYTHON = sys.executable
 
 
 def _stream(proc, prefix):
-    """Читает вывод процесса и печатает с префиксом."""
     for line in iter(proc.stdout.readline, b""):
         text = line.decode("utf-8", errors="replace").rstrip()
         print(f"{prefix} {text}", flush=True)
@@ -56,41 +52,14 @@ def run_bot():
     proc.wait()
 
 
-def run_ollama():
-    """Запускает Ollama-сервер если он не запущен."""
-    ollama_bin = shutil.which("ollama")
-    if not ollama_bin:
-        print("[OLLAMA] ⚠️  Ollama не найдена. Скачай: https://ollama.com", flush=True)
-        return
-
-    # Проверяем — вдруг уже запущена
-    try:
-        import urllib.request
-        urllib.request.urlopen("http://localhost:11434", timeout=2)
-        print("[OLLAMA] ✓ Уже запущена на http://localhost:11434", flush=True)
-        return
-    except Exception:
-        pass
-
-    print("[OLLAMA] Запуск сервера ...", flush=True)
-    proc = subprocess.Popen(
-        [ollama_bin, "serve"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-    )
-    _stream(proc, "[OLLAMA]")
-    proc.wait()
-
-
 def main():
     parser = argparse.ArgumentParser(description="Kayros CRM — запуск")
     parser.add_argument("--host",      default="127.0.0.1",
                         help="IP для привязки (по умолч. 127.0.0.1, для сервера — 0.0.0.0)")
     parser.add_argument("--port",      default="8000",
-                        help="Порт Django (по умолч. 8000)")
+                        help="Порт (по умолч. 8000)")
     parser.add_argument("--site-only", action="store_true", help="Только сайт")
     parser.add_argument("--bot-only",  action="store_true", help="Только бот")
-    parser.add_argument("--ollama",    action="store_true", help="Запустить Ollama-сервер")
     args = parser.parse_args()
 
     display_host = args.host if args.host != "0.0.0.0" else "<ваш-ip>"
@@ -100,23 +69,12 @@ def main():
     if not args.bot_only:
         print(f"   Сайт:  http://{display_host}:{args.port}")
         print(f"   CRM:   http://{display_host}:{args.port}/crm/")
-        print(f"   Bind:  {args.host}:{args.port}")
     if not args.site_only:
         print("   Бот:   работает в фоне")
-    if args.ollama:
-        print("   Ollama: http://localhost:11434")
     print("   Стоп:  Ctrl+C")
     print("=" * 52)
 
     threads = []
-
-    # Ollama запускаем первой — боту она нужна при старте
-    if args.ollama:
-        t = threading.Thread(target=run_ollama, daemon=True)
-        t.start()
-        threads.append(t)
-        # Даём секунду на запуск прежде чем стартует бот
-        import time; time.sleep(1)
 
     if not args.bot_only:
         t = threading.Thread(target=run_site, args=(args.host, args.port), daemon=True)

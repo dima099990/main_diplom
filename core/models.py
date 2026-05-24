@@ -35,20 +35,7 @@ class SiteSettings(models.Model):
     stamp = models.ImageField("Печать", upload_to='settings/', blank=True, null=True)
     # Telegram bot
     bot_token = models.CharField("Токен Telegram-бота", max_length=200, blank=True)
-    bot_deepseek_key = models.CharField("DeepSeek API Key", max_length=200, blank=True)
-    bot_ollama_url = models.CharField(
-        "Ollama URL (локальная модель)",
-        max_length=200,
-        blank=True,
-        help_text="Например: http://localhost:11434/v1 — если хотите использовать локальную модель вместо DeepSeek API"
-    )
-    bot_ollama_model = models.CharField(
-        "Ollama модель",
-        max_length=100,
-        blank=True,
-        default="deepseek-r1:7b",
-        help_text="Название модели в Ollama: deepseek-r1:7b, deepseek-r1:1.5b и т.д."
-    )
+    bot_deepseek_key = models.CharField("Groq API Key", max_length=200, blank=True)
     bot_prompt = models.TextField(
         "Системный промпт бота",
         blank=True,

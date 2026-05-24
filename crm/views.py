@@ -1512,8 +1512,7 @@ def settings_company(request):
         for field in ['inn', 'kpp', 'ogrn', 'director_name', 'email', 'website',
                       'telegram', 'whatsapp', 'legal_address', 'actual_address',
                       'bank_name', 'bik', 'account_number', 'corr_account',
-                      'warranty_days', 'bot_token', 'bot_deepseek_key', 'bot_prompt',
-                      'bot_ollama_url', 'bot_ollama_model']:
+                      'warranty_days', 'bot_token', 'bot_deepseek_key', 'bot_prompt']:
             if hasattr(settings_obj, field):
                 setattr(settings_obj, field, request.POST.get(field, ''))
         if 'logo' in request.FILES:

@@ -1,4 +1,5 @@
 import sys
+import time
 import logging
 import traceback
 from pathlib import Path
@@ -17,9 +18,10 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
+from telegram.request import HTTPXRequest
 
-# get_settings вызывается синхронно при старте — используем sync-версию напрямую
 from db import _get_settings as get_settings_sync
+from proxy import load_proxies, find_working_proxy, ProxyRotator
 
 from handlers.start import cmd_start, handle_registration_contact, MAIN_MENU
 from handlers.prices import ask_price_query, show_prices, WAITING_PRICE_QUERY
@@ -38,7 +40,6 @@ logger = logging.getLogger(__name__)
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Логирует все необработанные исключения из хендлеров."""
     logger.error("Исключение при обработке обновления:", exc_info=context.error)
     if isinstance(update, Update) and update.effective_message:
         await update.effective_message.reply_text(
@@ -46,18 +47,23 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
         )
 
 
-def build_app(token: str) -> Application:
-    app = Application.builder().token(token).build()
+def build_app(token: str, proxy: str | None = None) -> Application:
+    """Собирает Application, опционально с прокси."""
+    builder = Application.builder().token(token)
 
-    # Обработчик ошибок — ловит все исключения из хендлеров
+    if proxy:
+        builder = builder.request(HTTPXRequest(proxy=proxy))
+        logger.info(f"[БОТ] Прокси: {proxy}")
+    else:
+        logger.info("[БОТ] Прокси не используется")
+
+    app = builder.build()
     app.add_error_handler(error_handler)
 
-    # /start — проверяет регистрацию, показывает нужный экран
+    # /start
     app.add_handler(CommandHandler("start", cmd_start))
 
-    # ── Запись на ремонт ──────────────────────────────────────────────────
-    # Регистрируется ДО глобального обработчика контактов:
-    # когда пользователь в шаге ASK_PHONE, его контакт попадает сюда.
+    # Запись на ремонт
     booking_conv = ConversationHandler(
         entry_points=[
             MessageHandler(filters.Regex("^📅 Записаться$"), start_booking),
@@ -78,7 +84,7 @@ def build_app(token: str) -> Application:
     )
     app.add_handler(booking_conv)
 
-    # ── Цены ─────────────────────────────────────────────────────────────
+    # Цены
     prices_conv = ConversationHandler(
         entry_points=[
             MessageHandler(filters.Regex("^💰 Узнать цены$"), ask_price_query),
@@ -94,22 +100,20 @@ def build_app(token: str) -> Application:
     )
     app.add_handler(prices_conv)
 
-    # ── Контакт (регистрация через /start) ────────────────────────────────
-    # Стоит ПОСЛЕ booking_conv: когда пользователь НЕ в диалоге записи —
-    # его контакт попадает сюда (регистрация нового клиента).
+    # Контакт (регистрация)
     app.add_handler(MessageHandler(filters.CONTACT, handle_registration_contact))
 
-    # ── Контакты компании ─────────────────────────────────────────────────
+    # Контакты компании
     app.add_handler(MessageHandler(filters.Regex("^📞 Контакты$"), handle_contacts))
 
-    # ── Свободный чат с ИИ (все остальные сообщения) ─────────────────────
+    # Свободный чат с ИИ
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_chat))
 
     return app
 
 
 def main() -> None:
-    s = get_settings_sync()
+    s     = get_settings_sync()
     token = s.bot_token
 
     if not token:
@@ -120,8 +124,48 @@ def main() -> None:
         sys.exit(1)
 
     logger.info(f"Запуск бота для '{s.company_name}'...")
-    app = build_app(token)
-    app.run_polling(drop_pending_updates=True)
+
+    # ── Прокси ────────────────────────────────────────────────────────────
+    proxies  = load_proxies()
+    rotator  = ProxyRotator(proxies)
+    proxy    = find_working_proxy(proxies)
+    rotator.set_current(proxy)
+
+    # ── Цикл запуска с автоматической сменой прокси при сбое ─────────────
+    MAX_RETRIES = 10
+    attempt     = 0
+
+    while attempt < MAX_RETRIES:
+        attempt += 1
+        try:
+            app = build_app(token, rotator.current)
+            app.run_polling(drop_pending_updates=True)
+            break  # нормальное завершение (Ctrl+C)
+
+        except KeyboardInterrupt:
+            logger.info("Бот остановлен пользователем")
+            break
+
+        except Exception as e:
+            err = str(e).lower()
+            is_network = any(x in err for x in [
+                "timed out", "connect", "network", "proxy", "socks"
+            ])
+
+            if is_network and proxies:
+                logger.warning(
+                    f"[БОТ] Сетевая ошибка (попытка {attempt}/{MAX_RETRIES}): {e}\n"
+                    f"Переключаю прокси..."
+                )
+                rotator.next()
+                time.sleep(3)
+            else:
+                logger.error(f"[БОТ] Критическая ошибка: {e}")
+                traceback.print_exc()
+                time.sleep(5)
+
+    if attempt >= MAX_RETRIES:
+        logger.error(f"[БОТ] Исчерпано {MAX_RETRIES} попыток. Бот остановлен.")
 
 
 if __name__ == "__main__":
