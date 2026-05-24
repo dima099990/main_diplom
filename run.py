@@ -41,10 +41,11 @@ def run_site(port: str = "8000"):
 def run_bot():
     print("[БОТ]  Запуск Telegram-бота ...", flush=True)
     proc = subprocess.Popen(
-        [PYTHON, "bot/main.py"],
+        [PYTHON, "-u", "bot/main.py"],   # -u = небуферизованный вывод
         cwd=ROOT,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
+        env={**os.environ, "PYTHONUNBUFFERED": "1"},
     )
     _stream(proc, "[БОТ] ")
     proc.wait()

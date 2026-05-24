@@ -1,5 +1,6 @@
 import sys
 import logging
+import traceback
 from pathlib import Path
 
 # ── Инициализация Django (ПЕРВЫМ, до любых импортов моделей) ──────────────
@@ -7,11 +8,13 @@ sys.path.insert(0, str(Path(__file__).parent))
 import django_setup  # noqa
 
 # ── Импорты бота ──────────────────────────────────────────────────────────
+from telegram import Update
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
     ConversationHandler,
+    ContextTypes,
     filters,
 )
 
@@ -34,8 +37,20 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Логирует все необработанные исключения из хендлеров."""
+    logger.error("Исключение при обработке обновления:", exc_info=context.error)
+    if isinstance(update, Update) and update.effective_message:
+        await update.effective_message.reply_text(
+            "⚠️ Произошла ошибка. Попробуйте ещё раз или напишите /start"
+        )
+
+
 def build_app(token: str) -> Application:
     app = Application.builder().token(token).build()
+
+    # Обработчик ошибок — ловит все исключения из хендлеров
+    app.add_error_handler(error_handler)
 
     # /start — проверяет регистрацию, показывает нужный экран
     app.add_handler(CommandHandler("start", cmd_start))
