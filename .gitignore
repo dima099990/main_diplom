@@ -18,6 +18,7 @@ staticfiles/
 
 # Переменные окружения
 .env
+.claude
 
 # IDE
 .idea/
