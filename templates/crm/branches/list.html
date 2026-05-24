@@ -1,0 +1,223 @@
+{% extends 'crm/base.html' %}
+{% block title %}Рабочие места — Kayros CRM{% endblock %}
+{% block page_title %}Рабочие места и филиалы{% endblock %}
+
+{% block content %}
+
+{% if messages %}
+{% for msg in messages %}
+<div class="mb-4 px-4 py-3 rounded-xl text-sm {% if msg.tags == 'error' %}bg-red-500/10 border border-red-500/20 text-red-400{% else %}bg-green-500/10 border border-green-500/20 text-green-400{% endif %}">
+  {{ msg }}
+</div>
+{% endfor %}
+{% endif %}
+
+<div class="flex justify-end mb-4">
+  <button onclick="openBranchModal()"
+          class="btn-primary px-4 py-2 text-sm flex items-center gap-1.5">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+    Добавить филиал
+  </button>
+</div>
+
+{% if not branches %}
+<div class="card p-12 text-center">
+  <div class="text-5xl mb-4">🏢</div>
+  <p class="text-slate-400 mb-4">Филиалов пока нет</p>
+  <button onclick="openBranchModal()" class="btn-primary px-5 py-2.5 text-sm inline-flex items-center gap-2">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+    Создать первый филиал
+  </button>
+</div>
+{% endif %}
+
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+  {% for branch in branches %}
+  {% with employees=branch.employees.all %}
+  <div class="card p-5">
+
+    <!-- Шапка -->
+    <div class="flex items-start justify-between mb-4">
+      <div class="flex items-start gap-3">
+        <div class="w-10 h-10 bg-indigo-700/30 border border-indigo-600/30 rounded-xl flex items-center justify-center text-xl flex-shrink-0">🏢</div>
+        <div>
+          <h3 class="font-semibold text-white">{{ branch.name }}</h3>
+          {% if branch.address %}<p class="text-xs text-slate-500 mt-0.5">📍 {{ branch.address }}</p>{% endif %}
+          {% if branch.phone %}<p class="text-xs text-slate-500">📞 {{ branch.phone }}</p>{% endif %}
+          {% if branch.email %}<p class="text-xs text-slate-500">✉️ {{ branch.email }}</p>{% endif %}
+        </div>
+      </div>
+      <div class="flex gap-1 flex-shrink-0">
+        <button onclick="openBranchModal({{ branch.pk }}, '{{ branch.name|escapejs }}', '{{ branch.address|escapejs }}', '{{ branch.phone|escapejs }}', '{{ branch.email|escapejs }}', [{% for e in employees %}{{ e.user_id }}{% if not forloop.last %},{% endif %}{% endfor %}])"
+                class="p-1.5 rounded-lg text-slate-600 hover:text-slate-300 hover:bg-slate-700 transition-colors" title="Редактировать">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+        </button>
+        <form method="post" action="{% url 'crm:branch_delete' branch.pk %}" class="inline"
+              onsubmit="return confirm('Удалить филиал «{{ branch.name|escapejs }}»? Сотрудники останутся, но потеряют привязку к филиалу.')">
+          {% csrf_token %}
+          <button type="submit" class="p-1.5 rounded-lg text-slate-700 hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Удалить">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Сотрудники -->
+    <div class="border-t border-slate-800 pt-4">
+      <p class="text-xs text-slate-500 uppercase tracking-wide mb-3">
+        Сотрудники
+        <span class="ml-1 px-1.5 py-0.5 bg-slate-800 rounded text-slate-400 normal-case tracking-normal">{{ employees.count }}</span>
+      </p>
+      {% if employees %}
+      <div class="space-y-2">
+        {% for profile in employees %}
+        <div class="flex items-center gap-3">
+          <div class="w-7 h-7 bg-indigo-700/50 rounded-lg flex items-center justify-center text-xs font-semibold text-indigo-300 flex-shrink-0">
+            {{ profile.user.first_name|first|upper }}{{ profile.user.last_name|first|upper }}
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm text-slate-200 truncate">{{ profile.user.get_full_name|default:profile.user.username }}</p>
+            <p class="text-xs text-slate-600">{{ profile.get_role_display }}</p>
+          </div>
+          {% if profile.phone %}
+          <p class="text-xs text-slate-600 flex-shrink-0">{{ profile.phone }}</p>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-sm text-slate-600 text-center py-4">Нет сотрудников</p>
+      {% endif %}
+    </div>
+
+  </div>
+  {% endwith %}
+  {% endfor %}
+</div>
+
+<!-- Сотрудники без филиала -->
+{% with unassigned=all_employees %}
+{% if unassigned %}
+<div class="card p-5 mt-5">
+  <h3 class="text-sm font-semibold text-slate-200 mb-4">👤 Все сотрудники / Без филиала</h3>
+  <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+    {% for emp in all_employees %}
+    <div class="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-slate-800/50">
+      <div class="w-7 h-7 {% if emp.profile.branch %}bg-indigo-700/50{% else %}bg-slate-700{% endif %} rounded-lg flex items-center justify-center text-xs font-semibold text-slate-300 flex-shrink-0">
+        {{ emp.first_name|first|upper }}{{ emp.last_name|first|upper }}
+      </div>
+      <div class="min-w-0">
+        <p class="text-xs text-slate-300 truncate">{{ emp.get_full_name|default:emp.username }}</p>
+        <p class="text-xs {% if emp.profile.branch %}text-indigo-400{% else %}text-slate-600{% endif %}">
+          {% if emp.profile.branch %}{{ emp.profile.branch.name }}{% else %}Без филиала{% endif %}
+        </p>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endwith %}
+
+
+<!-- ═══ MODAL: Добавить / редактировать филиал ═══ -->
+<div id="branchModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeBranchModal()"></div>
+  <div class="relative bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
+
+    <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
+      <h3 id="branchModalTitle" class="text-base font-semibold text-white">Добавить филиал</h3>
+      <button onclick="closeBranchModal()" class="text-slate-500 hover:text-slate-300 text-xl leading-none">✕</button>
+    </div>
+
+    <form method="post" action="{% url 'crm:branch_save' %}" class="flex flex-col overflow-hidden">
+      {% csrf_token %}
+      <input type="hidden" name="pk" id="branchPk">
+
+      <div class="p-6 space-y-4 overflow-y-auto flex-1">
+
+        <!-- Данные филиала -->
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Название <span class="text-red-400">*</span></label>
+          <input type="text" name="name" id="branchName" required placeholder="Главный офис, Филиал на Ленина..."
+                 class="input-dark w-full px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">Адрес</label>
+          <input type="text" name="address" id="branchAddress" placeholder="ул. Примерная, д. 1"
+                 class="input-dark w-full px-3 py-2 text-sm">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs text-slate-400 mb-1 block">Телефон</label>
+            <input type="text" name="phone" id="branchPhone" placeholder="+7 (999) 000-00-00"
+                   class="input-dark w-full px-3 py-2 text-sm">
+          </div>
+          <div>
+            <label class="text-xs text-slate-400 mb-1 block">Email</label>
+            <input type="email" name="email" id="branchEmail" placeholder="branch@example.com"
+                   class="input-dark w-full px-3 py-2 text-sm">
+          </div>
+        </div>
+
+        <!-- Назначение сотрудников -->
+        <div>
+          <label class="text-xs text-slate-400 mb-2 block">Сотрудники</label>
+          <div class="space-y-1 max-h-52 overflow-y-auto pr-1" id="employeeCheckboxes">
+            {% for emp in all_employees %}
+            <label class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-800/50 cursor-pointer transition-colors">
+              <input type="checkbox" name="employees" value="{{ emp.pk }}"
+                     class="emp-check w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500">
+              <div class="w-7 h-7 bg-indigo-700/40 rounded-lg flex items-center justify-center text-xs font-semibold text-indigo-300 flex-shrink-0">
+                {{ emp.first_name|first|upper }}{{ emp.last_name|first|upper }}
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm text-slate-200 truncate">{{ emp.get_full_name|default:emp.username }}</p>
+                <p class="text-xs text-slate-500">{{ emp.profile.get_role_display }}</p>
+              </div>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+      </div>
+
+      <div class="px-6 py-4 border-t border-slate-800 flex gap-3 flex-shrink-0">
+        <button type="submit" class="btn-primary flex-1 py-2.5 text-sm">Сохранить</button>
+        <button type="button" onclick="closeBranchModal()" class="btn-secondary px-5 py-2.5 text-sm">Отмена</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function openBranchModal(pk, name, address, phone, email, employeeIds) {
+  const isEdit = !!pk;
+  document.getElementById('branchModalTitle').textContent = isEdit ? 'Редактировать филиал' : 'Добавить филиал';
+  document.getElementById('branchPk').value      = pk      || '';
+  document.getElementById('branchName').value    = name    || '';
+  document.getElementById('branchAddress').value = address || '';
+  document.getElementById('branchPhone').value   = phone   || '';
+  document.getElementById('branchEmail').value   = email   || '';
+
+  // Сбрасываем галочки, потом ставим нужные
+  document.querySelectorAll('.emp-check').forEach(cb => {
+    cb.checked = employeeIds ? employeeIds.includes(parseInt(cb.value)) : false;
+  });
+
+  document.getElementById('branchModal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('branchName').focus(), 50);
+}
+
+function closeBranchModal() {
+  document.getElementById('branchModal').classList.add('hidden');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeBranchModal();
+});
+</script>
+{% endblock %}

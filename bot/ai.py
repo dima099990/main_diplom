@@ -2,7 +2,9 @@
 from __future__ import annotations
 import re
 import json
+import httpx
 from openai import OpenAI
+from proxy import get_active_proxy
 
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 GROQ_MODEL    = "llama-3.3-70b-versatile"
@@ -22,7 +24,9 @@ def get_ai_response(
     if not api_key:
         return "ИИ-ассистент не настроен. Позвоните нам — ответим на все вопросы!"
 
-    client = OpenAI(api_key=api_key, base_url=GROQ_BASE_URL)
+    proxy_url = get_active_proxy()
+    http_client = httpx.Client(proxy=proxy_url) if proxy_url else None
+    client = OpenAI(api_key=api_key, base_url=GROQ_BASE_URL, http_client=http_client)
 
     full_system = system_prompt or "Ты помощник сервисного центра по ремонту телефонов."
     if prices_context:
@@ -41,8 +45,8 @@ def get_ai_response(
             temperature=0.7,
         )
         return resp.choices[0].message.content or "Не удалось получить ответ."
-    except Exception as e:
-        return f"Ошибка ИИ: {e}\nПозвоните нам — ответим на все вопросы!"
+    except Exception:
+        return "🔌 Нейросеть временно недоступна. Позвоните нам — ответим на все вопросы!"
 
 
 def extract_booking_info(text: str, api_key: str) -> dict:
@@ -53,7 +57,9 @@ def extract_booking_info(text: str, api_key: str) -> dict:
     if not api_key:
         return {"device": "", "problem": ""}
 
-    client = OpenAI(api_key=api_key, base_url=GROQ_BASE_URL)
+    proxy_url = get_active_proxy()
+    http_client = httpx.Client(proxy=proxy_url) if proxy_url else None
+    client = OpenAI(api_key=api_key, base_url=GROQ_BASE_URL, http_client=http_client)
 
     system = (
         "Извлеки из сообщения пользователя устройство (device) и проблему/вид работы (problem). "

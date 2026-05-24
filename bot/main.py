@@ -16,6 +16,7 @@ from telegram.ext import (
 )
 
 from db import _get_settings as get_settings_sync
+from proxy import find_working_proxy
 from handlers.start import cmd_start, handle_registration_contact
 from handlers.prices import ask_price_query, show_prices, WAITING_PRICE_QUERY
 from handlers.booking import (
@@ -40,8 +41,11 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
         )
 
 
-def build_app(token: str) -> Application:
-    app = Application.builder().token(token).build()
+def build_app(token: str, proxy_url: str | None = None) -> Application:
+    builder = Application.builder().token(token)
+    if proxy_url:
+        builder = builder.proxy(proxy_url).get_updates_proxy(proxy_url)
+    app = builder.build()
     app.add_error_handler(error_handler)
 
     app.add_handler(CommandHandler("start", cmd_start))
@@ -92,7 +96,8 @@ def main() -> None:
         logger.error("Токен бота не задан! CRM → Настройки → Telegram-бот")
         sys.exit(1)
     logger.info(f"Запуск бота для '{s.company_name}'...")
-    build_app(s.bot_token).run_polling(drop_pending_updates=True)
+    proxy_url = find_working_proxy()
+    build_app(s.bot_token, proxy_url).run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":

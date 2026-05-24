@@ -13,25 +13,50 @@
 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
   {% for emp in employees %}
   <div class="card p-5">
+
+    <!-- Шапка карточки -->
     <div class="flex items-start gap-4">
       <div class="w-12 h-12 bg-indigo-700 rounded-xl flex items-center justify-center text-lg font-bold text-white flex-shrink-0">
         {{ emp.first_name|first|upper }}{{ emp.last_name|first|upper }}
       </div>
       <div class="flex-1 min-w-0">
         <p class="font-semibold text-white truncate">{{ emp.get_full_name|default:emp.username }}</p>
-        <p class="text-xs text-slate-500 mt-0.5">{{ emp.profile.get_role_display }}</p>
+        <p class="text-xs text-slate-500 mt-0.5">
+          {% if emp.profile.role == 'admin' %}👑{% elif emp.profile.role == 'manager' %}🎯{% else %}🔧{% endif %}
+          {{ emp.profile.get_role_display }}
+        </p>
         {% if emp.profile.branch %}
-        <p class="text-xs text-slate-500">📍 {{ emp.profile.branch.name }}</p>
-        {% endif %}
-        {% if emp.profile.phone %}
-        <p class="text-xs text-slate-400 mt-1">{{ emp.profile.phone }}</p>
+        <p class="text-xs text-slate-500 mt-0.5">📍 {{ emp.profile.branch.name }}</p>
         {% endif %}
       </div>
-      <a href="{% url 'crm:employee_edit' emp.pk %}" class="text-slate-500 hover:text-slate-300 flex-shrink-0">
+      <a href="{% url 'crm:employee_edit' emp.pk %}"
+         class="p-1.5 rounded-lg text-slate-600 hover:text-slate-300 hover:bg-slate-700 flex-shrink-0 transition-colors" title="Редактировать">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
       </a>
     </div>
 
+    <!-- Контакты -->
+    {% if emp.profile.phone or emp.profile.telegram or emp.email %}
+    <div class="mt-3 space-y-1">
+      {% if emp.profile.phone %}
+      <p class="text-xs text-slate-400 flex items-center gap-1.5">
+        <span class="text-slate-600">📞</span> {{ emp.profile.phone }}
+      </p>
+      {% endif %}
+      {% if emp.profile.telegram %}
+      <p class="text-xs text-slate-400 flex items-center gap-1.5">
+        <span class="text-slate-600">✈️</span> {{ emp.profile.telegram }}
+      </p>
+      {% endif %}
+      {% if emp.email %}
+      <p class="text-xs text-slate-500 flex items-center gap-1.5">
+        <span class="text-slate-600">✉️</span> {{ emp.email }}
+      </p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Зарплата -->
     <div class="mt-4 grid grid-cols-3 gap-2 pt-4 border-t border-slate-800">
       <div class="text-center">
         <p class="text-xs text-slate-500">Оклад</p>
@@ -46,11 +71,29 @@
         <p class="text-sm font-semibold text-cyan-400 mt-0.5">{{ emp.profile.accessory_percent }}%</p>
       </div>
     </div>
+
+    <!-- Удалить (только для не-себя, только для admin) -->
+    {% if request.user.profile.role == 'admin' and emp.pk != request.user.pk %}
+    <div class="mt-3 pt-3 border-t border-slate-800/60">
+      <form method="post" action="{% url 'crm:employee_delete' emp.pk %}"
+            onsubmit="return confirm('Удалить сотрудника «{{ emp.get_full_name|escapejs }}»?')">
+        {% csrf_token %}
+        <button type="submit" class="text-xs text-slate-700 hover:text-red-400 transition-colors flex items-center gap-1">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          Удалить сотрудника
+        </button>
+      </form>
+    </div>
+    {% endif %}
+
   </div>
   {% empty %}
   <div class="col-span-3 card px-5 py-12 text-center">
-    <p class="text-slate-400">Сотрудников нет</p>
-    <a href="{% url 'crm:employee_create' %}" class="text-indigo-400 hover:underline text-sm mt-2 inline-block">Добавить первого сотрудника</a>
+    <p class="text-slate-400 mb-3">Сотрудников нет</p>
+    <a href="{% url 'crm:employee_create' %}" class="btn-primary px-4 py-2 text-sm inline-flex items-center gap-2">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Добавить первого сотрудника
+    </a>
   </div>
   {% endfor %}
 </div>

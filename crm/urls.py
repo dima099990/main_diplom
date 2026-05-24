@@ -68,10 +68,17 @@ urlpatterns = [
     path('tasks/create/', views.task_create, name='task_create'),
     path('tasks/<int:pk>/status/', views.task_update_status, name='task_update_status'),
 
+    # Branches
+    path('branches/', views.branch_list, name='branch_list'),
+    path('branches/save/', views.branch_save, name='branch_save'),
+    path('branches/<int:pk>/delete/', views.branch_delete, name='branch_delete'),
+
     # Employees
     path('employees/', views.employee_list, name='employee_list'),
     path('employees/new/', views.employee_create, name='employee_create'),
     path('employees/<int:pk>/edit/', views.employee_edit, name='employee_edit'),
+    path('employees/<int:pk>/delete/', views.employee_delete, name='employee_delete'),
+    path('profile/', views.my_profile, name='my_profile'),
 
     # Notifications
     path('notifications/', views.notifications, name='notifications'),
@@ -102,6 +109,8 @@ urlpatterns = [
 
     # Price list editor
     path('prices/', views.price_list, name='price_list'),
+    path('prices/brand/save/', views.price_brand_save, name='price_brand_save'),
+    path('prices/brand/<int:pk>/delete/', views.price_brand_delete, name='price_brand_delete'),
     path('prices/service/save/', views.price_service_save, name='price_service_save'),
     path('prices/service/<int:pk>/delete/', views.price_service_delete, name='price_service_delete'),
     path('prices/model/save/', views.price_model_save, name='price_model_save'),

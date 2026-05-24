@@ -211,7 +211,7 @@ tailwind.config = {
     <a href="{% url 'crm:price_list' %}"
        class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 border-l-2 border-transparent {% if request.resolver_match.url_name == 'price_list' %}active{% endif %}">
       <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
-      <span x-show="sidebarOpen" class="text-sm whitespace-nowrap">Прайсы</span>
+      <span x-show="sidebarOpen" class="text-sm whitespace-nowrap">Услуги и цены</span>
     </a>
 
     <a href="{% url 'crm:customer_list' %}"
@@ -324,8 +324,11 @@ tailwind.config = {
           <p class="text-sm font-medium text-slate-200">{{ request.user.get_full_name|default:request.user.username }}</p>
           <p class="text-xs text-slate-500">{{ request.user.profile.get_role_display }}</p>
         </div>
-        <a href="{% url 'crm:payroll_my' %}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800">Моя зарплата</a>
-        <a href="{% url 'crm:settings_company' %}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800">Настройки</a>
+        <a href="{% url 'crm:my_profile' %}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800">👤 Мой профиль</a>
+        <a href="{% url 'crm:payroll_my' %}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800">💰 Моя зарплата</a>
+        {% if request.user.profile.role == 'admin' %}
+        <a href="{% url 'crm:settings_company' %}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800">⚙️ Настройки</a>
+        {% endif %}
         <div class="border-t border-slate-800 my-1"></div>
         <a href="{% url 'crm:logout' %}" class="block px-4 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10">Выйти</a>
       </div>

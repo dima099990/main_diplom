@@ -35,10 +35,12 @@ class UserProfile(models.Model):
     ]
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     role = models.CharField("Роль", max_length=20, choices=ROLES, default='employee')
-    phone = models.CharField("Телефон", max_length=30, blank=True)
-    branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True,
-                               related_name='employees', verbose_name="Филиал")
-    photo = models.ImageField("Фото", upload_to='employees/', blank=True, null=True)
+    phone    = models.CharField("Телефон", max_length=30, blank=True)
+    telegram = models.CharField("Telegram", max_length=100, blank=True)
+    notes    = models.TextField("Заметки (только для админа)", blank=True)
+    branch   = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True,
+                                 related_name='employees', verbose_name="Филиал")
+    photo    = models.ImageField("Фото", upload_to='employees/', blank=True, null=True)
     # Salary settings
     repair_percent = models.DecimalField("% с ремонтов", max_digits=5, decimal_places=2, default=Decimal('0'))
     accessory_percent = models.DecimalField("% с аксессуаров", max_digits=5, decimal_places=2, default=Decimal('0'))

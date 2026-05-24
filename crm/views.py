@@ -1469,23 +1469,156 @@ def employee_edit(request, pk):
     profile = getattr(user, 'profile', None)
     if request.method == 'POST':
         user.first_name = request.POST.get('first_name', '')
-        user.last_name = request.POST.get('last_name', '')
-        user.email = request.POST.get('email', '')
+        user.last_name  = request.POST.get('last_name', '')
+        user.email      = request.POST.get('email', '')
         user.save(update_fields=['first_name', 'last_name', 'email'])
         if profile:
-            profile.role = request.POST.get('role', 'employee')
-            profile.phone = request.POST.get('phone', '')
-            profile.repair_percent = Decimal(request.POST.get('repair_percent') or '0')
+            profile.role              = request.POST.get('role', 'employee')
+            profile.phone             = request.POST.get('phone', '')
+            profile.telegram          = request.POST.get('telegram', '')
+            profile.notes             = request.POST.get('notes', '')
+            profile.repair_percent    = Decimal(request.POST.get('repair_percent') or '0')
             profile.accessory_percent = Decimal(request.POST.get('accessory_percent') or '0')
-            profile.base_salary = Decimal(request.POST.get('base_salary') or '0')
-            profile.branch_id = request.POST.get('branch') or None
+            profile.base_salary       = Decimal(request.POST.get('base_salary') or '0')
+            profile.branch_id         = request.POST.get('branch') or None
             profile.save()
+        # Смена пароля администратором
+        new_pw = request.POST.get('new_password', '').strip()
+        if new_pw:
+            user.set_password(new_pw)
+            user.save(update_fields=['password'])
+            messages.success(request, 'Пароль сотрудника изменён')
         messages.success(request, 'Сотрудник обновлён')
-        return redirect('crm:employee_list')
+        return redirect('crm:employee_edit', pk=pk)
     return render(request, 'crm/employees/form.html', {
         'employee': user, 'profile': profile,
         'roles': UserProfile.ROLES,
         'branches': Branch.objects.filter(is_active=True),
+    })
+
+
+# ─── BRANCHES ─────────────────────────────────────────────────────────────────
+
+@crm_required
+@admin_required
+def branch_list(request):
+    branches = Branch.objects.prefetch_related('employees__user').all()
+    all_employees = User.objects.select_related('profile').filter(
+        profile__is_active=True
+    ).order_by('first_name', 'last_name')
+    return render(request, 'crm/branches/list.html', {
+        'branches': branches,
+        'all_employees': all_employees,
+    })
+
+
+@crm_required
+@admin_required
+def branch_save(request):
+    if request.method != 'POST':
+        return redirect('crm:branch_list')
+
+    pk      = request.POST.get('pk')
+    name    = request.POST.get('name', '').strip()
+    address = request.POST.get('address', '').strip()
+    phone   = request.POST.get('phone', '').strip()
+    email   = request.POST.get('email', '').strip()
+
+    if not name:
+        messages.error(request, 'Введите название филиала')
+        return redirect('crm:branch_list')
+
+    if pk:
+        branch = get_object_or_404(Branch, pk=pk)
+        branch.name    = name
+        branch.address = address
+        branch.phone   = phone
+        branch.email   = email
+        branch.save()
+        messages.success(request, f'Филиал «{name}» обновлён')
+    else:
+        branch = Branch.objects.create(name=name, address=address, phone=phone, email=email)
+        messages.success(request, f'Филиал «{name}» создан')
+
+    # Назначаем сотрудников: сначала снимаем всех с этого филиала,
+    # потом назначаем выбранных
+    UserProfile.objects.filter(branch=branch).update(branch=None)
+    selected_ids = request.POST.getlist('employees')
+    if selected_ids:
+        UserProfile.objects.filter(user_id__in=selected_ids).update(branch=branch)
+
+    return redirect('crm:branch_list')
+
+
+@crm_required
+@admin_required
+def branch_delete(request, pk):
+    if request.method != 'POST':
+        return redirect('crm:branch_list')
+    branch = get_object_or_404(Branch, pk=pk)
+    name = branch.name
+    UserProfile.objects.filter(branch=branch).update(branch=None)
+    branch.delete()
+    messages.success(request, f'Филиал «{name}» удалён')
+    return redirect('crm:branch_list')
+
+
+@crm_required
+@admin_required
+def employee_delete(request, pk):
+    if request.method != 'POST':
+        return redirect('crm:employee_list')
+    user = get_object_or_404(User, pk=pk)
+    if user == request.user:
+        messages.error(request, 'Нельзя удалить самого себя')
+        return redirect('crm:employee_list')
+    name = user.get_full_name() or user.username
+    user.delete()
+    messages.success(request, f'Сотрудник «{name}» удалён')
+    return redirect('crm:employee_list')
+
+
+@crm_required
+def my_profile(request):
+    """Страница профиля для самого сотрудника."""
+    user    = request.user
+    profile = getattr(user, 'profile', None)
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'update_profile':
+            user.first_name = request.POST.get('first_name', '').strip()
+            user.last_name  = request.POST.get('last_name', '').strip()
+            user.email      = request.POST.get('email', '').strip()
+            user.save(update_fields=['first_name', 'last_name', 'email'])
+            if profile:
+                profile.phone    = request.POST.get('phone', '').strip()
+                profile.telegram = request.POST.get('telegram', '').strip()
+                profile.save(update_fields=['phone', 'telegram'])
+            messages.success(request, 'Профиль обновлён')
+
+        elif action == 'change_password':
+            old_pw  = request.POST.get('old_password', '')
+            new_pw  = request.POST.get('new_password', '').strip()
+            new_pw2 = request.POST.get('new_password2', '').strip()
+            if not user.check_password(old_pw):
+                messages.error(request, 'Текущий пароль неверный')
+            elif len(new_pw) < 6:
+                messages.error(request, 'Новый пароль должен быть не менее 6 символов')
+            elif new_pw != new_pw2:
+                messages.error(request, 'Пароли не совпадают')
+            else:
+                user.set_password(new_pw)
+                user.save()
+                from django.contrib.auth import update_session_auth_hash
+                update_session_auth_hash(request, user)
+                messages.success(request, 'Пароль успешно изменён')
+
+        return redirect('crm:my_profile')
+
+    return render(request, 'crm/employees/profile.html', {
+        'profile': profile,
     })
 
 
@@ -1750,10 +1883,14 @@ def price_list(request):
             brand_id=selected_brand_id
         ).prefetch_related('services').order_by('order', 'name')
 
+    brand_emojis = ['🍎', '📱', '🤖', '⚡', '🔷', '🔴', '🟠', '🟡',
+                    '🟢', '🔵', '🟣', '⬛', '🌟', '💎', '🔧', '📲']
+
     return render(request, 'crm/prices/index.html', {
         'brands': brands,
         'selected_brand': selected_brand,
         'selected_brand_id': selected_brand_id,
+        'brand_emojis': brand_emojis,
         'phone_models': phone_models,
     })
 
@@ -1847,5 +1984,46 @@ def price_model_delete(request, pk):
     model.delete()
     messages.success(request, f'Модель удалена вместе с {count} услугами')
     return redirect(f'/crm/prices/?brand={brand_id}')
+
+
+@crm_required
+@admin_required
+def price_brand_save(request):
+    if request.method != 'POST':
+        return redirect('crm:price_list')
+
+    pk       = request.POST.get('pk')
+    name     = request.POST.get('name', '').strip()
+    icon     = request.POST.get('icon', '📱').strip() or '📱'
+    is_active = request.POST.get('is_active', '1') == '1'
+
+    if not name:
+        messages.error(request, 'Введите название марки')
+        return redirect('crm:price_list')
+
+    if pk:
+        brand = get_object_or_404(Brand, pk=pk)
+        brand.name = name
+        brand.icon = icon
+        brand.emoji = icon
+        brand.is_active = is_active
+        brand.save()
+        messages.success(request, f'Марка «{name}» обновлена')
+        return redirect(f'/crm/prices/?brand={brand.pk}')
+    else:
+        brand = Brand.objects.create(name=name, icon=icon, emoji=icon, is_active=is_active)
+        messages.success(request, f'Марка «{name}» добавлена')
+        return redirect(f'/crm/prices/?brand={brand.pk}')
+
+
+@crm_required
+@admin_required
+def price_brand_delete(request, pk):
+    brand = get_object_or_404(Brand, pk=pk)
+    name = brand.name
+    models_count = brand.phone_models.count()
+    brand.delete()
+    messages.success(request, f'Марка «{name}» и {models_count} моделей удалены')
+    return redirect('crm:price_list')
 
 

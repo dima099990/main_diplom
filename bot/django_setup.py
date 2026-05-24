@@ -19,7 +19,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 # ── Патчим настройки ДО django.setup() ────────────────────────────────────
 import config.settings as _cfg  # noqa: E402
 
-# Бот не использует Redis-кэш — заменяем на in-memory чтобы не нужен Redis
+# Бот не нуждается во внешнем кэше — in-memory достаточно
 _cfg.CACHES = {
     "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}
 }
