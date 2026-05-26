@@ -114,7 +114,7 @@ urlpatterns = [
     # File Manager
     path('filemanager/', views.filemanager, name='filemanager'),
     path('filemanager/upload/', views.filemanager_upload, name='filemanager_upload'),
-    path('filemanager/view/', views.filemanager_view, name='filemanager_view'),
+    path('filemanager/rename/', views.filemanager_rename, name='filemanager_rename'),
     path('filemanager/download/', views.filemanager_download, name='filemanager_download'),
     path('filemanager/mkdir/', views.filemanager_mkdir, name='filemanager_mkdir'),
     path('filemanager/delete/', views.filemanager_delete, name='filemanager_delete'),

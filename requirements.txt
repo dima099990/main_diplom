@@ -28,4 +28,3 @@ socksio==1.0.0
 #   Utils
 sqlparse==0.5.5
 tzdata==2026.2
-mammoth==1.12.0

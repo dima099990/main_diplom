@@ -2424,7 +2424,11 @@ def filemanager_download(request):
         open(target, 'rb'),
         content_type=mime or 'application/octet-stream',
     )
-    response['Content-Disposition'] = f'attachment; filename="{target.name}"'
+    from urllib.parse import quote
+    encoded_name = quote(target.name, safe='')
+    response['Content-Disposition'] = (
+        f"attachment; filename=\"{target.name}\"; filename*=UTF-8''{encoded_name}"
+    )
     return response
 
 
@@ -2444,73 +2448,29 @@ def filemanager_mkdir(request):
     return redirect(f'/crm/filemanager/{back}')
 
 
+
 @crm_required
 @admin_required
-def filemanager_view(request):
-    """Просмотр файла в браузере: PDF — встроенный, DOCX/DOC — конвертация в HTML."""
-    rel = request.GET.get('path', '').strip('/')
+def filemanager_rename(request):
+    if request.method != 'POST':
+        return redirect('crm:filemanager')
+    rel = request.POST.get('path', '').strip('/')
+    new_name = request.POST.get('new_name', '').strip()
     target = _safe_path(rel)
-    if not target or not target.is_file():
-        raise Http404
-
-    ext = target.suffix.lower()
-
-    import subprocess
-    import tempfile
-    from django.http import HttpResponse
-
-    def _to_pdf(src: Path):
-        """Конвертирует файл в PDF через LibreOffice. Возвращает байты PDF или None."""
-        candidates = ['libreoffice', 'soffice']
-        if os.name == 'nt':
-            candidates = [
-                r'C:\Program Files\LibreOffice\program\soffice.exe',
-                r'C:\Program Files (x86)\LibreOffice\program\soffice.exe',
-            ] + candidates
-        with tempfile.TemporaryDirectory() as tmp:
-            for cmd in candidates:
-                try:
-                    subprocess.run(
-                        [cmd, '--headless', '--convert-to', 'pdf', '--outdir', tmp, str(src)],
-                        capture_output=True, timeout=30,
-                    )
-                    pdf = Path(tmp) / (src.stem + '.pdf')
-                    if pdf.exists():
-                        return pdf.read_bytes()
-                except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
-                    continue
-        return None
-
-    back = str(target.parent.relative_to(STORAGE_ROOT)).replace('\\', '/')
-    back = '' if back == '.' else back
-
-    # PDF — отдаём напрямую inline
-    if ext == '.pdf':
-        response = FileResponse(open(target, 'rb'), content_type='application/pdf')
-        response['Content-Disposition'] = f'inline; filename="{target.name}"'
-        return response
-
-    # TXT — отдаём как текст, браузер отобразит
-    if ext == '.txt':
-        response = FileResponse(open(target, 'rb'), content_type='text/plain; charset=utf-8')
-        response['Content-Disposition'] = f'inline; filename="{target.name}"'
-        return response
-
-    # DOC / DOCX — конвертируем в PDF через LibreOffice
-    if ext in ('.docx', '.doc'):
-        pdf_bytes = _to_pdf(target)
-        if pdf_bytes:
-            response = HttpResponse(pdf_bytes, content_type='application/pdf')
-            response['Content-Disposition'] = f'inline; filename="{target.stem}.pdf"'
-            return response
-        # LibreOffice не найден — показываем страницу с ошибкой
-        return render(request, 'crm/filemanager/view_error.html', {
-            'file_name': target.name,
-            'file_path': rel,
-            'back_path': back,
-        })
-
-    raise Http404
+    if not target or not target.exists() or not new_name:
+        return redirect('crm:filemanager')
+    # Запрещаем / и \ в имени
+    new_name = new_name.replace('/', '').replace('\\', '')
+    new_target = target.parent / new_name
+    # Не даём выйти за пределы STORAGE_ROOT
+    if not str(new_target.resolve()).startswith(str(STORAGE_ROOT.resolve())):
+        return redirect('crm:filemanager')
+    if not new_target.exists():
+        target.rename(new_target)
+    parent = str(target.parent.relative_to(STORAGE_ROOT)).replace('\\', '/')
+    parent = '' if parent == '.' else parent
+    back = f'?path={parent}' if parent else ''
+    return redirect(f'/crm/filemanager/{back}')
 
 
 @crm_required

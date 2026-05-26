@@ -96,20 +96,6 @@
           <td class="px-4 py-3">
             <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               {% if not item.is_dir %}
-              {% with ext=item.name|lower %}
-              {% if ext|slice:"-4:" == ".pdf" or ext|slice:"-5:" == ".docx" or ext|slice:"-4:" == ".doc" or ext|slice:"-4:" == ".txt" %}
-              <a href="{% url 'crm:filemanager_view' %}?path={{ item.path }}"
-                 class="p-1.5 rounded-lg hover:bg-green-500/20 text-slate-500 hover:text-green-400 transition-colors"
-                 title="Просмотреть">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                </svg>
-              </a>
-              {% endif %}
-              {% endwith %}
               <a href="{% url 'crm:filemanager_download' %}?path={{ item.path }}"
                  class="p-1.5 rounded-lg hover:bg-indigo-500/20 text-slate-500 hover:text-indigo-400 transition-colors"
                  title="Скачать">
@@ -119,6 +105,14 @@
                 </svg>
               </a>
               {% endif %}
+              <button onclick="openRename('{{ item.path|escapejs }}', '{{ item.name|escapejs }}')"
+                      class="p-1.5 rounded-lg hover:bg-yellow-500/20 text-slate-600 hover:text-yellow-400 transition-colors"
+                      title="Переименовать">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+              </button>
               <form method="post" action="{% url 'crm:filemanager_delete' %}"
                     onsubmit="return confirm('Удалить «{{ item.name }}»?{% if item.is_dir %} Папка будет удалена со всем содержимым.{% endif %}')">
                 {% csrf_token %}
@@ -184,6 +178,32 @@
         <button type="submit" class="btn-primary flex-1 py-2.5 text-sm">Загрузить</button>
         <button type="button"
                 onclick="document.getElementById('modalUpload').classList.add('hidden')"
+                class="btn-secondary px-5 py-2.5 text-sm">Отмена</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Переименование -->
+<div id="modalRename" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm shadow-2xl">
+    <div class="flex justify-between items-center px-6 py-4 border-b border-slate-800">
+      <h3 class="font-semibold text-slate-200">Переименовать</h3>
+      <button onclick="document.getElementById('modalRename').classList.add('hidden')"
+              class="text-slate-500 hover:text-slate-300 text-xl leading-none">&times;</button>
+    </div>
+    <form method="post" action="{% url 'crm:filemanager_rename' %}" class="p-6 space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="path" id="renamePath">
+      <div>
+        <label class="text-xs text-slate-400 mb-1 block">Новое название</label>
+        <input type="text" name="new_name" id="renameName" required
+               class="input-dark w-full px-3 py-2 text-sm">
+      </div>
+      <div class="flex gap-3">
+        <button type="submit" class="btn-primary flex-1 py-2.5 text-sm">Переименовать</button>
+        <button type="button"
+                onclick="document.getElementById('modalRename').classList.add('hidden')"
                 class="btn-secondary px-5 py-2.5 text-sm">Отмена</button>
       </div>
     </form>
@@ -256,11 +276,26 @@ if (dropZone && fileInput) {
   });
 }
 
+// Переименование
+function openRename(path, name) {
+  document.getElementById('renamePath').value = path;
+  document.getElementById('renameName').value = name;
+  document.getElementById('modalRename').classList.remove('hidden');
+  setTimeout(() => {
+    const input = document.getElementById('renameName');
+    input.focus();
+    // Выделяем имя без расширения
+    const dot = name.lastIndexOf('.');
+    input.setSelectionRange(0, dot > 0 ? dot : name.length);
+  }, 50);
+}
+
 // Закрытие по Escape
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     document.getElementById('modalUpload').classList.add('hidden');
     document.getElementById('modalMkdir').classList.add('hidden');
+    document.getElementById('modalRename').classList.add('hidden');
   }
 });
 </script>
