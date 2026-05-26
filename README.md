@@ -276,7 +276,24 @@ echo "✓ .bashrc обновлён"
 
 ### Прокси (для серверов с блокировкой Telegram)
 
-Добавить прокси в `bot/proxies.txt` (один на строку):
+Файл `bot/proxies.txt` — список SOCKS5 прокси. Бот автоматически перебирает их и берёт первый рабочий.
+
+**Добавить прокси в Telegram одним нажатием:**
+
+| # | Сервер | Ссылка |
+|---|--------|--------|
+| 1 | 38.154.203.95:5863 | [Добавить в Telegram](https://t.me/proxy?server=38.154.203.95&port=5863&user=edltkbwa&pass=4chcrqzr8gkz) |
+| 2 | 198.105.121.200:6462 | [Добавить в Telegram](https://t.me/proxy?server=198.105.121.200&port=6462&user=edltkbwa&pass=4chcrqzr8gkz) |
+| 3 | 64.137.96.74:6641 | [Добавить в Telegram](https://t.me/proxy?server=64.137.96.74&port=6641&user=edltkbwa&pass=4chcrqzr8gkz) |
+| 4 | 209.127.138.10:5784 | [Добавить в Telegram](https://t.me/proxy?server=209.127.138.10&port=5784&user=edltkbwa&pass=4chcrqzr8gkz) |
+| 5 | 38.154.185.97:6370 | [Добавить в Telegram](https://t.me/proxy?server=38.154.185.97&port=6370&user=edltkbwa&pass=4chcrqzr8gkz) |
+| 6 | 84.247.60.125:6095 | [Добавить в Telegram](https://t.me/proxy?server=84.247.60.125&port=6095&user=edltkbwa&pass=4chcrqzr8gkz) |
+| 7 | 142.111.67.146:5611 | [Добавить в Telegram](https://t.me/proxy?server=142.111.67.146&port=5611&user=edltkbwa&pass=4chcrqzr8gkz) |
+| 8 | 194.39.32.164:6461 | [Добавить в Telegram](https://t.me/proxy?server=194.39.32.164&port=6461&user=edltkbwa&pass=4chcrqzr8gkz) |
+| 9 | 191.96.254.138:6185 | [Добавить в Telegram](https://t.me/proxy?server=191.96.254.138&port=6185&user=edltkbwa&pass=4chcrqzr8gkz) |
+| 10 | 31.58.9.4:6077 | [Добавить в Telegram](https://t.me/proxy?server=31.58.9.4&port=6077&user=edltkbwa&pass=4chcrqzr8gkz) |
+
+Добавить новые прокси в `bot/proxies.txt` (один на строку):
 ```
 socks5://username:password@host:port
 ```
