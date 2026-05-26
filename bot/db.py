@@ -113,7 +113,13 @@ def _get_all_prices_text() -> str:
 
 
 def _create_appointment(
-    name: str, phone: str, device: str, problem: str, telegram_chat_id: str | int
+    name: str,
+    phone: str,
+    device: str,
+    problem: str,
+    telegram_chat_id: str | int,
+    preferred_date=None,
+    preferred_time=None,
 ) -> Appointment:
     return Appointment.objects.create(
         name=name,
@@ -123,6 +129,8 @@ def _create_appointment(
         source="telegram",
         telegram_chat_id=str(telegram_chat_id),
         status="new",
+        preferred_date=preferred_date,
+        preferred_time=preferred_time,
     )
 
 

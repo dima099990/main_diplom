@@ -72,21 +72,36 @@ def get_ai_response(
 
 def extract_booking_info(text: str, api_key: str) -> dict:
     """
-    Извлекает устройство и проблему из произвольного текста пользователя.
-    Возвращает {"device": "...", "problem": "..."}, пустые строки если не найдено.
+    Извлекает из сообщения клиента все поля для записи:
+    device, problem, name, phone, date (YYYY-MM-DD), time (HH:MM).
+    Пустые строки если поле не найдено.
     """
+    empty = {"device": "", "problem": "", "name": "", "phone": "", "date": "", "time": ""}
     if not api_key:
-        return {"device": "", "problem": ""}
+        return empty
+
+    from datetime import date as _date
+    today_str = _date.today().isoformat()
 
     proxy_url = get_active_proxy()
     http_client = httpx.Client(proxy=proxy_url) if proxy_url else None
     client = OpenAI(api_key=api_key, base_url=GROQ_BASE_URL, http_client=http_client)
 
     system = (
-        "Извлеки из сообщения пользователя устройство (device) и проблему/вид работы (problem). "
-        "Ответь ТОЛЬКО JSON без пояснений. "
-        'Пример: {"device": "iPhone 15", "problem": "замена экрана"}. '
-        "Если что-то не указано — оставь пустую строку."
+        f"Сегодня {today_str}. "
+        "Ты — парсер данных для сервисного центра по ремонту телефонов. "
+        "Извлеки из сообщения клиента следующие поля:\n"
+        "  device  — устройство (марка и модель, например 'iPhone X')\n"
+        "  problem — проблема или вид работы (например 'не включается')\n"
+        "  name    — имя клиента\n"
+        "  phone   — номер телефона (в том виде, как написано)\n"
+        f"  date    — дата в формате YYYY-MM-DD (переведи относительные: "
+        f"'сегодня'={today_str}, 'завтра', 'послезавтра', 'в пятницу', '20 июля' и т.д.)\n"
+        "  time    — время в формате HH:MM (24-часовой)\n\n"
+        "Ответь ТОЛЬКО валидным JSON без пояснений.\n"
+        f'Пример: {{"device":"iPhone X","problem":"не включается","name":"Дмитрий",'
+        f'"phone":"","date":"{today_str}","time":"16:00"}}\n'
+        "Если поле не указано — оставь пустую строку."
     )
 
     try:
@@ -96,7 +111,7 @@ def extract_booking_info(text: str, api_key: str) -> dict:
                 {"role": "system", "content": system},
                 {"role": "user", "content": text},
             ],
-            max_tokens=100,
+            max_tokens=180,
             temperature=0.1,
         )
         content = resp.choices[0].message.content or "{}"
@@ -104,9 +119,13 @@ def extract_booking_info(text: str, api_key: str) -> dict:
         if match:
             data = json.loads(match.group())
             return {
-                "device":  str(data.get("device", "")).strip(),
+                "device":  str(data.get("device",  "")).strip(),
                 "problem": str(data.get("problem", "")).strip(),
+                "name":    str(data.get("name",    "")).strip(),
+                "phone":   str(data.get("phone",   "")).strip(),
+                "date":    str(data.get("date",    "")).strip(),
+                "time":    str(data.get("time",    "")).strip(),
             }
     except Exception:
         pass
-    return {"device": "", "problem": ""}
+    return empty
