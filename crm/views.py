@@ -1,13 +1,18 @@
+import mimetypes
+import os
+import shutil
 from datetime import date, timedelta
 from decimal import Decimal
+from pathlib import Path
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, F, Q, Sum, Avg
-from django.http import JsonResponse
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -2299,5 +2304,165 @@ def price_brand_delete(request, pk):
     brand.delete()
     messages.success(request, f'Марка «{name}» и {models_count} моделей удалены')
     return redirect('crm:price_list')
+
+
+# ─── FILE MANAGER ─────────────────────────────────────────────────────────────
+
+STORAGE_ROOT = Path(settings.BASE_DIR) / 'storage'
+
+
+def _safe_path(rel: str) -> Path | None:
+    """Возвращает абсолютный путь если он внутри STORAGE_ROOT, иначе None."""
+    base = STORAGE_ROOT.resolve()
+    try:
+        target = (base / rel).resolve()
+    except Exception:
+        return None
+    if not str(target).startswith(str(base)):
+        return None
+    return target
+
+
+def _fmt_size(size: int) -> str:
+    for unit in ('Б', 'КБ', 'МБ', 'ГБ'):
+        if size < 1024:
+            return f'{size:.0f} {unit}'
+        size /= 1024
+    return f'{size:.1f} ТБ'
+
+
+def _file_icon(name: str) -> str:
+    ext = Path(name).suffix.lower()
+    icons = {
+        '.pdf': '📄', '.doc': '📝', '.docx': '📝', '.txt': '📃',
+        '.xls': '📊', '.xlsx': '📊', '.csv': '📊',
+        '.jpg': '🖼️', '.jpeg': '🖼️', '.png': '🖼️', '.gif': '🖼️',
+        '.svg': '🖼️', '.webp': '🖼️',
+        '.zip': '📦', '.rar': '📦', '.tar': '📦', '.gz': '📦',
+        '.mp3': '🎵', '.wav': '🎵', '.ogg': '🎵',
+        '.mp4': '🎬', '.avi': '🎬', '.mov': '🎬', '.mkv': '🎬',
+        '.py': '🐍', '.js': '⚙️', '.html': '🌐', '.css': '🎨',
+        '.json': '📋', '.sql': '🗄️', '.db': '🗄️', '.sqlite3': '🗄️',
+    }
+    return icons.get(ext, '📄')
+
+
+@crm_required
+@admin_required
+def filemanager(request):
+    STORAGE_ROOT.mkdir(parents=True, exist_ok=True)
+    rel = request.GET.get('path', '').strip('/')
+    current_dir = _safe_path(rel) if rel else STORAGE_ROOT.resolve()
+    if not current_dir or not current_dir.is_dir():
+        return redirect('crm:filemanager')
+
+    items = []
+    for item in sorted(current_dir.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
+        rel_item = str(item.relative_to(STORAGE_ROOT)).replace('\\', '/')
+        stat = item.stat()
+        items.append({
+            'name': item.name,
+            'is_dir': item.is_dir(),
+            'path': rel_item,
+            'size': _fmt_size(stat.st_size) if item.is_file() else None,
+            'modified': timezone.datetime.fromtimestamp(stat.st_mtime).strftime('%d.%m.%Y %H:%M'),
+            'icon': '📁' if item.is_dir() else _file_icon(item.name),
+        })
+
+    # Хлебные крошки
+    breadcrumbs = []
+    if rel:
+        parts = Path(rel).parts
+        for i, part in enumerate(parts):
+            breadcrumbs.append({
+                'name': part,
+                'path': '/'.join(parts[:i + 1]),
+            })
+
+    parent_path = ''
+    if rel:
+        parent = str(Path(rel).parent).replace('\\', '/')
+        parent_path = '' if parent == '.' else parent
+
+    return render(request, 'crm/filemanager/index.html', {
+        'items': items,
+        'current_path': rel,
+        'breadcrumbs': breadcrumbs,
+        'parent_path': parent_path,
+    })
+
+
+@crm_required
+@admin_required
+def filemanager_upload(request):
+    if request.method != 'POST':
+        return redirect('crm:filemanager')
+    rel = request.POST.get('path', '').strip('/')
+    current_dir = _safe_path(rel) if rel else STORAGE_ROOT.resolve()
+    if not current_dir or not current_dir.is_dir():
+        return redirect('crm:filemanager')
+
+    for f in request.FILES.getlist('files'):
+        dest = current_dir / f.name
+        with open(dest, 'wb+') as fh:
+            for chunk in f.chunks():
+                fh.write(chunk)
+
+    back = f'?path={rel}' if rel else ''
+    return redirect(f'/crm/filemanager/{back}')
+
+
+@crm_required
+@admin_required
+def filemanager_download(request):
+    rel = request.GET.get('path', '').strip('/')
+    target = _safe_path(rel)
+    if not target or not target.is_file():
+        raise Http404
+    mime, _ = mimetypes.guess_type(str(target))
+    response = FileResponse(
+        open(target, 'rb'),
+        content_type=mime or 'application/octet-stream',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{target.name}"'
+    return response
+
+
+@crm_required
+@admin_required
+def filemanager_mkdir(request):
+    if request.method != 'POST':
+        return redirect('crm:filemanager')
+    rel = request.POST.get('path', '').strip('/')
+    name = request.POST.get('name', '').strip()
+    # безопасное имя — только буквы, цифры, пробел, дефис, подчёркивание, точка
+    name = ''.join(c for c in name if c.isalnum() or c in (' ', '-', '_', '.'))
+    current_dir = _safe_path(rel) if rel else STORAGE_ROOT.resolve()
+    if name and current_dir and current_dir.is_dir():
+        (current_dir / name).mkdir(exist_ok=True)
+    back = f'?path={rel}' if rel else ''
+    return redirect(f'/crm/filemanager/{back}')
+
+
+@crm_required
+@admin_required
+def filemanager_delete(request):
+    if request.method != 'POST':
+        return redirect('crm:filemanager')
+    rel = request.POST.get('path', '').strip('/')
+    target = _safe_path(rel)
+    if not target or target.resolve() == STORAGE_ROOT.resolve():
+        return redirect('crm:filemanager')
+
+    parent = str(Path(rel).parent).replace('\\', '/')
+    parent = '' if parent == '.' else parent
+
+    if target.is_file():
+        target.unlink()
+    elif target.is_dir():
+        shutil.rmtree(target)
+
+    back = f'?path={parent}' if parent else ''
+    return redirect(f'/crm/filemanager/{back}')
 
 

@@ -1,0 +1,253 @@
+{% extends 'crm/base.html' %}
+{% block title %}Файловый менеджер — Kayros CRM{% endblock %}
+{% block page_title %}Файловый менеджер{% endblock %}
+
+{% block content %}
+{% include 'crm/includes/messages.html' %}
+
+<!-- Toolbar -->
+<div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+
+  <!-- Breadcrumbs -->
+  <nav class="flex items-center gap-1 text-sm flex-wrap">
+    <a href="{% url 'crm:filemanager' %}"
+       class="flex items-center gap-1.5 text-slate-400 hover:text-slate-200 transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
+      </svg>
+      Хранилище
+    </a>
+    {% for crumb in breadcrumbs %}
+    <span class="text-slate-700">/</span>
+    <a href="{% url 'crm:filemanager' %}?path={{ crumb.path }}"
+       class="text-slate-400 hover:text-slate-200 transition-colors truncate max-w-[160px]">
+      {{ crumb.name }}
+    </a>
+    {% endfor %}
+  </nav>
+
+  <!-- Actions -->
+  <div class="flex items-center gap-2">
+    {% if current_path %}
+    <a href="{% url 'crm:filemanager' %}{% if parent_path %}?path={{ parent_path }}{% endif %}"
+       class="px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-700 transition-colors flex items-center gap-1.5">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+      </svg>
+      Назад
+    </a>
+    {% endif %}
+    <button onclick="document.getElementById('modalMkdir').classList.remove('hidden')"
+            class="px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-700 transition-colors flex items-center gap-1.5">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+      </svg>
+      Новая папка
+    </button>
+    <button onclick="document.getElementById('modalUpload').classList.remove('hidden')"
+            class="btn-primary px-4 py-2 text-sm flex items-center gap-1.5">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+      </svg>
+      Загрузить файлы
+    </button>
+  </div>
+</div>
+
+<!-- File list -->
+<div class="card overflow-hidden">
+  {% if items %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-xs text-slate-500 uppercase border-b border-slate-800">
+          <th class="text-left px-4 py-3 font-medium">Название</th>
+          <th class="text-right px-4 py-3 font-medium hidden sm:table-cell">Размер</th>
+          <th class="text-right px-4 py-3 font-medium hidden md:table-cell">Изменён</th>
+          <th class="px-4 py-3 w-24"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-800/60">
+        {% for item in items %}
+        <tr class="hover:bg-slate-800/30 transition-colors group">
+          <td class="px-4 py-3">
+            {% if item.is_dir %}
+            <a href="{% url 'crm:filemanager' %}?path={{ item.path }}"
+               class="flex items-center gap-2.5 text-slate-200 hover:text-indigo-400 transition-colors">
+              <span class="text-xl leading-none">{{ item.icon }}</span>
+              <span class="font-medium">{{ item.name }}</span>
+            </a>
+            {% else %}
+            <div class="flex items-center gap-2.5">
+              <span class="text-xl leading-none">{{ item.icon }}</span>
+              <span class="text-slate-300">{{ item.name }}</span>
+            </div>
+            {% endif %}
+          </td>
+          <td class="px-4 py-3 text-right text-slate-500 text-xs hidden sm:table-cell font-mono">
+            {% if item.size %}{{ item.size }}{% else %}<span class="text-slate-700">—</span>{% endif %}
+          </td>
+          <td class="px-4 py-3 text-right text-slate-500 text-xs hidden md:table-cell">
+            {{ item.modified }}
+          </td>
+          <td class="px-4 py-3">
+            <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {% if not item.is_dir %}
+              <a href="{% url 'crm:filemanager_download' %}?path={{ item.path }}"
+                 class="p-1.5 rounded-lg hover:bg-indigo-500/20 text-slate-500 hover:text-indigo-400 transition-colors"
+                 title="Скачать">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+              </a>
+              {% endif %}
+              <form method="post" action="{% url 'crm:filemanager_delete' %}"
+                    onsubmit="return confirm('Удалить «{{ item.name }}»?{% if item.is_dir %} Папка будет удалена со всем содержимым.{% endif %}')">
+                {% csrf_token %}
+                <input type="hidden" name="path" value="{{ item.path }}">
+                <button type="submit"
+                        class="p-1.5 rounded-lg hover:bg-red-500/20 text-slate-600 hover:text-red-400 transition-colors"
+                        title="Удалить">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="flex flex-col items-center justify-center py-20 text-center">
+    <div class="text-6xl mb-4">📂</div>
+    <p class="text-slate-400 text-sm mb-1">Папка пустая</p>
+    <p class="text-slate-600 text-xs">Загрузите файлы или создайте подпапку</p>
+    <button onclick="document.getElementById('modalUpload').classList.remove('hidden')"
+            class="mt-5 btn-primary px-4 py-2 text-sm flex items-center gap-2">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+      </svg>
+      Загрузить файлы
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Modal: Загрузка файлов -->
+<div id="modalUpload" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl">
+    <div class="flex justify-between items-center px-6 py-4 border-b border-slate-800">
+      <h3 class="font-semibold text-slate-200">Загрузить файлы</h3>
+      <button onclick="document.getElementById('modalUpload').classList.add('hidden')"
+              class="text-slate-500 hover:text-slate-300 text-xl leading-none">&times;</button>
+    </div>
+    <form method="post" action="{% url 'crm:filemanager_upload' %}" enctype="multipart/form-data" class="p-6 space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="path" value="{{ current_path }}">
+
+      <!-- Drop zone -->
+      <label id="dropZone"
+             class="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-slate-700 rounded-xl cursor-pointer hover:border-indigo-500 hover:bg-indigo-500/5 transition-all">
+        <svg class="w-10 h-10 text-slate-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+        </svg>
+        <p class="text-sm text-slate-400">Перетащите файлы или <span class="text-indigo-400">выберите</span></p>
+        <p id="fileNames" class="text-xs text-slate-600 mt-1">Можно выбрать несколько файлов</p>
+        <input type="file" name="files" id="fileInput" multiple class="hidden">
+      </label>
+
+      <div class="flex gap-3">
+        <button type="submit" class="btn-primary flex-1 py-2.5 text-sm">Загрузить</button>
+        <button type="button"
+                onclick="document.getElementById('modalUpload').classList.add('hidden')"
+                class="btn-secondary px-5 py-2.5 text-sm">Отмена</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Новая папка -->
+<div id="modalMkdir" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm shadow-2xl">
+    <div class="flex justify-between items-center px-6 py-4 border-b border-slate-800">
+      <h3 class="font-semibold text-slate-200">Новая папка</h3>
+      <button onclick="document.getElementById('modalMkdir').classList.add('hidden')"
+              class="text-slate-500 hover:text-slate-300 text-xl leading-none">&times;</button>
+    </div>
+    <form method="post" action="{% url 'crm:filemanager_mkdir' %}" class="p-6 space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="path" value="{{ current_path }}">
+      <div>
+        <label class="text-xs text-slate-400 mb-1 block">Название папки</label>
+        <input type="text" name="name" id="mkdirName" required placeholder="Новая папка"
+               class="input-dark w-full px-3 py-2 text-sm" autofocus>
+      </div>
+      <div class="flex gap-3">
+        <button type="submit" class="btn-primary flex-1 py-2.5 text-sm">Создать</button>
+        <button type="button"
+                onclick="document.getElementById('modalMkdir').classList.add('hidden')"
+                class="btn-secondary px-5 py-2.5 text-sm">Отмена</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Показываем выбранные имена файлов
+const fileInput = document.getElementById('fileInput');
+const fileNames = document.getElementById('fileNames');
+if (fileInput) {
+  fileInput.addEventListener('change', () => {
+    const files = Array.from(fileInput.files);
+    if (files.length === 0) {
+      fileNames.textContent = 'Можно выбрать несколько файлов';
+    } else if (files.length === 1) {
+      fileNames.textContent = files[0].name;
+    } else {
+      fileNames.textContent = `Выбрано: ${files.length} файла(-ов)`;
+    }
+    fileNames.classList.remove('text-slate-600');
+    fileNames.classList.add('text-indigo-400');
+  });
+}
+
+// Drag & drop
+const dropZone = document.getElementById('dropZone');
+if (dropZone && fileInput) {
+  dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.classList.add('border-indigo-500', 'bg-indigo-500/10');
+  });
+  dropZone.addEventListener('dragleave', () => {
+    dropZone.classList.remove('border-indigo-500', 'bg-indigo-500/10');
+  });
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('border-indigo-500', 'bg-indigo-500/10');
+    fileInput.files = e.dataTransfer.files;
+    fileInput.dispatchEvent(new Event('change'));
+  });
+}
+
+// Закрытие по Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.getElementById('modalUpload').classList.add('hidden');
+    document.getElementById('modalMkdir').classList.add('hidden');
+  }
+});
+</script>
+{% endblock %}

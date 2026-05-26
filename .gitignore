@@ -13,10 +13,12 @@ env/
 *.log
 #db.sqlite3
 media/
-#staticfiles/
+staticfiles/
+storage/*
+!storage/.gitkeep
 
 # Переменные окружения
-#.env
+.env
 .claude
 
 # IDE
