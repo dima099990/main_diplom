@@ -2446,6 +2446,75 @@ def filemanager_mkdir(request):
 
 @crm_required
 @admin_required
+def filemanager_view(request):
+    """Просмотр файла в браузере: PDF — встроенный, DOCX/DOC — конвертация в HTML."""
+    rel = request.GET.get('path', '').strip('/')
+    target = _safe_path(rel)
+    if not target or not target.is_file():
+        raise Http404
+
+    ext = target.suffix.lower()
+
+    import subprocess
+    import tempfile
+    from django.http import HttpResponse
+
+    def _to_pdf(src: Path):
+        """Конвертирует файл в PDF через LibreOffice. Возвращает байты PDF или None."""
+        candidates = ['libreoffice', 'soffice']
+        if os.name == 'nt':
+            candidates = [
+                r'C:\Program Files\LibreOffice\program\soffice.exe',
+                r'C:\Program Files (x86)\LibreOffice\program\soffice.exe',
+            ] + candidates
+        with tempfile.TemporaryDirectory() as tmp:
+            for cmd in candidates:
+                try:
+                    subprocess.run(
+                        [cmd, '--headless', '--convert-to', 'pdf', '--outdir', tmp, str(src)],
+                        capture_output=True, timeout=30,
+                    )
+                    pdf = Path(tmp) / (src.stem + '.pdf')
+                    if pdf.exists():
+                        return pdf.read_bytes()
+                except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+                    continue
+        return None
+
+    back = str(target.parent.relative_to(STORAGE_ROOT)).replace('\\', '/')
+    back = '' if back == '.' else back
+
+    # PDF — отдаём напрямую inline
+    if ext == '.pdf':
+        response = FileResponse(open(target, 'rb'), content_type='application/pdf')
+        response['Content-Disposition'] = f'inline; filename="{target.name}"'
+        return response
+
+    # TXT — отдаём как текст, браузер отобразит
+    if ext == '.txt':
+        response = FileResponse(open(target, 'rb'), content_type='text/plain; charset=utf-8')
+        response['Content-Disposition'] = f'inline; filename="{target.name}"'
+        return response
+
+    # DOC / DOCX — конвертируем в PDF через LibreOffice
+    if ext in ('.docx', '.doc'):
+        pdf_bytes = _to_pdf(target)
+        if pdf_bytes:
+            response = HttpResponse(pdf_bytes, content_type='application/pdf')
+            response['Content-Disposition'] = f'inline; filename="{target.stem}.pdf"'
+            return response
+        # LibreOffice не найден — показываем страницу с ошибкой
+        return render(request, 'crm/filemanager/view_error.html', {
+            'file_name': target.name,
+            'file_path': rel,
+            'back_path': back,
+        })
+
+    raise Http404
+
+
+@crm_required
+@admin_required
 def filemanager_delete(request):
     if request.method != 'POST':
         return redirect('crm:filemanager')
