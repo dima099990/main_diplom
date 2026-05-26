@@ -20,14 +20,13 @@ from db import _get_settings as get_settings_sync
 from proxy import find_working_proxy
 from handlers.start import (
     cmd_start, handle_registration_contact,
-    handle_register_button, handle_consent_callback,
+    handle_consent_callback,
 )
 from handlers.prices import ask_price_query, show_prices, WAITING_PRICE_QUERY
 from handlers.booking import (
     start_booking, got_name, got_phone, got_device,
     got_problem, confirm_booking, cancel_booking,
-    handle_booking_consent,
-    AWAIT_CONSENT, ASK_NAME, ASK_PHONE, ASK_DEVICE, ASK_PROBLEM, CONFIRM,
+    ASK_NAME, ASK_PHONE, ASK_DEVICE, ASK_PROBLEM, CONFIRM,
 )
 from handlers.chat import handle_chat, handle_contacts, handle_aibook_callback
 
@@ -53,18 +52,21 @@ def build_app(token: str, proxy_url: str | None = None) -> Application:
     app = builder.build()
     app.add_error_handler(error_handler)
 
+    # Базовые команды и регистрация
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CallbackQueryHandler(handle_consent_callback, pattern="^pd_"))
     app.add_handler(CallbackQueryHandler(handle_aibook_callback,  pattern="^aibook_"))
-    app.add_handler(MessageHandler(filters.Regex("^📝 Зарегистрироваться$"), handle_register_button))
 
+    # Контакт (кнопка «Поделиться контактом» — для регистрации и ai_book-потока)
+    app.add_handler(MessageHandler(filters.CONTACT, handle_registration_contact))
+
+    # Запись на ремонт (пошаговый диалог)
     app.add_handler(ConversationHandler(
         entry_points=[
             MessageHandler(filters.Regex("^📅 Записаться$"), start_booking),
             CommandHandler("book", start_booking),
         ],
         states={
-            AWAIT_CONSENT: [CallbackQueryHandler(handle_booking_consent, pattern="^bpd_")],
             ASK_NAME:    [MessageHandler(filters.TEXT & ~filters.COMMAND, got_name)],
             ASK_PHONE:   [
                 MessageHandler(filters.CONTACT, got_phone),
@@ -78,6 +80,7 @@ def build_app(token: str, proxy_url: str | None = None) -> Application:
         allow_reentry=True,
     ))
 
+    # Цены (пошаговый диалог, доступен всем)
     app.add_handler(ConversationHandler(
         entry_points=[
             MessageHandler(filters.Regex("^💰 Узнать цены$"), ask_price_query),
@@ -92,7 +95,7 @@ def build_app(token: str, proxy_url: str | None = None) -> Application:
         allow_reentry=True,
     ))
 
-    app.add_handler(MessageHandler(filters.CONTACT, handle_registration_contact))
+    # Контакты и свободный чат
     app.add_handler(MessageHandler(filters.Regex("^📞 Контакты$"), handle_contacts))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_chat))
 

@@ -409,10 +409,22 @@ async def handle_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     from db import (get_settings, get_all_prices_text,
                     get_customer_by_telegram, create_appointment)
     from ai import get_ai_response, extract_booking_info
+    from handlers.start import UNREGISTERED_MENU
 
     user_text = update.message.text.strip()
     s   = await get_settings()
     tid = update.effective_user.id
+
+    # Проверяем регистрацию — незарегистрированные видят только цены
+    customer = await get_customer_by_telegram(tid)
+    if not customer:
+        await update.message.reply_text(
+            "Для чата и записи на ремонт необходима регистрация.\n\n"
+            "Нажмите *«Поделиться контактом»* 👇",
+            parse_mode="Markdown",
+            reply_markup=UNREGISTERED_MENU,
+        )
+        return
 
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
 
@@ -520,37 +532,16 @@ async def handle_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     # Определение намерения записаться → умный парсинг всего сообщения
     # ══════════════════════════════════════════════════════════════════════
     if _is_booking_intent(user_text) and s.bot_deepseek_key:
-        from db import get_pd_consent
-        from handlers.start import _CONSENT_KB, _PD_TEXT
-
-        # ── Проверяем согласие на ПД ──────────────────────────────────
-        has_consent = context.user_data.get("pd_consent") or await get_pd_consent(tid)
-        if has_consent:
-            context.user_data["pd_consent"] = True  # кэшируем в сессии
-
         raw = await asyncio.to_thread(extract_booking_info, user_text, s.bot_deepseek_key)
         ai_book = _validate_ai_extract(raw)
 
-        # Подтягиваем данные из БД если клиент знаком
-        customer = await get_customer_by_telegram(tid)
-        if customer:
-            if not ai_book["name"]:
-                ai_book["name"] = customer.name
-            if not ai_book["phone"]:
-                ai_book["phone"] = customer.phone
+        # Подтягиваем имя и телефон из профиля клиента
+        if not ai_book["name"]:
+            ai_book["name"] = customer.name
+        if not ai_book["phone"]:
+            ai_book["phone"] = customer.phone
 
-        # Если нет согласия — показываем форму ПД и сохраняем ai_book
-        if not has_consent:
-            context.user_data["ai_book"] = ai_book
-            context.user_data["pending_flow"] = "ai_booking"
-            await update.message.reply_text(
-                _PD_TEXT,
-                parse_mode="Markdown",
-                reply_markup=_CONSENT_KB,
-            )
-            return
-
-        # ── Согласие есть — продолжаем запись ────────────────────────
+        # ── Продолжаем запись ─────────────────────────────────────────
         known = []
         if ai_book.get("device"):  known.append(f"📱 {ai_book['device']}")
         if ai_book.get("problem"): known.append(f"🔧 {ai_book['problem']}")
@@ -610,13 +601,17 @@ async def handle_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 
 async def handle_contacts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    from db import get_settings
+    from db import get_settings, get_customer_by_telegram
+    from handlers.start import UNREGISTERED_MENU
     s = await get_settings()
+    tid = update.effective_user.id
+    customer = await get_customer_by_telegram(tid)
+    menu = MAIN_MENU if customer else UNREGISTERED_MENU
     await update.message.reply_text(
         f"📍 *{s.company_name}*\n\n"
         f"📞 {s.phone}\n"
         f"⏰ {s.working_hours}\n"
         f"📍 {s.address}",
         parse_mode="Markdown",
-        reply_markup=MAIN_MENU,
+        reply_markup=menu,
     )

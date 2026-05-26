@@ -10,7 +10,46 @@ from proxy import get_active_proxy
 logger = logging.getLogger(__name__)
 
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
-GROQ_MODEL    = "llama-3.3-70b-versatile"
+
+# Цепочка моделей: если основная исчерпала суточный лимит токенов (TPD),
+# автоматически переключаемся на следующую — у каждой свой независимый лимит.
+GROQ_MODELS = [
+    "llama-3.3-70b-versatile",   # основная: высокое качество
+    "llama-3.1-8b-instant",      # резерв 1: быстрая, экономичная
+    "gemma2-9b-it",              # резерв 2: Google Gemma 2
+    "mixtral-8x7b-32768",        # резерв 3: Mistral
+]
+
+
+def _make_client(api_key: str) -> OpenAI:
+    proxy_url = get_active_proxy()
+    http_client = httpx.Client(proxy=proxy_url) if proxy_url else None
+    return OpenAI(api_key=api_key, base_url=GROQ_BASE_URL, http_client=http_client)
+
+
+def _try_models(client: OpenAI, messages: list, max_tokens: int, temperature: float) -> tuple[str, str]:
+    """
+    Пробует модели по порядку из GROQ_MODELS.
+    Возвращает (content, model_used).
+    При исчерпании всех моделей бросает последнее исключение.
+    """
+    last_exc = None
+    for model in GROQ_MODELS:
+        try:
+            resp = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+            if model != GROQ_MODELS[0]:
+                logger.info(f"Используем резервную модель: {model}")
+            return resp.choices[0].message.content or "", model
+        except RateLimitError as e:
+            logger.warning(f"Модель {model} исчерпала лимит, переключаемся... ({e})")
+            last_exc = e
+            continue
+    raise last_exc
 
 
 def get_ai_response(
@@ -27,9 +66,7 @@ def get_ai_response(
     if not api_key:
         return "ИИ-ассистент не настроен. Позвоните нам — ответим на все вопросы!"
 
-    proxy_url = get_active_proxy()
-    http_client = httpx.Client(proxy=proxy_url) if proxy_url else None
-    client = OpenAI(api_key=api_key, base_url=GROQ_BASE_URL, http_client=http_client)
+    client = _make_client(api_key)
 
     full_system = system_prompt or "Ты помощник сервисного центра по ремонту телефонов."
     if prices_context:
@@ -44,19 +81,17 @@ def get_ai_response(
     messages.append({"role": "user", "content": user_message})
 
     try:
-        resp = client.chat.completions.create(
-            model=GROQ_MODEL,
-            messages=messages,
-            max_tokens=600,
-            temperature=0.7,
+        content, _ = _try_models(client, messages, max_tokens=600, temperature=0.7)
+        return content or "Не удалось получить ответ."
+    except RateLimitError as e:
+        logger.error(f"Все модели Groq исчерпали лимит: {e}")
+        return (
+            "⏳ ИИ-ассистент временно недоступен — суточный лимит запросов исчерпан.\n\n"
+            "Позвоните нам напрямую, мы всё расскажем! 📞"
         )
-        return resp.choices[0].message.content or "Не удалось получить ответ."
     except AuthenticationError as e:
         logger.error(f"Groq AuthenticationError: {e}")
         return "❌ Неверный Groq API ключ. Проверьте настройки в CRM."
-    except RateLimitError as e:
-        logger.error(f"Groq RateLimitError: {e}")
-        return "⏳ Слишком много запросов к ИИ. Попробуйте через минуту."
     except APIConnectionError as e:
         logger.error(f"Groq APIConnectionError: {e}")
         return "🔌 Нет соединения с сервером ИИ. Позвоните нам напрямую!"
@@ -83,9 +118,7 @@ def extract_booking_info(text: str, api_key: str) -> dict:
     from datetime import date as _date
     today_str = _date.today().isoformat()
 
-    proxy_url = get_active_proxy()
-    http_client = httpx.Client(proxy=proxy_url) if proxy_url else None
-    client = OpenAI(api_key=api_key, base_url=GROQ_BASE_URL, http_client=http_client)
+    client = _make_client(api_key)
 
     system = (
         f"Сегодня {today_str}. "
@@ -104,17 +137,13 @@ def extract_booking_info(text: str, api_key: str) -> dict:
         "Если поле не указано — оставь пустую строку."
     )
 
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": text},
+    ]
+
     try:
-        resp = client.chat.completions.create(
-            model=GROQ_MODEL,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": text},
-            ],
-            max_tokens=180,
-            temperature=0.1,
-        )
-        content = resp.choices[0].message.content or "{}"
+        content, _ = _try_models(client, messages, max_tokens=180, temperature=0.1)
         match = re.search(r"\{.*\}", content, re.DOTALL)
         if match:
             data = json.loads(match.group())
@@ -126,6 +155,8 @@ def extract_booking_info(text: str, api_key: str) -> dict:
                 "date":    str(data.get("date",    "")).strip(),
                 "time":    str(data.get("time",    "")).strip(),
             }
+    except RateLimitError:
+        logger.warning("Все модели Groq исчерпали лимит при извлечении данных записи")
     except Exception:
         pass
     return empty

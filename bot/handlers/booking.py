@@ -1,19 +1,18 @@
-"""Запись на ремонт — пошаговый диалог."""
+"""Запись на ремонт — пошаговый диалог (только для зарегистрированных)."""
 from telegram import (
     Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove,
     InlineKeyboardMarkup, InlineKeyboardButton,
 )
 from telegram.ext import ContextTypes, ConversationHandler
 
-# Состояния (диапазон 20-25)
-AWAIT_CONSENT = 20   # ожидание согласия на ПД
-ASK_NAME      = 21
-ASK_PHONE     = 22
-ASK_DEVICE    = 23
-ASK_PROBLEM   = 24
-CONFIRM       = 25
+# Состояния (диапазон 20-24)
+ASK_NAME   = 20
+ASK_PHONE  = 21
+ASK_DEVICE = 22
+ASK_PROBLEM = 23
+CONFIRM    = 24
 
-# Inline-кнопка подтверждения записи (крепится к сообщению)
+# Inline-кнопка подтверждения записи (крепится к сообщению, не к низу экрана)
 _CONFIRM_IKB = InlineKeyboardMarkup([
     [
         InlineKeyboardButton("✅ Записать!", callback_data="book_confirm"),
@@ -21,84 +20,38 @@ _CONFIRM_IKB = InlineKeyboardMarkup([
     ]
 ])
 
-# Inline-кнопки согласия на ПД (специфичные для шага booking, чтобы не конфликтовать с глобальным pd_*)
-_BOOKING_PD_KB = InlineKeyboardMarkup([
-    [InlineKeyboardButton("✅ Согласен",      callback_data="bpd_yes")],
-    [InlineKeyboardButton("❌ Не соглашаюсь", callback_data="bpd_no")],
-])
-
-_PD_TEXT = (
-    "📋 *Обработка персональных данных*\n\n"
-    "Для записи на ремонт нам необходимо сохранить ваши персональные данные "
-    "(имя и номер телефона) в соответствии с ФЗ-152 «О персональных данных».\n\n"
-    "Данные используются исключительно для связи с вами и организации ремонта. "
-    "Вы можете запросить их удаление в любой момент.\n\n"
-    "Вы согласны?"
-)
-
 
 async def start_booking(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    from db import get_pd_consent
+    """Начало записи — только для зарегистрированных пользователей."""
+    from db import get_customer_by_telegram
+    from handlers.start import UNREGISTERED_MENU, MAIN_MENU
 
     tid = update.effective_user.id
+    customer = await get_customer_by_telegram(tid)
 
-    # Проверяем согласие на ПД (сессия → БД)
-    has_consent = context.user_data.get("pd_consent") or await get_pd_consent(tid)
-    if has_consent:
-        context.user_data["pd_consent"] = True
-    else:
-        # Показываем форму согласия, ждём ответа
+    if not customer:
         await update.message.reply_text(
-            _PD_TEXT,
+            "Для записи на ремонт необходима регистрация.\n\n"
+            "Нажмите *«Поделиться контактом»* 👇",
             parse_mode="Markdown",
-            reply_markup=_BOOKING_PD_KB,
+            reply_markup=UNREGISTERED_MENU,
         )
-        return AWAIT_CONSENT
-
-    return await _do_start_booking(update, context)
-
-
-async def handle_booking_consent(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> int:
-    """Обработка согласия на ПД внутри ConversationHandler (bpd_yes / bpd_no)."""
-    from db import set_pd_consent
-    from handlers.start import MAIN_MENU
-
-    query = update.callback_query
-    await query.answer()
-    tid = update.effective_user.id
-
-    if query.data == "bpd_yes":
-        context.user_data["pd_consent"] = True
-        await set_pd_consent(tid)
-        await query.edit_message_text("✅ Согласие принято! Начинаем запись...")
-        await query.message.reply_text(
-            "📅 *Запись на ремонт*\n\n"
-            "Шаг 1 из 4 — Как вас зовут?",
-            parse_mode="Markdown",
-            reply_markup=ReplyKeyboardRemove(),
-        )
-        return ASK_NAME
-
-    else:  # bpd_no
-        await query.edit_message_text(
-            "❌ Без согласия на обработку данных запись невозможна.\n\n"
-            "Если хотите записаться — позвоните нам напрямую.",
-        )
-        await query.message.reply_text("Чем ещё могу помочь?", reply_markup=MAIN_MENU)
         return ConversationHandler.END
 
-
-async def _do_start_booking(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> int:
-    """Внутренний старт диалога после проверки согласия."""
-    pd_ok = context.user_data.get("pd_consent", False)
+    # Зарегистрирован — начинаем запись, подтягиваем данные из профиля
+    pd_ok = context.user_data.get("pd_consent", True)  # зарегистрированные уже дали согласие
     context.user_data.clear()
     context.user_data["pd_consent"] = pd_ok
 
+    # Если есть данные клиента — используем их как умолчание
+    context.user_data["_customer_name"]  = customer.name  or ""
+    context.user_data["_customer_phone"] = customer.phone or ""
+
     await update.message.reply_text(
+        "📅 *Запись на ремонт*\n\n"
+        "Шаг 1 из 4 — Как вас зовут?\n"
+        f"_(или нажмите Enter чтобы использовать: {customer.name})_"
+        if customer.name else
         "📅 *Запись на ремонт*\n\n"
         "Шаг 1 из 4 — Как вас зовут?",
         parse_mode="Markdown",
@@ -108,9 +61,15 @@ async def _do_start_booking(
 
 
 async def got_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data["name"] = update.message.text.strip()
+    text = update.message.text.strip()
+    # Если пользователь ничего не ввёл или написал "-" — используем из профиля
+    if text in ("-", ".") and context.user_data.get("_customer_name"):
+        context.user_data["name"] = context.user_data["_customer_name"]
+    else:
+        context.user_data["name"] = text
+
     await update.message.reply_text(
-        "Шаг 2 из 4 — Укажите ваш номер телефона:",
+        "Шаг 2 из 4 — Укажите номер телефона:",
         reply_markup=ReplyKeyboardMarkup(
             [[KeyboardButton("📱 Поделиться номером", request_contact=True)]],
             resize_keyboard=True,
