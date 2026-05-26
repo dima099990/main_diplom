@@ -10,15 +10,15 @@ CRM-система для сервисного центра по ремонту 
 | Компонент | Технология |
 |-----------|-----------|
 | Бэкенд | Django 6 |
-| База данных | SQLite (локально) / PostgreSQL (сервер) |
+| База данных | PostgreSQL (сервер) / SQLite (локально) |
 | Фронтенд | Tailwind CSS, Alpine.js |
 | Telegram-бот | python-telegram-bot 22 |
 | ИИ-ассистент | Groq API (llama-3.3-70b) |
-| Прокси | SOCKS5 через Webshare.io (для серверов с блокировкой Telegram) |
+| Статика | WhiteNoise |
 
 ---
 
-## Быстрый старт
+## Быстрый старт (локально)
 
 ```bash
 # 1. Клонировать репозиторий
@@ -35,13 +35,14 @@ source .venv/bin/activate
 # 3. Установить зависимости
 pip install -r requirements.txt
 
-# 4. Создать .env (скопировать из примера)
+# 4. Создать .env
 cp .env.example .env
+# Открыть .env и заполнить (минимум: USE_SQLITE=True, DEBUG=True)
 
 # 5. Применить миграции
 python manage.py migrate
 
-# 6. Заполнить тестовыми данными (опционально)
+# 6. Заполнить тестовыми данными
 python manage.py seed_data
 
 # 7. Запустить
@@ -54,54 +55,214 @@ python run.py
 
 ---
 
-## Все команды
+## Деплой на сервер
 
-### Запуск приложения
+### 1. Первичная настройка
 
-| Команда | Описание |
-|---------|----------|
-| `python run.py` | Запустить сайт + бот |
-| `python run.py --site-only` | Запустить только сайт (без бота) |
-| `python run.py --bot-only` | Запустить только Telegram-бота |
-| `python run.py --host 0.0.0.0 --port 8000` | Запустить на всех интерфейсах (для сервера) |
-| `python run.py --host 0.0.0.0 --port 8000 --site-only` | Только сайт, доступен снаружи |
+```bash
+# Клонировать репозиторий
+cd /opt
+git clone <url> main_diplom
+cd main_diplom
 
-### Управление базой данных
+# Создать виртуальное окружение
+python3 -m venv .venv
+source .venv/bin/activate
 
-| Команда | Описание |
-|---------|----------|
-| `python manage.py migrate` | Применить все миграции |
-| `python manage.py makemigrations` | Создать новые миграции после изменений моделей |
-| `python manage.py seed_data` | Заполнить БД тестовыми данными (бренды, прайс, сотрудники, 40 заказов) |
-| `python manage.py seed_iphone_prices` | Загрузить цены на ремонт iPhone (33 модели, 743 услуги, данные с mobi-service.com) |
-| `python manage.py seed_iphone_prices --yes` | То же без запроса подтверждения |
-| `python manage.py clear_db` | Очистить транзакционные данные (заказы, клиенты, склад, продажи) |
-| `python manage.py clear_db --all` | Очистить всё включая справочники и пользователей |
-| `python manage.py clear_db --yes` | Очистить без запроса подтверждения |
-| `python manage.py reset_db` | **Полный сброс БД** — удаляет всё, пересоздаёт структуру, предлагает создать суперюзера |
-| `python manage.py reset_db --yes` | Полный сброс без подтверждения |
+# Установить зависимости
+pip install -r requirements.txt
 
-### Администрирование Django
+# Создать и заполнить .env
+cp .env.example .env
+nano .env
+```
 
-| Команда | Описание |
-|---------|----------|
-| `python manage.py createsuperuser` | Создать нового администратора |
-| `python manage.py changepassword <username>` | Сменить пароль пользователя |
-| `python manage.py collectstatic` | Собрать статику в папку staticfiles (для продакшна) |
-| `python manage.py shell` | Открыть Django-консоль (Python REPL с доступом к моделям) |
-| `python manage.py dbshell` | Открыть консоль базы данных |
-| `python manage.py check` | Проверить проект на ошибки конфигурации |
-| `python manage.py showmigrations` | Показать список всех миграций и их статус |
+Минимальный `.env` для сервера:
 
-### Виртуальное окружение и пакеты
+```env
+DEBUG=False
+SECRET_KEY=ваш-длинный-случайный-ключ
+ALLOWED_HOSTS=ваш_ip,localhost,127.0.0.1
+USE_SQLITE=False
+DB_NAME=kayros_crm
+DB_USER=postgres
+DB_PASSWORD=ваш_пароль
+DB_HOST=localhost
+DB_PORT=5432
+```
 
-| Команда | Описание |
-|---------|----------|
-| `pip install -r requirements.txt` | Установить все зависимости |
-| `pip freeze` | Показать все установленные пакеты с версиями |
-| `pip list` | Показать установленные пакеты |
-| `pip install <пакет>` | Установить пакет |
-| `pip uninstall <пакет>` | Удалить пакет |
+```bash
+# Применить миграции
+python3 manage.py migrate
+
+# Собрать статику
+python3 manage.py collectstatic --noinput
+
+# Создать администратора
+python3 manage.py createsuperuser
+
+# Открыть порт
+ufw allow 8000
+```
+
+---
+
+### 2. Скрипт управления сервером (kayros)
+
+Создать файл `/usr/local/bin/kayros`:
+
+```bash
+cat > /usr/local/bin/kayros << 'EOF'
+#!/bin/bash
+DIR=/opt/main_diplom
+VENV=$DIR/.venv/bin/activate
+
+start() {
+  echo "Запускаю сайт..."
+  cd $DIR
+  source $VENV
+  nohup python3 run.py --host 0.0.0.0 --port 8000 > /tmp/kayros_site.log 2>&1 &
+  echo "✓ Сайт запущен (PID $!)"
+}
+
+stop() {
+  pkill -f "manage.py runserver" 2>/dev/null
+  pkill -f "run.py --host" 2>/dev/null
+  pkill -f "bot/main.py" 2>/dev/null
+  echo "✓ Все процессы остановлены"
+}
+
+status() {
+  echo "=== Статус процессов ==="
+  pgrep -fa "manage.py runserver" || echo "  сайт: не запущен"
+  pgrep -fa "bot/main.py"         || echo "  бот:  не запущен"
+}
+
+logs() {
+  tail -f /tmp/kayros_site.log
+}
+
+kill_all() {
+  pkill -9 -f "manage.py runserver" 2>/dev/null
+  pkill -9 -f "run.py --host" 2>/dev/null
+  pkill -9 -f "bot/main.py" 2>/dev/null
+  echo "✓ Принудительно остановлено"
+}
+
+case "$1" in
+  start)   start   ;;
+  stop)    stop    ;;
+  restart) stop; sleep 1; start ;;
+  status)  status  ;;
+  logs)    logs    ;;
+  kill)    kill_all ;;
+  *) echo "Использование: kayros {start|stop|restart|status|logs|kill}" ;;
+esac
+EOF
+
+chmod +x /usr/local/bin/kayros
+echo "✓ Скрипт kayros установлен"
+```
+
+---
+
+### 3. Короткие команды (~/.bashrc)
+
+Вставить целиком в терминал сервера:
+
+```bash
+VENV=$(find /opt/main_diplom -name "activate" -path "*/bin/activate" 2>/dev/null | head -1)
+echo "Venv найден: $VENV"
+
+cat > ~/.bashrc << EOF
+export PYTHONUNBUFFERED=1
+
+DIR=/opt/main_diplom
+VENV=$VENV
+
+# Хелпер: активирует venv, запускает команду, деактивирует
+_py() { source \$VENV && "\$@"; deactivate; }
+
+# Переключатель venv
+venv() {
+  if [ -n "\$VIRTUAL_ENV" ]; then
+    deactivate && echo "✗ venv выключен"
+  else
+    source \$VENV && echo "✓ venv включён"
+  fi
+}
+
+# Сервис
+alias start='bash /usr/local/bin/kayros start'
+alias stop='bash /usr/local/bin/kayros stop'
+alias restart='bash /usr/local/bin/kayros restart'
+alias status='bash /usr/local/bin/kayros status'
+alias kill_all='bash /usr/local/bin/kayros kill'
+alias logs='bash /usr/local/bin/kayros logs'
+
+# Git / Деплой
+alias pull='cd \$DIR && git stash && git pull'
+alias deploy='cd \$DIR && git stash && git pull && _py python3 manage.py collectstatic --noinput && bash /usr/local/bin/kayros restart'
+
+# База данных
+alias db_fill='cd \$DIR && _py python3 manage.py seed_data'
+alias db_prices='cd \$DIR && _py python3 manage.py seed_iphone_prices'
+alias db_clear='cd \$DIR && _py python3 manage.py clear_db --yes'
+alias db_clear_all='cd \$DIR && _py python3 manage.py clear_db --all --yes'
+alias db_reset='cd \$DIR && _py python3 manage.py reset_db --yes'
+
+# Система
+alias mem='free -h'
+alias disk='df -h /'
+alias list='echo "
+╔════════════════════════════════════════════════╗
+║           KAYROS CRM — Команды                 ║
+╠════════════════════════════════════════════════╣
+║  СЕРВИС                                        ║
+║    start         — запустить всё               ║
+║    stop          — остановить всё              ║
+║    restart       — перезапустить               ║
+║    status        — статус процессов            ║
+║    kill_all      — принудительно убить         ║
+║    logs          — логи сервера                ║
+╠════════════════════════════════════════════════╣
+║  GIT / ДЕПЛОЙ                                  ║
+║    pull          — stash + git pull            ║
+║    deploy        — pull + static + restart     ║
+╠════════════════════════════════════════════════╣
+║  БАЗА ДАННЫХ                                   ║
+║    db_fill       — заполнить рандомными данными║
+║    db_prices     — загрузить прайс iPhone      ║
+║    db_clear      — очистить данные (без юзеров)║
+║    db_clear_all  — очистить всё + юзеры        ║
+║    db_reset      — полный сброс + migrate      ║
+╠════════════════════════════════════════════════╣
+║  УТИЛИТЫ                                       ║
+║    venv          — включить/выключить venv     ║
+║    mem           — память                      ║
+║    disk          — диск                        ║
+║    list          — это меню                    ║
+╚════════════════════════════════════════════════╝"'
+
+EOF
+source ~/.bashrc
+echo "✓ .bashrc обновлён"
+```
+
+---
+
+## Управление базой данных
+
+| Команда Django | Короткая команда | Описание |
+|---|---|---|
+| `python3 manage.py seed_data` | `db_fill` | Заполнить тестовыми данными |
+| `python3 manage.py seed_iphone_prices` | `db_prices` | Загрузить прайс iPhone |
+| `python3 manage.py clear_db --yes` | `db_clear` | Очистить данные (без юзеров) |
+| `python3 manage.py clear_db --all --yes` | `db_clear_all` | Очистить всё включая юзеров |
+| `python3 manage.py reset_db --yes` | `db_reset` | Полный сброс + migrate |
+| `python3 manage.py migrate` | — | Применить миграции |
+| `python3 manage.py createsuperuser` | — | Создать администратора |
+| `python3 manage.py collectstatic --noinput` | — | Собрать статику |
 
 ---
 
@@ -110,73 +271,38 @@ python run.py
 1. Создать бота через [@BotFather](https://t.me/BotFather) → получить токен
 2. Открыть **CRM → Настройки → Telegram-бот**
 3. Вставить токен бота
-4. Вставить Groq API Key (получить на [console.groq.com/keys](https://console.groq.com/keys), бесплатно, начинается с `gsk_`)
-5. Заполнить системный промпт — описание вашего сервисного центра
+4. Вставить Groq API Key (получить на [console.groq.com/keys](https://console.groq.com/keys), начинается с `gsk_`)
+5. Заполнить системный промпт — описание сервисного центра
 
-### Прокси (для серверов в России)
+### Прокси (для серверов с блокировкой Telegram)
 
-Если сервер находится в России и Telegram заблокирован — бот автоматически использует SOCKS5-прокси из файла `bot/proxies.txt`.
-
-Формат файла (один прокси на строку):
+Добавить прокси в `bot/proxies.txt` (один на строку):
 ```
 socks5://username:password@host:port
 ```
 
-Получить бесплатные прокси: [webshare.io](https://webshare.io) → Proxy List → скачать в формате IP:PORT:USER:PASS.
-
-При запуске бот сам перебирает прокси и берёт первый рабочий. Если все недоступны — запускается без прокси.
+Получить бесплатные прокси: [webshare.io](https://webshare.io)
 
 ---
 
-## Файл .env
-
-```env
-# Режим отладки
-DEBUG=False
-
-# Секретный ключ Django (обязательно сменить в продакшне)
-SECRET_KEY=ваш-длинный-случайный-ключ
-
-# Разрешённые хосты (через запятую)
-ALLOWED_HOSTS=161.104.32.125,localhost,127.0.0.1
-
-# База данных
-USE_SQLITE=True                  # True = SQLite, False = PostgreSQL
-
-# PostgreSQL (если USE_SQLITE=False)
-DB_NAME=kayros_crm
-DB_USER=postgres
-DB_PASSWORD=postgres
-DB_HOST=localhost
-DB_PORT=5432
-```
-
----
-
-## Страницы сайта
+## Страницы
 
 | Адрес | Описание |
 |-------|----------|
 | `/` | Главная |
-| `/about/` | О компании |
 | `/prices/` | Прайс-лист |
 | `/contacts/` | Контакты |
-
-## Страницы CRM
-
-| Адрес | Описание |
-|-------|----------|
-| `/crm/` | Вход / дашборд |
+| `/crm/` | CRM — вход / дашборд |
 | `/crm/repairs/` | Заказы на ремонт |
-| `/crm/appointments/` | Записи на ремонт |
+| `/crm/appointments/` | Записи |
 | `/crm/customers/` | Клиенты |
-| `/crm/warehouse/` | Склад (запчасти, аксессуары) |
-| `/crm/sales/` | Продажи аксессуаров |
-| `/crm/finance/` | Финансы и расчёт зарплат |
+| `/crm/warehouse/` | Склад |
+| `/crm/sales/` | Продажи |
+| `/crm/finance/` | Финансы и зарплаты |
 | `/crm/employees/` | Сотрудники |
-| `/crm/documents/` | Печать актов и документов |
 | `/crm/analytics/` | Аналитика |
-| `/crm/settings/` | Настройки компании и бота |
+| `/crm/settings/` | Настройки |
+| `/crm/filemanager/` | Файловый менеджер (только admin) |
 
 ---
 
@@ -184,11 +310,10 @@ DB_PORT=5432
 
 | Роль | Доступ |
 |------|--------|
-| `admin` | Всё: настройки, зарплаты всех, штрафы, аналитика |
+| `admin` | Всё: настройки, зарплаты, аналитика, файловый менеджер |
 | `manager` | Заказы, клиенты, склад, продажи, задачи |
-| `employee` | Свои заказы, свои задачи, своя зарплата |
-
-Роль назначается в **CRM → Сотрудники → редактировать**.
+| `master` | Свои заказы, задачи, зарплата |
+| `employee` | Свои заказы, задачи, зарплата |
 
 ---
 
@@ -197,82 +322,44 @@ DB_PORT=5432
 ```
 diplom/
 ├── run.py                    # Точка входа — запуск сайта и бота
-├── manage.py                 # Django management
+├── manage.py
 ├── requirements.txt
 ├── .env                      # Конфигурация (не в git)
-├── .env.example              # Пример конфигурации
+├── .env.example
 │
 ├── config/                   # Настройки Django
 │   ├── settings.py
-│   ├── urls.py
-│   ├── wsgi.py
-│   └── asgi.py
+│   └── urls.py
 │
 ├── core/                     # Публичный сайт
 │   ├── models.py             # SiteSettings, Brand, PhoneModel, RepairService
 │   ├── views.py
-│   ├── urls.py
-│   └── context_processors.py
+│   └── static/core/
+│       ├── css/style.css
+│       └── js/main.js
 │
 ├── crm/                      # CRM-панель
-│   ├── models.py             # RepairOrder, Customer, Appointment...
+│   ├── models.py
 │   ├── views.py
-│   ├── urls.py
-│   ├── decorators.py         # @crm_required, @admin_required
-│   ├── signals.py            # Автосоздание профиля пользователя
+│   ├── static/crm/
+│   │   ├── css/crm.css
+│   │   └── js/crm.js
 │   └── management/commands/
-│       ├── seed_data.py      # Тестовые данные
-│       └── clear_db.py       # Очистка БД
+│       ├── seed_data.py
+│       ├── seed_iphone_prices.py
+│       ├── clear_db.py
+│       └── reset_db.py
 │
 ├── bot/                      # Telegram-бот
-│   ├── main.py               # Точка входа бота
-│   ├── db.py                 # Работа с БД через Django ORM
-│   ├── ai.py                 # Groq API (ИИ-ассистент)
-│   ├── proxy.py              # Автовыбор рабочего SOCKS5-прокси
-│   ├── proxies.txt           # Список прокси
-│   ├── django_setup.py       # Инициализация Django вне веб-сервера
-│   └── handlers/
-│       ├── start.py          # /start, регистрация клиента
-│       ├── booking.py        # Запись на ремонт (диалог)
-│       ├── prices.py         # Поиск цен
-│       └── chat.py           # ИИ-чат, запись через нейросеть
+│   ├── main.py
+│   ├── ai.py                 # Groq API
+│   ├── proxy.py
+│   └── proxies.txt
 │
-└── templates/
-    ├── core/                 # Шаблоны публичного сайта
-    └── crm/                  # Шаблоны CRM
-```
-
----
-
-## Деплой на сервер
-
-```bash
-# 1. Загрузить файлы на сервер
-git pull  # или scp/ftp
-
-# 2. Установить зависимости
-pip install -r requirements.txt
-
-# 3. Применить миграции
-python manage.py migrate
-
-# 4. Собрать статику
-python manage.py collectstatic --noinput
-
-# 5. Запустить (доступен снаружи по IP)
-python run.py --host 0.0.0.0 --port 8000
-
-# В фоне (не закрывается при отключении SSH)
-nohup python run.py --host 0.0.0.0 --port 8000 > app.log 2>&1 &
-
-# Через screen
-screen -S kayros
-python run.py --host 0.0.0.0 --port 8000
-# Ctrl+A, D — отсоединиться
-screen -r kayros  # вернуться
-```
-
-**Порт в фаерволе (Ubuntu):**
-```bash
-ufw allow 8000
+├── templates/
+│   ├── core/                 # Шаблоны публичного сайта
+│   └── crm/                  # Шаблоны CRM
+│
+├── media/                    # Загружаемые файлы (логотип и т.д.)
+└── storage/                  # Файловый менеджер (только для сервера)
 ```
