@@ -53,11 +53,11 @@ img { max-width: 100%; display: block; }
   background: rgba(13,13,13,.9); backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
 }
-.nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; }
-.logo { display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-size: 24px; letter-spacing: 1px; color: var(--white); }
+.nav-inner { display: flex; align-items: center; justify-content: space-between; height: 80px; }
+.logo { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-size: 24px; letter-spacing: 1px; color: var(--white); }
 .logo:hover { color: var(--white); }
 .logo-mark { color: var(--red); font-size: 12px; }
-.logo-img { height: 32px; max-width: 100px; width: auto; object-fit: contain; flex-shrink: 0; }
+.logo-img { height: 60px; max-width: 220px; width: auto; object-fit: contain; flex-shrink: 0; }
 .nav-links { display: flex; align-items: center; gap: 8px; }
 .nav-links a { color: var(--text-muted); font-size: 15px; font-weight: 500; padding: 6px 12px; border-radius: 6px; transition: all var(--transition); }
 .nav-links a:hover, .nav-links a.active { color: var(--white); background: var(--dark-4); }
@@ -75,7 +75,7 @@ img { max-width: 100%; display: block; }
 /* ===== HERO ===== */
 .hero {
   position: relative; overflow: hidden;
-  min-height: calc(100vh - 64px);
+  min-height: calc(100vh - 80px);
   display: flex; align-items: center;
   padding: 60px 0;
   background: var(--dark-2);
@@ -296,7 +296,9 @@ section h2 { margin-bottom: 36px; }
   .stat-item:nth-child(2) { border-right: none; }
 }
 @media (max-width: 640px) {
-  .nav-links { display: none; flex-direction: column; position: fixed; top: 64px; left: 0; right: 0; bottom: 0; background: #0d0d0d; padding: 20px 16px; gap: 4px; z-index: 100; overflow-y: auto; }
+  .nav-inner { height: 60px; }
+  .logo-img { height: 40px; max-width: 160px; }
+  .nav-links { display: none; flex-direction: column; position: fixed; top: 60px; left: 0; right: 0; bottom: 0; background: #0d0d0d; padding: 20px 16px; gap: 4px; z-index: 100; overflow-y: auto; }
   .nav-links.open { display: flex; }
   .nav-links a { font-size: 17px; padding: 14px 16px; border-radius: 8px; width: 100%; }
   /* Кнопка "Записаться" в мобильном меню */
