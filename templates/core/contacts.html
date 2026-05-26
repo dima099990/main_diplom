@@ -74,6 +74,11 @@
             {% endfor %}
           </select>
           {% endif %}
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:.875rem;color:var(--text-muted);line-height:1.5">
+            <input type="checkbox" name="pd_consent" required
+                   style="margin-top:3px;flex-shrink:0;accent-color:#f24a47;width:16px;height:16px;cursor:pointer">
+            <span>Я согласен на обработку персональных данных в соответствии с ФЗ-152 «О персональных данных»</span>
+          </label>
           <button type="submit" class="btn btn-lg" style="width:100%">Записаться</button>
         </form>
       </div>

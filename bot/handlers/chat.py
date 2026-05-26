@@ -469,15 +469,18 @@ async def handle_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         if ai_book.get("phone"):
             known.append(f"📞 {ai_book['phone']}")
 
+        _pd_notice = "\n\n_Продолжая запись, вы соглашаетесь на обработку персональных данных (ФЗ-152)._"
+
         if known:
             await update.message.reply_text(
-                "📋 Записываю! Уже понял:\n" + "  ".join(known),
+                "📋 Записываю! Уже понял:\n" + "  ".join(known) + _pd_notice,
                 parse_mode="Markdown",
                 reply_markup=ReplyKeyboardRemove(),
             )
         else:
             await update.message.reply_text(
-                "📅 Отлично, оформляю запись!",
+                "📅 Отлично, оформляю запись!" + _pd_notice,
+                parse_mode="Markdown",
                 reply_markup=ReplyKeyboardRemove(),
             )
 

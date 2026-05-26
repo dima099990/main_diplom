@@ -1,78 +1,121 @@
 # Kayros CRM
 
 CRM-система для сервисного центра по ремонту смартфонов.  
-Включает публичный сайт, панель управления CRM и Telegram-бота с ИИ-ассистентом.
+Публичный сайт + панель управления + Telegram-бот с ИИ-ассистентом.
 
 ---
 
 ## Стек
 
-| Компонент | Технология |
-|-----------|-----------|
-| Бэкенд | Django 6 |
-| База данных | PostgreSQL (сервер) / SQLite (локально) |
-| Фронтенд | Tailwind CSS, Alpine.js |
-| Telegram-бот | python-telegram-bot 22 |
-| ИИ-ассистент | Groq API (llama-3.3-70b) |
-| Статика | WhiteNoise |
+| Компонент     | Технология                         |
+|---------------|------------------------------------|
+| Бэкенд        | Django 6                           |
+| База данных   | PostgreSQL (сервер) / SQLite (dev) |
+| Фронтенд      | Tailwind CSS, Alpine.js            |
+| Telegram-бот  | python-telegram-bot 22             |
+| ИИ-ассистент  | Groq API (llama-3.3-70b-versatile) |
+| Статика       | WhiteNoise                         |
 
 ---
 
 ## Быстрый старт (локально)
 
 ```bash
-# 1. Клонировать репозиторий
+# 1. Клонировать
 git clone <url> && cd diplom
 
-# 2. Создать виртуальное окружение
+# 2. Виртуальное окружение
 python -m venv .venv
+.venv\Scripts\activate        # Windows
+source .venv/bin/activate     # Linux / Mac
 
-# Windows
-.venv\Scripts\activate
-# Linux / Mac
-source .venv/bin/activate
-
-# 3. Установить зависимости
+# 3. Зависимости
 pip install -r requirements.txt
 
-# 4. Создать .env
+# 4. Конфиг
 cp .env.example .env
-# Открыть .env и заполнить (минимум: USE_SQLITE=True, DEBUG=True)
+# Открыть .env → USE_SQLITE=True, DEBUG=True
 
-# 5. Применить миграции
+# 5. Миграции + тестовые данные
 python manage.py migrate
-
-# 6. Заполнить тестовыми данными
 python manage.py seed_data
 
-# 7. Запустить
+# 6. Запуск
 python run.py
 ```
 
 **Сайт:** http://127.0.0.1:8000  
 **CRM:** http://127.0.0.1:8000/crm/  
-**Логин / пароль после seed_data:** `admin` / `admin123`
+**Логин / пароль:** `admin` / `admin123`
 
 ---
 
 ## Деплой на сервер
 
-### 1. Первичная настройка
+### Автоматическая установка (рекомендуется)
+
+Скачать файл на сервер и запустить:
 
 ```bash
-# Клонировать репозиторий
+wget https://raw.githubusercontent.com/<user>/<repo>/main/setup.sh
+sudo bash setup.sh
+```
+
+Или, если уже склонировали репозиторий:
+
+```bash
+cd /opt/main_diplom
+sudo bash setup.sh
+```
+
+Скрипт автоматически:
+- Установит системные пакеты (python3, git, postgresql, ufw)
+- Создаст базу данных PostgreSQL с генерацией случайного пароля
+- Создаст виртуальное окружение и установит зависимости
+- Сгенерирует `.env` со случайным `SECRET_KEY` и вашим IP-адресом
+- Применит миграции и соберёт статику
+- Предложит создать администратора CRM
+- Установит скрипт `kayros` в `/usr/local/bin/`
+- Пропишет все короткие команды в `~/.bashrc`
+- Откроет порт 8000 через UFW
+
+### После установки
+
+```bash
+# Активировать команды в текущей сессии
+source ~/.bashrc
+
+# Проверить статус
+status
+
+# Запустить
+start
+```
+
+### Настроить бота (обязательно)
+
+Войти в **CRM → Настройки → Telegram-бот** и вставить:
+- **Токен бота** — получить у [@BotFather](https://t.me/BotFather)
+- **Groq API ключ** — получить на [console.groq.com/keys](https://console.groq.com/keys) (начинается с `gsk_`)
+
+> Токен и ключ отображаются скрытыми (нельзя скопировать). Чтобы сменить — вставить новое значение. Чтобы удалить — поставить галочку «Удалить».
+
+---
+
+## Ручная установка
+
+```bash
+# 1. Клонировать
 cd /opt
 git clone <url> main_diplom
 cd main_diplom
 
-# Создать виртуальное окружение
+# 2. Виртуальное окружение
 python3 -m venv .venv
 source .venv/bin/activate
-
-# Установить зависимости
 pip install -r requirements.txt
 
-# Создать и заполнить .env
+# 3. Файл .env
 cp .env.example .env
 nano .env
 ```
@@ -92,313 +135,190 @@ DB_PORT=5432
 ```
 
 ```bash
-# Применить миграции
+# 4. База данных
 python3 manage.py migrate
-
-# Собрать статику
-python3 manage.py collectstatic --noinput
-
-# Создать администратора
 python3 manage.py createsuperuser
 
-# Открыть порт
+# 5. Статика (обязательно перед запуском!)
+python3 manage.py collectstatic --noinput
+
+# 6. Открыть порт
 ufw allow 8000
-```
 
----
-
-### 2. Скрипт управления сервером (kayros)
-
-Создать файл `/usr/local/bin/kayros`:
-
-```bash
-cat > /usr/local/bin/kayros << 'EOF'
-#!/bin/bash
-DIR=/opt/main_diplom
-VENV=$DIR/.venv/bin/activate
-PROXY_FILE=$DIR/bot/proxies.txt
-PROXY_BAK=$DIR/bot/proxies.txt.disabled
-
-start() {
-  echo "Запускаю сайт..."
-  cd $DIR
-  source $VENV
-  nohup python3 run.py --host 0.0.0.0 --port 8000 > /tmp/kayros_site.log 2>&1 &
-  echo "✓ Сайт запущен (PID $!)"
-}
-
-stop() {
-  pkill -f "run.py --host" 2>/dev/null
-  pkill -f "bot/main.py" 2>/dev/null
-  echo "✓ Все процессы остановлены"
-}
-
-status() {
-  # Сайт
-  SITE_PID=$(pgrep -f "run.py --host" 2>/dev/null | head -1)
-  if [ -n "$SITE_PID" ]; then
-    SITE_INFO="✅ работает   (PID $SITE_PID)"
-  else
-    SITE_INFO="❌ не запущен"
-  fi
-
-  # Бот
-  BOT_PID=$(pgrep -f "bot/main.py" 2>/dev/null | head -1)
-  if [ -n "$BOT_PID" ]; then
-    BOT_INFO="✅ работает   (PID $BOT_PID)"
-  else
-    BOT_INFO="❌ не запущен"
-  fi
-
-  # Прокси
-  if [ -f "$PROXY_FILE" ]; then
-    CNT=$(grep -c "socks5" "$PROXY_FILE" 2>/dev/null || echo 0)
-    PROXY_INFO="✅ включён    ($CNT шт.)"
-  elif [ -f "$PROXY_BAK" ]; then
-    PROXY_INFO="⛔ выключен   (файл скрыт)"
-  else
-    PROXY_INFO="⚠️  файл не найден"
-  fi
-
-  # VPN
-  VPN_IF=$(ip link show 2>/dev/null | grep -oE "(tun|wg|ppp)[0-9]+" | head -1)
-  if [ -n "$VPN_IF" ]; then
-    VPN_IP=$(ip addr show "$VPN_IF" 2>/dev/null | grep "inet " | awk '{print $2}' | cut -d/ -f1)
-    VPN_INFO="✅ подключён  ($VPN_IF $VPN_IP)"
-  else
-    VPN_INFO="⛔ не подключен"
-  fi
-
-  # Память и диск
-  MEM=$(free -h | awk '/^Mem:/ {print $3" / "$2}')
-  DISK=$(df -h / | awk 'NR==2 {print $3" / "$2"  ("$5")"}')
-
-  echo ""
-  echo "╔══════════════════════════════════════════════╗"
-  echo "║           KAYROS CRM — Статус               ║"
-  echo "╠══════════════════════════════════════════════╣"
-  printf "║  Сайт    %-36s║\n" "$SITE_INFO"
-  printf "║  Бот     %-36s║\n" "$BOT_INFO"
-  printf "║  Прокси  %-36s║\n" "$PROXY_INFO"
-  printf "║  VPN     %-36s║\n" "$VPN_INFO"
-  echo "╠══════════════════════════════════════════════╣"
-  printf "║  Память  %-36s║\n" "$MEM"
-  printf "║  Диск    %-36s║\n" "$DISK"
-  echo "╚══════════════════════════════════════════════╝"
-  echo ""
-}
-
-proxy_toggle() {
-  if [ -f "$PROXY_FILE" ]; then
-    mv "$PROXY_FILE" "$PROXY_BAK"
-    echo "⛔ Прокси выключен — proxies.txt скрыт"
-    echo "   Перезапустите бот: restart"
-  elif [ -f "$PROXY_BAK" ]; then
-    mv "$PROXY_BAK" "$PROXY_FILE"
-    echo "✅ Прокси включён — proxies.txt восстановлен"
-    echo "   Перезапустите бот: restart"
-  else
-    echo "⚠️  Файл proxies.txt не найден — нечего переключать"
-  fi
-}
-
-logs() {
-  tail -f /tmp/kayros_site.log
-}
-
-kill_all() {
-  pkill -9 -f "run.py --host" 2>/dev/null
-  pkill -9 -f "bot/main.py" 2>/dev/null
-  echo "✓ Принудительно остановлено"
-}
-
-case "$1" in
-  start)   start         ;;
-  stop)    stop          ;;
-  restart) stop; sleep 1; start ;;
-  status)  status        ;;
-  proxy)   proxy_toggle  ;;
-  logs)    logs          ;;
-  kill)    kill_all      ;;
-  *) echo "Использование: kayros {start|stop|restart|status|proxy|logs|kill}" ;;
-esac
-EOF
-
-chmod +x /usr/local/bin/kayros
-echo "✓ Скрипт kayros установлен"
-```
-
----
-
-### 3. Короткие команды (~/.bashrc)
-
-Вставить целиком в терминал сервера:
-
-```bash
-VENV=$(find /opt/main_diplom -name "activate" -path "*/bin/activate" 2>/dev/null | head -1)
-echo "Venv найден: $VENV"
-
-cat > ~/.bashrc << EOF
-export PYTHONUNBUFFERED=1
-
-DIR=/opt/main_diplom
-VENV=$VENV
-
-# Хелпер: активирует venv, запускает команду, деактивирует
-_py() { source \$VENV && "\$@"; deactivate; }
-
-# Переключатель venv
-venv() {
-  if [ -n "\$VIRTUAL_ENV" ]; then
-    deactivate && echo "✗ venv выключен"
-  else
-    source \$VENV && echo "✓ venv включён"
-  fi
-}
-
-# Сервис
-alias start='bash /usr/local/bin/kayros start'
-alias stop='bash /usr/local/bin/kayros stop'
-alias restart='bash /usr/local/bin/kayros restart'
-alias status='bash /usr/local/bin/kayros status'
-alias kill_all='bash /usr/local/bin/kayros kill'
-alias logs='bash /usr/local/bin/kayros logs'
-alias proxy='bash /usr/local/bin/kayros proxy'
-
-# Git / Деплой
-alias pull='cd \$DIR && git stash && git pull'
-alias deploy='cd \$DIR && git stash && git pull && _py python3 manage.py collectstatic --noinput && bash /usr/local/bin/kayros restart'
-
-# База данных
-alias db_fill='cd \$DIR && _py python3 manage.py seed_data'
-alias db_prices='cd \$DIR && _py python3 manage.py seed_iphone_prices'
-alias db_clear='cd \$DIR && _py python3 manage.py clear_db --yes'
-alias db_clear_all='cd \$DIR && _py python3 manage.py clear_db --all --yes'
-alias db_reset='cd \$DIR && _py python3 manage.py reset_db --yes'
-
-# Система
-alias mem='free -h'
-alias disk='df -h /'
-alias list='echo "
-╔════════════════════════════════════════════════╗
-║           KAYROS CRM — Команды                 ║
-╠════════════════════════════════════════════════╣
-║  СЕРВИС                                        ║
-║    start         — запустить всё               ║
-║    stop          — остановить всё              ║
-║    restart       — перезапустить               ║
-║    status        — статус: сайт/бот/прокси/vpn ║
-║    kill_all      — принудительно убить         ║
-║    logs          — логи сервера                ║
-╠════════════════════════════════════════════════╣
-║  СЕТЬ                                          ║
-║    proxy         — вкл/выкл прокси (SOCKS5)   ║
-╠════════════════════════════════════════════════╣
-║  GIT / ДЕПЛОЙ                                  ║
-║    pull          — stash + git pull            ║
-║    deploy        — pull + static + restart     ║
-╠════════════════════════════════════════════════╣
-║  БАЗА ДАННЫХ                                   ║
-║    db_fill       — заполнить тестовыми данными ║
-║    db_prices     — загрузить прайс iPhone      ║
-║    db_clear      — очистить данные (без юзеров)║
-║    db_clear_all  — очистить всё + юзеры        ║
-║    db_reset      — полный сброс + migrate      ║
-╠════════════════════════════════════════════════╣
-║  УТИЛИТЫ                                       ║
-║    venv          — включить/выключить venv     ║
-║    mem           — использование памяти        ║
-║    disk          — использование диска         ║
-║    list          — это меню                    ║
-╚════════════════════════════════════════════════╝"'
-
-EOF
+# 7. Установить kayros + команды
+sudo bash setup.sh
 source ~/.bashrc
-echo "✓ .bashrc обновлён"
 ```
 
 ---
 
-## Управление базой данных
+## Команды управления сервером
 
-| Команда Django | Короткая команда | Описание |
-|---|---|---|
-| `python3 manage.py seed_data` | `db_fill` | Заполнить тестовыми данными |
-| `python3 manage.py seed_iphone_prices` | `db_prices` | Загрузить прайс iPhone |
-| `python3 manage.py clear_db --yes` | `db_clear` | Очистить данные (без юзеров) |
-| `python3 manage.py clear_db --all --yes` | `db_clear_all` | Очистить всё включая юзеров |
-| `python3 manage.py reset_db --yes` | `db_reset` | Полный сброс + migrate |
-| `python3 manage.py migrate` | — | Применить миграции |
-| `python3 manage.py createsuperuser` | — | Создать администратора |
-| `python3 manage.py collectstatic --noinput` | — | Собрать статику |
+После `source ~/.bashrc` доступны короткие команды. Список всегда можно посмотреть командой `list`.
+
+### Сервис
+
+| Команда   | Описание                                       |
+|-----------|------------------------------------------------|
+| `start`   | Запустить сайт + бот (авто-сборка статики)     |
+| `stop`    | Остановить всё                                 |
+| `restart` | Перезапустить                                  |
+| `status`  | Статус: сайт / бот / прокси / VPN / память    |
+| `kill`    | Принудительно убить все процессы              |
+| `logs`    | Логи сервера в реальном времени               |
+
+### Сеть
+
+| Команда | Описание                                   |
+|---------|--------------------------------------------|
+| `proxy` | Включить / выключить прокси SOCKS5         |
+
+> Прокси хранятся в `bot/proxies.txt`. Команда `proxy` переименовывает файл в `proxies.txt.disabled` и обратно. Требует перезапуска бота (`restart`).
+
+### Git / Деплой
+
+| Команда  | Описание                              |
+|----------|---------------------------------------|
+| `pull`   | `git stash` + `git pull`              |
+| `deploy` | `pull` + пересборка статики + restart |
+
+### База данных
+
+| Команда        | Описание                            |
+|----------------|-------------------------------------|
+| `db_fill`      | Заполнить тестовыми данными         |
+| `db_prices`    | Загрузить прайс iPhone              |
+| `db_clear`     | Очистить данные (без пользователей) |
+| `db_clear_all` | Очистить всё включая пользователей  |
+| `db_reset`     | Полный сброс + миграции             |
+
+### Утилиты
+
+| Команда | Описание                       |
+|---------|--------------------------------|
+| `venv`  | Активировать виртуальное окружение |
+| `mem`   | Использование памяти           |
+| `disk`  | Использование диска            |
+| `list`  | Показать все команды           |
 
 ---
 
-## Настройка Telegram-бота
+## Пример вывода `status`
 
-1. Создать бота через [@BotFather](https://t.me/BotFather) → получить токен
-2. Открыть **CRM → Настройки → Telegram-бот**
-3. Вставить токен бота
-4. Вставить Groq API Key (получить на [console.groq.com/keys](https://console.groq.com/keys), начинается с `gsk_`)
-5. Заполнить системный промпт — описание сервисного центра
+```
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+         KAYROS CRM — Статус
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Сайт    :  ✅ работает  (PID 12345)
+  Бот     :  ✅ работает  (PID 12346)
+  Прокси  :  ✅ включён   (10 прокси)
+  VPN     :  ⛔ не подключен
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Память  :  512M / 2.0G
+  Диск    :  4.2G / 20G (21%)
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
 
-### Прокси (для серверов с блокировкой Telegram)
+---
 
-Файл `bot/proxies.txt` — список SOCKS5 прокси. Бот автоматически перебирает их и берёт первый рабочий.
+## Telegram-бот
 
-**Добавить прокси в Telegram одним нажатием:**
+### Возможности бота
 
-| # | Сервер | Ссылка |
-|---|--------|--------|
-| 1 | 38.154.203.95:5863 | [Добавить в Telegram](https://t.me/proxy?server=38.154.203.95&port=5863&user=edltkbwa&pass=4chcrqzr8gkz) |
-| 2 | 198.105.121.200:6462 | [Добавить в Telegram](https://t.me/proxy?server=198.105.121.200&port=6462&user=edltkbwa&pass=4chcrqzr8gkz) |
-| 3 | 64.137.96.74:6641 | [Добавить в Telegram](https://t.me/proxy?server=64.137.96.74&port=6641&user=edltkbwa&pass=4chcrqzr8gkz) |
-| 4 | 209.127.138.10:5784 | [Добавить в Telegram](https://t.me/proxy?server=209.127.138.10&port=5784&user=edltkbwa&pass=4chcrqzr8gkz) |
-| 5 | 38.154.185.97:6370 | [Добавить в Telegram](https://t.me/proxy?server=38.154.185.97&port=6370&user=edltkbwa&pass=4chcrqzr8gkz) |
-| 6 | 84.247.60.125:6095 | [Добавить в Telegram](https://t.me/proxy?server=84.247.60.125&port=6095&user=edltkbwa&pass=4chcrqzr8gkz) |
-| 7 | 142.111.67.146:5611 | [Добавить в Telegram](https://t.me/proxy?server=142.111.67.146&port=5611&user=edltkbwa&pass=4chcrqzr8gkz) |
-| 8 | 194.39.32.164:6461 | [Добавить в Telegram](https://t.me/proxy?server=194.39.32.164&port=6461&user=edltkbwa&pass=4chcrqzr8gkz) |
-| 9 | 191.96.254.138:6185 | [Добавить в Telegram](https://t.me/proxy?server=191.96.254.138&port=6185&user=edltkbwa&pass=4chcrqzr8gkz) |
-| 10 | 31.58.9.4:6077 | [Добавить в Telegram](https://t.me/proxy?server=31.58.9.4&port=6077&user=edltkbwa&pass=4chcrqzr8gkz) |
+| Функция                  | Описание                                                              |
+|--------------------------|-----------------------------------------------------------------------|
+| 💬 ИИ-чат                | Отвечает на вопросы клиентов с учётом прайса и системного промпта    |
+| 📅 Умная запись          | Разбирает свободный текст и извлекает все данные для записи          |
+| 💰 Узнать цены           | Поиск по прайс-листу через ИИ                                        |
+| 📞 Контакты              | Адрес, телефон, часы работы из настроек                              |
+| 📝 Регистрация           | Создание карточки клиента с согласием на обработку ПД               |
 
-Добавить новые прокси в `bot/proxies.txt` (один на строку):
+### Умная запись на ремонт
+
+Бот понимает свободный текст и сам извлекает все данные:
+
+> *«хочу записаться на завтра в 16:00, меня зовут Дмитрий, iPhone X не включается»*
+
+Из одного сообщения бот определит:
+- **Устройство** — iPhone X
+- **Проблема** — не включается
+- **Имя** — Дмитрий
+- **Дата** — завтра (пересчитывает автоматически)
+- **Время** — 16:00
+
+Бот дозаполняет только то, чего не хватает, и просит телефон в конце.  
+Дату и время можно пропустить кнопкой «Пропустить».
+
+### Согласие на обработку персональных данных
+
+- При **регистрации** — бот показывает текст согласия с inline-кнопками ✅ / ❌  
+- При **записи на ремонт** — в начале диалога выводится уведомление по ФЗ-152  
+- На **сайте** — форма записи содержит обязательный чекбокс согласия
+
+### Прокси (если Telegram заблокирован на сервере)
+
+Добавить прокси в `bot/proxies.txt` (один на строку):
 ```
 socks5://username:password@host:port
 ```
 
-Получить бесплатные прокси: [webshare.io](https://webshare.io)
+Переключение: команда `proxy` (затем `restart`)
+
+**Готовые прокси (добавить в Telegram одним нажатием):**
+
+| # | Сервер | Ссылка |
+|---|--------|--------|
+| 1 | 38.154.203.95:5863 | [Добавить](https://t.me/proxy?server=38.154.203.95&port=5863&user=edltkbwa&pass=4chcrqzr8gkz) |
+| 2 | 198.105.121.200:6462 | [Добавить](https://t.me/proxy?server=198.105.121.200&port=6462&user=edltkbwa&pass=4chcrqzr8gkz) |
+| 3 | 64.137.96.74:6641 | [Добавить](https://t.me/proxy?server=64.137.96.74&port=6641&user=edltkbwa&pass=4chcrqzr8gkz) |
+| 4 | 209.127.138.10:5784 | [Добавить](https://t.me/proxy?server=209.127.138.10&port=5784&user=edltkbwa&pass=4chcrqzr8gkz) |
+| 5 | 38.154.185.97:6370 | [Добавить](https://t.me/proxy?server=38.154.185.97&port=6370&user=edltkbwa&pass=4chcrqzr8gkz) |
+| 6 | 84.247.60.125:6095 | [Добавить](https://t.me/proxy?server=84.247.60.125&port=6095&user=edltkbwa&pass=4chcrqzr8gkz) |
+| 7 | 142.111.67.146:5611 | [Добавить](https://t.me/proxy?server=142.111.67.146&port=5611&user=edltkbwa&pass=4chcrqzr8gkz) |
+| 8 | 194.39.32.164:6461 | [Добавить](https://t.me/proxy?server=194.39.32.164&port=6461&user=edltkbwa&pass=4chcrqzr8gkz) |
+| 9 | 191.96.254.138:6185 | [Добавить](https://t.me/proxy?server=191.96.254.138&port=6185&user=edltkbwa&pass=4chcrqzr8gkz) |
+| 10 | 31.58.9.4:6077 | [Добавить](https://t.me/proxy?server=31.58.9.4&port=6077&user=edltkbwa&pass=4chcrqzr8gkz) |
+
+Бесплатные прокси: [webshare.io](https://webshare.io)
 
 ---
 
 ## Страницы
 
-| Адрес | Описание |
-|-------|----------|
-| `/` | Главная |
-| `/prices/` | Прайс-лист |
-| `/contacts/` | Контакты |
-| `/crm/` | CRM — вход / дашборд |
-| `/crm/repairs/` | Заказы на ремонт |
-| `/crm/appointments/` | Записи |
-| `/crm/customers/` | Клиенты |
-| `/crm/warehouse/` | Склад |
-| `/crm/sales/` | Продажи |
-| `/crm/finance/` | Финансы и зарплаты |
-| `/crm/employees/` | Сотрудники |
-| `/crm/analytics/` | Аналитика |
-| `/crm/settings/` | Настройки |
-| `/crm/filemanager/` | Файловый менеджер (только admin) |
+### Публичный сайт
+
+| Адрес        | Описание                |
+|--------------|-------------------------|
+| `/`          | Главная                 |
+| `/prices/`   | Прайс-лист              |
+| `/contacts/` | Контакты + форма записи |
+
+### CRM-панель
+
+| Адрес                  | Описание                                |
+|------------------------|-----------------------------------------|
+| `/crm/`                | Дашборд / вход                          |
+| `/crm/repairs/`        | Заказы на ремонт                        |
+| `/crm/appointments/`   | Записи клиентов                         |
+| `/crm/customers/`      | Клиентская база                         |
+| `/crm/warehouse/`      | Склад                                   |
+| `/crm/sales/`          | Продажи                                 |
+| `/crm/finance/`        | Финансы и зарплаты                      |
+| `/crm/employees/`      | Сотрудники                              |
+| `/crm/analytics/`      | Аналитика                               |
+| `/crm/settings/`       | Настройки (компания, бот, Groq)         |
+| `/crm/filemanager/`    | Файловый менеджер (только `admin`)      |
 
 ---
 
 ## Роли пользователей
 
-| Роль | Доступ |
-|------|--------|
-| `admin` | Всё: настройки, зарплаты, аналитика, файловый менеджер |
-| `manager` | Заказы, клиенты, склад, продажи, задачи |
-| `master` | Свои заказы, задачи, зарплата |
-| `employee` | Свои заказы, задачи, зарплата |
+| Роль       | Доступ                                                |
+|------------|-------------------------------------------------------|
+| `admin`    | Всё: настройки, зарплаты, аналитика, файл-менеджер   |
+| `manager`  | Заказы, клиенты, склад, продажи, задачи               |
+| `master`   | Свои заказы, задачи, зарплата                         |
+| `employee` | Свои заказы, задачи, зарплата                         |
 
 ---
 
@@ -406,45 +326,75 @@ socks5://username:password@host:port
 
 ```
 diplom/
-├── run.py                    # Точка входа — запуск сайта и бота
+├── setup.sh                   # Автоустановщик сервера
+├── run.py                     # Точка входа — запускает сайт и бот
 ├── manage.py
 ├── requirements.txt
-├── .env                      # Конфигурация (не в git)
+├── .env                       # Конфигурация (не в git)
 ├── .env.example
 │
-├── config/                   # Настройки Django
+├── config/                    # Настройки Django
 │   ├── settings.py
 │   └── urls.py
 │
-├── core/                     # Публичный сайт
-│   ├── models.py             # SiteSettings, Brand, PhoneModel, RepairService
-│   ├── views.py
-│   └── static/core/
-│       ├── css/style.css
-│       └── js/main.js
-│
-├── crm/                      # CRM-панель
+├── core/                      # Публичный сайт
 │   ├── models.py
 │   ├── views.py
-│   ├── static/crm/
-│   │   ├── css/crm.css
-│   │   └── js/crm.js
+│   └── static/core/
+│
+├── crm/                       # CRM-панель
+│   ├── models.py
+│   ├── views.py
 │   └── management/commands/
 │       ├── seed_data.py
 │       ├── seed_iphone_prices.py
 │       ├── clear_db.py
 │       └── reset_db.py
 │
-├── bot/                      # Telegram-бот
-│   ├── main.py
-│   ├── ai.py                 # Groq API
-│   ├── proxy.py
-│   └── proxies.txt
+├── bot/                       # Telegram-бот
+│   ├── main.py                # Регистрация хендлеров
+│   ├── ai.py                  # Groq API — чат и умная запись
+│   ├── db.py                  # Асинхронные обёртки над ORM
+│   ├── proxy.py               # Авто-выбор прокси
+│   ├── proxies.txt            # Список SOCKS5 прокси
+│   └── handlers/
+│       ├── start.py           # /start, регистрация, согласие на ПД
+│       ├── booking.py         # Пошаговая запись (/book)
+│       ├── chat.py            # ИИ-чат + умная запись
+│       └── prices.py          # Поиск по прайсу
 │
 ├── templates/
-│   ├── core/                 # Шаблоны публичного сайта
-│   └── crm/                  # Шаблоны CRM
+│   ├── core/
+│   └── crm/
 │
-├── media/                    # Загружаемые файлы (логотип и т.д.)
-└── storage/                  # Файловый менеджер (только для сервера)
+└── media/                     # Загружаемые файлы (логотип и т.д.)
 ```
+
+---
+
+## Частые проблемы
+
+### Не грузятся стили на сайте
+
+Статика (`staticfiles/`) не попадает в git. После `git pull` нужно пересобрать:
+
+```bash
+source .venv/bin/activate
+python3 manage.py collectstatic --noinput
+```
+
+Или просто выполнить `restart` — команда `start` делает `collectstatic` автоматически.
+
+### Бот не запускается — нет токена
+
+Войти в **CRM → Настройки → Telegram-бот** и вставить токен от [@BotFather](https://t.me/BotFather).
+
+### Groq возвращает ошибку 413
+
+Прайс-лист слишком большой. Бот автоматически обрезает контекст до 6 000 символов.  
+Если ошибка продолжается — уменьшить количество позиций в прайс-листе.
+
+### Telegram недоступен с сервера
+
+Добавить прокси в `bot/proxies.txt` (формат `socks5://user:pass@host:port`), затем `restart`.  
+Или подключить VPN и убедиться, что интерфейс поднят (`ip link show up`).

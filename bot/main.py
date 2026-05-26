@@ -10,6 +10,7 @@ from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
+    CallbackQueryHandler,
     ConversationHandler,
     ContextTypes,
     filters,
@@ -17,7 +18,10 @@ from telegram.ext import (
 
 from db import _get_settings as get_settings_sync
 from proxy import find_working_proxy
-from handlers.start import cmd_start, handle_registration_contact
+from handlers.start import (
+    cmd_start, handle_registration_contact,
+    handle_register_button, handle_consent_callback,
+)
 from handlers.prices import ask_price_query, show_prices, WAITING_PRICE_QUERY
 from handlers.booking import (
     start_booking, got_name, got_phone, got_device,
@@ -49,6 +53,8 @@ def build_app(token: str, proxy_url: str | None = None) -> Application:
     app.add_error_handler(error_handler)
 
     app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CallbackQueryHandler(handle_consent_callback, pattern="^pd_"))
+    app.add_handler(MessageHandler(filters.Regex("^📝 Зарегистрироваться$"), handle_register_button))
 
     app.add_handler(ConversationHandler(
         entry_points=[

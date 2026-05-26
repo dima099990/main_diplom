@@ -1865,9 +1865,21 @@ def settings_company(request):
         for field in ['inn', 'kpp', 'ogrn', 'director_name', 'email', 'website',
                       'telegram', 'whatsapp', 'legal_address', 'actual_address',
                       'bank_name', 'bik', 'account_number', 'corr_account',
-                      'warranty_days', 'bot_token', 'bot_deepseek_key', 'bot_prompt']:
+                      'warranty_days', 'bot_prompt']:
             if hasattr(settings_obj, field):
                 setattr(settings_obj, field, request.POST.get(field, ''))
+        # Токен бота — обновляем только если введён новый, или удаляем по чекбоксу
+        new_token = request.POST.get('bot_token', '').strip()
+        if request.POST.get('delete_bot_token') == 'on':
+            settings_obj.bot_token = ''
+        elif new_token:
+            settings_obj.bot_token = new_token
+        # Groq API ключ — аналогично
+        new_key = request.POST.get('bot_deepseek_key', '').strip()
+        if request.POST.get('delete_groq_key') == 'on':
+            settings_obj.bot_deepseek_key = ''
+        elif new_key:
+            settings_obj.bot_deepseek_key = new_key
         if request.POST.get('delete_logo') == 'on' and settings_obj.logo:
             settings_obj.logo.delete(save=False)
             settings_obj.logo = None

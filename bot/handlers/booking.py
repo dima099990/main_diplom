@@ -13,7 +13,9 @@ CONFIRM = 24
 async def start_booking(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data.clear()
     await update.message.reply_text(
-        "📅 *Запись на ремонт*\n\nШаг 1 из 4 — Как вас зовут?",
+        "📅 *Запись на ремонт*\n\n"
+        "Шаг 1 из 4 — Как вас зовут?\n\n"
+        "_Продолжая, вы соглашаетесь на обработку персональных данных (ФЗ-152)._",
         parse_mode="Markdown",
         reply_markup=ReplyKeyboardRemove(),
     )

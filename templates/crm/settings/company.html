@@ -120,14 +120,61 @@
           <div class="space-y-4">
 
             <div class="grid md:grid-cols-2 gap-4">
+
+              <!-- Токен бота -->
               <div>
-                <label class="text-xs text-slate-400 mb-1 block">Токен бота (от @BotFather)</label>
-                <input type="text" name="bot_token" value="{{ settings.bot_token }}" class="input-dark w-full px-3 py-2 text-sm font-mono" placeholder="1234567890:AAF...">
+                <label class="text-xs text-slate-400 mb-1 flex items-center gap-2">
+                  Токен бота (от @BotFather)
+                  {% if settings.bot_token %}
+                  <span class="text-emerald-400 font-medium">✓ установлен</span>
+                  {% else %}
+                  <span class="text-slate-600">не задан</span>
+                  {% endif %}
+                </label>
+                {% if settings.bot_token %}
+                <div class="flex items-center gap-2 mb-2">
+                  <div class="input-dark flex-1 px-3 py-2 text-sm font-mono text-slate-600 tracking-widest select-none" style="user-select:none;-webkit-user-select:none">
+                    ••••••••••••••••••••••••••••••••
+                  </div>
+                  <label class="flex items-center gap-1.5 text-xs text-red-400 cursor-pointer whitespace-nowrap">
+                    <input type="checkbox" name="delete_bot_token" class="rounded border-slate-600 bg-slate-800 text-red-500">
+                    Удалить
+                  </label>
+                </div>
+                <p class="text-xs text-slate-600 mb-1">Введите новый токен чтобы заменить:</p>
+                {% endif %}
+                <input type="password" name="bot_token" autocomplete="new-password"
+                       class="input-dark w-full px-3 py-2 text-sm font-mono"
+                       placeholder="{% if settings.bot_token %}Новый токен (оставьте пустым чтобы не менять){% else %}1234567890:AAF...{% endif %}">
               </div>
+
+              <!-- Groq API Key -->
               <div>
-                <label class="text-xs text-slate-400 mb-1 block">Groq API Key</label>
-                <input type="text" name="bot_deepseek_key" value="{{ settings.bot_deepseek_key }}" class="input-dark w-full px-3 py-2 text-sm font-mono" placeholder="gsk_...">
+                <label class="text-xs text-slate-400 mb-1 flex items-center gap-2">
+                  Groq API Key
+                  {% if settings.bot_deepseek_key %}
+                  <span class="text-emerald-400 font-medium">✓ установлен</span>
+                  {% else %}
+                  <span class="text-slate-600">не задан</span>
+                  {% endif %}
+                </label>
+                {% if settings.bot_deepseek_key %}
+                <div class="flex items-center gap-2 mb-2">
+                  <div class="input-dark flex-1 px-3 py-2 text-sm font-mono text-slate-600 tracking-widest select-none" style="user-select:none;-webkit-user-select:none">
+                    ••••••••••••••••••••••••••••••••
+                  </div>
+                  <label class="flex items-center gap-1.5 text-xs text-red-400 cursor-pointer whitespace-nowrap">
+                    <input type="checkbox" name="delete_groq_key" class="rounded border-slate-600 bg-slate-800 text-red-500">
+                    Удалить
+                  </label>
+                </div>
+                <p class="text-xs text-slate-600 mb-1">Введите новый ключ чтобы заменить:</p>
+                {% endif %}
+                <input type="password" name="bot_deepseek_key" autocomplete="new-password"
+                       class="input-dark w-full px-3 py-2 text-sm font-mono"
+                       placeholder="{% if settings.bot_deepseek_key %}Новый ключ (оставьте пустым чтобы не менять){% else %}gsk_...{% endif %}">
               </div>
+
             </div>
 
             <div>
