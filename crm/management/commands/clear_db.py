@@ -2,11 +2,11 @@
 python manage.py clear_db
 
 Очищает все рабочие данные из базы, не трогая структуру таблиц.
-Пользователи-администраторы и настройки сайта сохраняются по умолчанию.
+Прайс-лист очищается всегда. Пользователи и настройки сайта сохраняются.
 
 Опции:
-  --all         Удалить вообще всё, включая пользователей и настройки
-  --yes         Не спрашивать подтверждения
+  --all   Удалить вообще всё, включая пользователей и настройки
+  --yes   Не спрашивать подтверждения
 """
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
@@ -15,14 +15,13 @@ from core.models import Brand, PhoneModel, RepairService, SiteSettings
 from crm.models import (
     Accessory, Appointment, Branch, Customer, Expense,
     Notification, OrderHistory, Part, PaymentRecord, PayrollRecord,
-    RepairOrder, RepairOrderPart, RepairOrderService,
+    RepairOrder, RepairOrderAccessory, RepairOrderPart, RepairOrderService,
     SaleOrder, SaleOrderItem, StockMovement, Supplier, Task, UserProfile,
 )
 
-
+# Порядок важен (FK-зависимости)
 TABLES = [
-    # Порядок важен (FK-зависимости)
-    RepairOrderService, RepairOrderPart, OrderHistory,
+    RepairOrderService, RepairOrderPart, RepairOrderAccessory, OrderHistory,
     PaymentRecord, PayrollRecord,
     RepairOrder,
     SaleOrderItem, SaleOrder,
@@ -44,7 +43,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--all', action='store_true',
-                            help='Удалить также пользователей, настройки сайта и прайс')
+                            help='Удалить также пользователей и настройки сайта')
         parser.add_argument('--yes', action='store_true',
                             help='Не спрашивать подтверждения')
 
@@ -56,8 +55,8 @@ class Command(BaseCommand):
         if clear_all:
             self.stdout.write('   Будут удалены ВСЕ данные, включая пользователей и настройки.')
         else:
-            self.stdout.write('   Будут удалены: заказы, клиенты, склад, расходы.')
-            self.stdout.write('   Сохранятся: пользователи, настройки сайта, прайс-лист.')
+            self.stdout.write('   Будут удалены: заказы, клиенты, склад, прайс, расходы.')
+            self.stdout.write('   Сохранятся: пользователи, настройки сайта.')
 
         if not skip_confirm:
             confirm = input('\nПродолжить? [да/нет]: ').strip().lower()
@@ -74,19 +73,19 @@ class Command(BaseCommand):
                 self.stdout.write(f'  Удалено {count:>5} → {model.__name__}')
                 deleted_total += count
 
-        # Дополнительно: прайс и пользователи
-        if clear_all:
-            for model in TABLES_PRICES:
-                count, _ = model.objects.all().delete()
-                if count:
-                    self.stdout.write(f'  Удалено {count:>5} → {model.__name__}')
-                    deleted_total += count
+        # Прайс — чистится всегда
+        for model in TABLES_PRICES:
+            count, _ = model.objects.all().delete()
+            if count:
+                self.stdout.write(f'  Удалено {count:>5} → {model.__name__}')
+                deleted_total += count
 
+        # Дополнительно: пользователи и настройки
+        if clear_all:
             count, _ = User.objects.all().delete()
             if count:
                 self.stdout.write(f'  Удалено {count:>5} → User')
                 deleted_total += count
-
             SiteSettings.objects.all().delete()
             self.stdout.write('  Удалено       → SiteSettings')
 
@@ -95,6 +94,6 @@ class Command(BaseCommand):
         ))
         if not clear_all:
             self.stdout.write(
-                '  Войдите в систему: http://127.0.0.1:8000/crm/\n'
-                '  Для создания тестовых данных: python manage.py seed_data\n'
+                '  Для заполнения тестовыми данными: python manage.py seed_data\n'
+                '  Для загрузки прайса iPhone:       python manage.py seed_iphone_prices\n'
             )

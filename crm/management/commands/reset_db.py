@@ -5,10 +5,8 @@ python manage.py reset_db
   - SQLite: удаляет файл db.sqlite3 и запускает migrate заново
   - PostgreSQL: удаляет все таблицы и запускает migrate заново
 
-После сброса предлагает создать суперпользователя.
-
 Опции:
-  --yes   Не спрашивать подтверждения
+  --yes   Не спрашивать подтверждения (и не создавать суперпользователя)
 """
 import os
 from pathlib import Path
@@ -27,13 +25,15 @@ class Command(BaseCommand):
                             help='Не спрашивать подтверждения')
 
     def handle(self, *args, **options):
+        skip_confirm = options['yes']
+
         self.stdout.write(self.style.ERROR(
             '\n🗑  ПОЛНЫЙ СБРОС БАЗЫ ДАННЫХ\n'
             '   Все данные будут удалены безвозвратно!\n'
             '   (заказы, клиенты, пользователи, настройки — всё)'
         ))
 
-        if not options['yes']:
+        if not skip_confirm:
             confirm = input('\nВы уверены? [да/нет]: ').strip().lower()
             if confirm not in ('да', 'д', 'yes', 'y'):
                 self.stdout.write('Отменено.')
@@ -78,12 +78,19 @@ class Command(BaseCommand):
         call_command('migrate', '--run-syncdb', verbosity=0)
         self.stdout.write(self.style.SUCCESS('✓ База пересоздана.\n'))
 
-        # ── Предложить создать суперюзера ─────────────────────────────────────
-        create = input('Создать суперпользователя прямо сейчас? [да/нет]: ').strip().lower()
-        if create in ('да', 'д', 'yes', 'y'):
-            call_command('createsuperuser')
+        # ── Предложить создать суперюзера (только в интерактивном режиме) ─────
+        if not skip_confirm:
+            create = input('Создать суперпользователя прямо сейчас? [да/нет]: ').strip().lower()
+            if create in ('да', 'д', 'yes', 'y'):
+                call_command('createsuperuser')
+            else:
+                self.stdout.write(
+                    '\nСоздать позже:\n'
+                    '  python manage.py createsuperuser\n'
+                )
         else:
             self.stdout.write(
-                '\nСоздать позже:\n'
-                '  python manage.py createsuperuser\n'
+                'Суперпользователь не создан (--yes режим).\n'
+                'Создать: python manage.py createsuperuser\n'
+                'Или запустить: python manage.py seed_data\n'
             )
