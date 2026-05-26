@@ -63,7 +63,7 @@
         <form action="{% url 'contact_request' %}" method="post" class="contact-form">
           {% csrf_token %}
           <input type="text" name="name" placeholder="Ваше имя" required>
-          <input type="text" name="phone" placeholder="Телефон или Telegram" required>
+          <input type="text" name="phone" placeholder="+7 (999) 000-00-00" required data-phone>
           <input type="text" name="device" placeholder="Устройство (напр. iPhone 14, Samsung S22)">
           <textarea name="message" placeholder="Опишите проблему" rows="3"></textarea>
           {% if branches %}

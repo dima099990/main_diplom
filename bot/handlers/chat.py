@@ -4,7 +4,10 @@ import asyncio
 import re
 from datetime import date, time, timedelta
 
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+from telegram import (
+    Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove,
+    InlineKeyboardMarkup, InlineKeyboardButton, Message,
+)
 from telegram.ext import ContextTypes
 
 from handlers.start import MAIN_MENU
@@ -17,11 +20,13 @@ _BOOKING_KEYWORDS = [
     "запись на ремонт", "хочу на ремонт", "запись на сервис",
 ]
 
-_CONFIRM_KB = ReplyKeyboardMarkup(
-    [["✅ Подтвердить", "❌ Отмена"]],
-    resize_keyboard=True,
-    one_time_keyboard=True,
-)
+# Inline-кнопка подтверждения (крепится к сообщению, не к низу экрана)
+_CONFIRM_IKB = InlineKeyboardMarkup([
+    [
+        InlineKeyboardButton("✅ Подтвердить", callback_data="aibook_confirm"),
+        InlineKeyboardButton("❌ Отмена",      callback_data="aibook_cancel"),
+    ]
+])
 
 _PHONE_KB = ReplyKeyboardMarkup(
     [[KeyboardButton("📱 Поделиться номером", request_contact=True)]],
@@ -215,7 +220,7 @@ async def _ask_step(update: Update, ai_book: dict, step: str) -> None:
 
 
 async def _show_confirm(update: Update, ai_book: dict) -> None:
-    """Показывает итоговые данные записи для подтверждения."""
+    """Показывает итоговые данные записи для подтверждения (inline-кнопки)."""
     ai_book["step"] = "confirm"
     await update.message.reply_text(
         f"📋 *Проверьте данные записи:*\n\n"
@@ -227,7 +232,24 @@ async def _show_confirm(update: Update, ai_book: dict) -> None:
         f"⏰ Время:      {_fmt_time(ai_book.get('time', ''))}\n\n"
         "Всё верно?",
         parse_mode="Markdown",
-        reply_markup=_CONFIRM_KB,
+        reply_markup=_CONFIRM_IKB,
+    )
+
+
+async def _show_confirm_from_msg(message: Message, ai_book: dict) -> None:
+    """То же, но принимает Message напрямую (для вызова из callback-хендлеров)."""
+    ai_book["step"] = "confirm"
+    await message.reply_text(
+        f"📋 *Проверьте данные записи:*\n\n"
+        f"👤 Имя:        {ai_book.get('name') or '—'}\n"
+        f"📞 Телефон:    {ai_book.get('phone') or '—'}\n"
+        f"📱 Устройство: {ai_book.get('device') or '—'}\n"
+        f"🔧 Проблема:   {ai_book.get('problem') or '—'}\n"
+        f"📅 Дата:       {_fmt_date(ai_book.get('date', ''))}\n"
+        f"⏰ Время:      {_fmt_time(ai_book.get('time', ''))}\n\n"
+        "Всё верно?",
+        parse_mode="Markdown",
+        reply_markup=_CONFIRM_IKB,
     )
 
 
@@ -277,6 +299,96 @@ async def _finish_ai_book_phone(
     ai_book["phone"] = contact.phone_number or ""
     context.user_data["ai_book"] = ai_book
     await _show_confirm(update, ai_book)
+
+
+async def _continue_ai_booking(
+    message: Message, context: ContextTypes.DEFAULT_TYPE, ai_book: dict
+) -> None:
+    """Продолжает умную запись после получения согласия на ПД."""
+    next_s = _next_step(ai_book)
+    context.user_data["ai_book"] = ai_book
+
+    if next_s == "confirm":
+        await _show_confirm_from_msg(message, ai_book)
+    else:
+        # Имитируем update.message для _ask_step через временный объект
+        class _FakeUpdate:
+            class message:
+                pass
+
+        _FakeUpdate.message = message
+        await _ask_step(_FakeUpdate, ai_book, next_s)
+
+
+# ── CallbackQuery: подтверждение/отмена умной записи ─────────────────────────
+async def handle_aibook_callback(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    """Обрабатывает inline-кнопки ✅ Подтвердить / ❌ Отмена в ai_book-потоке."""
+    from db import get_settings, create_appointment
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "aibook_cancel":
+        context.user_data.pop("ai_book", None)
+        await query.edit_message_text("❌ Запись отменена.")
+        await query.message.reply_text("Чем ещё могу помочь?", reply_markup=MAIN_MENU)
+        return
+
+    # aibook_confirm
+    ai_book = context.user_data.get("ai_book")
+    if not ai_book:
+        await query.edit_message_text("Сессия записи устарела. Начните заново.")
+        return
+
+    tid = update.effective_user.id
+    s = await get_settings()
+
+    pref_date = None
+    pref_time = None
+    d_val = ai_book.get("date", "")
+    t_val = ai_book.get("time", "")
+    if d_val and d_val != "skip":
+        try:
+            pref_date = date.fromisoformat(d_val)
+        except Exception:
+            pass
+    if t_val and t_val != "skip":
+        pref_time = _parse_time(t_val)
+
+    appt = await create_appointment(
+        name=ai_book["name"],
+        phone=ai_book["phone"],
+        device=ai_book["device"],
+        problem=ai_book["problem"],
+        telegram_chat_id=tid,
+        preferred_date=pref_date,
+        preferred_time=pref_time,
+    )
+    context.user_data.pop("ai_book", None)
+
+    dt_line = ""
+    if pref_date:
+        dt_line += f"\n📅 {pref_date.day} {_MONTHS_RU[pref_date.month - 1]}"
+    if pref_time:
+        dt_line += f" в {pref_time.strftime('%H:%M')}"
+
+    await query.edit_message_text(
+        f"📋 *Данные записи:*\n\n"
+        f"👤 {ai_book.get('name') or '—'}\n"
+        f"📞 {ai_book.get('phone') or '—'}\n"
+        f"📱 {ai_book.get('device') or '—'}\n"
+        f"🔧 {ai_book.get('problem') or '—'}",
+        parse_mode="Markdown",
+    )
+    await query.message.reply_text(
+        f"✅ *Заявка #{appt.pk} принята!*\n\n"
+        f"Мы свяжемся с вами в ближайшее время.{dt_line}\n\n"
+        f"📞 {s.phone}\n"
+        f"⏰ {s.working_hours}",
+        parse_mode="Markdown",
+        reply_markup=MAIN_MENU,
+    )
 
 
 # ── История чата ──────────────────────────────────────────────────────────────
@@ -391,58 +503,31 @@ async def handle_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             await _show_confirm(update, ai_book)
             return
 
-        # ── Подтверждение ────────────────────────────────────────────────
+        # ── Подтверждение — обрабатывается через inline callback ─────────
         if step == "confirm":
+            # Пользователь написал текст вместо нажатия кнопки
             if "отмена" in user_text.lower() or "❌" in user_text:
                 context.user_data.pop("ai_book", None)
                 await update.message.reply_text("Запись отменена.", reply_markup=MAIN_MENU)
-                return
-
-            # Конвертируем date/time для БД
-            pref_date = None
-            pref_time = None
-            d_val = ai_book.get("date", "")
-            t_val = ai_book.get("time", "")
-            if d_val and d_val != "skip":
-                try:
-                    pref_date = date.fromisoformat(d_val)
-                except Exception:
-                    pass
-            if t_val and t_val != "skip":
-                pref_time = _parse_time(t_val)
-
-            appt = await create_appointment(
-                name=ai_book["name"],
-                phone=ai_book["phone"],
-                device=ai_book["device"],
-                problem=ai_book["problem"],
-                telegram_chat_id=tid,
-                preferred_date=pref_date,
-                preferred_time=pref_time,
-            )
-            context.user_data.pop("ai_book", None)
-
-            # Красивое подтверждение
-            dt_line = ""
-            if pref_date:
-                dt_line += f"\n📅 {pref_date.day} {_MONTHS_RU[pref_date.month - 1]}"
-            if pref_time:
-                dt_line += f" в {pref_time.strftime('%H:%M')}"
-
-            await update.message.reply_text(
-                f"✅ *Заявка #{appt.pk} принята!*\n\n"
-                f"Мы свяжемся с вами в ближайшее время.{dt_line}\n\n"
-                f"📞 {s.phone}\n"
-                f"⏰ {s.working_hours}",
-                parse_mode="Markdown",
-                reply_markup=MAIN_MENU,
-            )
+            else:
+                await update.message.reply_text(
+                    "Пожалуйста, используйте кнопки ✅ / ❌ под сообщением.",
+                    reply_markup=ReplyKeyboardRemove(),
+                )
             return
 
     # ══════════════════════════════════════════════════════════════════════
     # Определение намерения записаться → умный парсинг всего сообщения
     # ══════════════════════════════════════════════════════════════════════
     if _is_booking_intent(user_text) and s.bot_deepseek_key:
+        from db import get_pd_consent
+        from handlers.start import _CONSENT_KB, _PD_TEXT
+
+        # ── Проверяем согласие на ПД ──────────────────────────────────
+        has_consent = context.user_data.get("pd_consent") or await get_pd_consent(tid)
+        if has_consent:
+            context.user_data["pd_consent"] = True  # кэшируем в сессии
+
         raw = await asyncio.to_thread(extract_booking_info, user_text, s.bot_deepseek_key)
         ai_book = _validate_ai_extract(raw)
 
@@ -454,32 +539,35 @@ async def handle_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             if not ai_book["phone"]:
                 ai_book["phone"] = customer.phone
 
-        # Показываем что уже распознали
-        known = []
-        if ai_book.get("device"):
-            known.append(f"📱 {ai_book['device']}")
-        if ai_book.get("problem"):
-            known.append(f"🔧 {ai_book['problem']}")
-        if ai_book.get("date"):
-            known.append(f"📅 {_fmt_date(ai_book['date'])}")
-        if ai_book.get("time"):
-            known.append(f"⏰ {ai_book['time']}")
-        if ai_book.get("name"):
-            known.append(f"👤 {ai_book['name']}")
-        if ai_book.get("phone"):
-            known.append(f"📞 {ai_book['phone']}")
+        # Если нет согласия — показываем форму ПД и сохраняем ai_book
+        if not has_consent:
+            context.user_data["ai_book"] = ai_book
+            context.user_data["pending_flow"] = "ai_booking"
+            await update.message.reply_text(
+                _PD_TEXT,
+                parse_mode="Markdown",
+                reply_markup=_CONSENT_KB,
+            )
+            return
 
-        _pd_notice = "\n\n_Продолжая запись, вы соглашаетесь на обработку персональных данных (ФЗ-152)._"
+        # ── Согласие есть — продолжаем запись ────────────────────────
+        known = []
+        if ai_book.get("device"):  known.append(f"📱 {ai_book['device']}")
+        if ai_book.get("problem"): known.append(f"🔧 {ai_book['problem']}")
+        if ai_book.get("date"):    known.append(f"📅 {_fmt_date(ai_book['date'])}")
+        if ai_book.get("time"):    known.append(f"⏰ {ai_book['time']}")
+        if ai_book.get("name"):    known.append(f"👤 {ai_book['name']}")
+        if ai_book.get("phone"):   known.append(f"📞 {ai_book['phone']}")
 
         if known:
             await update.message.reply_text(
-                "📋 Записываю! Уже понял:\n" + "  ".join(known) + _pd_notice,
+                "📋 Записываю! Уже понял:\n" + "  ".join(known),
                 parse_mode="Markdown",
                 reply_markup=ReplyKeyboardRemove(),
             )
         else:
             await update.message.reply_text(
-                "📅 Отлично, оформляю запись!" + _pd_notice,
+                "📅 Отлично, оформляю запись!",
                 parse_mode="Markdown",
                 reply_markup=ReplyKeyboardRemove(),
             )
@@ -488,7 +576,6 @@ async def handle_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         context.user_data["ai_book"] = ai_book
 
         if next_s == "confirm":
-            # Всё распознано — сразу на подтверждение
             await _show_confirm(update, ai_book)
         else:
             await _ask_step(update, ai_book, next_s)

@@ -76,6 +76,8 @@ class Customer(models.Model):
     email = models.EmailField("Email", blank=True)
     notes = models.TextField("Примечания", blank=True)
     telegram_id = models.CharField("Telegram ID", max_length=50, blank=True, db_index=True)
+    pd_consent = models.BooleanField("Согласие на ПД", default=False)
+    pd_consent_at = models.DateTimeField("Дата согласия на ПД", null=True, blank=True)
     branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True,
                                related_name='customers', verbose_name="Филиал")
     created_at = models.DateTimeField("Дата добавления", auto_now_add=True)

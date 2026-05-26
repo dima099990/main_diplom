@@ -96,11 +96,14 @@
     </thead>
     <tbody class="divide-y divide-slate-800/60">
       {% for appt in appointments %}
-      <tr class="hover:bg-slate-800/30 transition-colors">
+      <tr class="transition-colors {% if appt.status == 'completed' %}opacity-50 bg-slate-900/40{% else %}hover:bg-slate-800/30{% endif %}">
 
         <!-- Клиент -->
         <td class="px-4 py-3">
-          <p class="font-medium text-slate-200">{{ appt.name }}</p>
+          <div class="flex items-center gap-1.5">
+            <p class="font-medium {% if appt.status == 'completed' %}text-slate-400 line-through{% else %}text-slate-200{% endif %}">{{ appt.name }}</p>
+            {% if appt.status == 'completed' %}<span class="text-xs text-slate-600">(закрыта)</span>{% endif %}
+          </div>
           <a href="tel:{{ appt.phone }}" class="text-xs text-indigo-400 hover:text-indigo-300">{{ appt.phone }}</a>
           {% if appt.problem %}
           <p class="text-xs text-slate-500 mt-0.5 truncate max-w-[200px]">{{ appt.problem }}</p>
@@ -177,14 +180,30 @@
             </a>
             {% endif %}
 
+            {% if appt.status != 'completed' %}
             <!-- Редактировать -->
             <a href="{% url 'crm:appointment_edit' appt.pk %}"
                class="px-2.5 py-1.5 rounded-lg bg-slate-700 text-slate-300
                       hover:bg-slate-600 border border-slate-600 text-xs
                       transition-all"
                title="Редактировать">
-              ✏️ Изменить
+              ✏️
             </a>
+            {% endif %}
+
+            <!-- Удалить -->
+            <form method="post" action="{% url 'crm:appointment_delete' appt.pk %}"
+                  onsubmit="return confirm('Удалить запись «{{ appt.name }}»?')"
+                  class="inline">
+              {% csrf_token %}
+              <button type="submit"
+                      class="px-2.5 py-1.5 rounded-lg bg-red-900/20 text-red-400
+                             hover:bg-red-900/40 border border-red-800/30 text-xs
+                             transition-all"
+                      title="Удалить">
+                🗑
+              </button>
+            </form>
 
           </div>
         </td>

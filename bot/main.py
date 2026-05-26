@@ -26,9 +26,10 @@ from handlers.prices import ask_price_query, show_prices, WAITING_PRICE_QUERY
 from handlers.booking import (
     start_booking, got_name, got_phone, got_device,
     got_problem, confirm_booking, cancel_booking,
-    ASK_NAME, ASK_PHONE, ASK_DEVICE, ASK_PROBLEM, CONFIRM,
+    handle_booking_consent,
+    AWAIT_CONSENT, ASK_NAME, ASK_PHONE, ASK_DEVICE, ASK_PROBLEM, CONFIRM,
 )
-from handlers.chat import handle_chat, handle_contacts
+from handlers.chat import handle_chat, handle_contacts, handle_aibook_callback
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
@@ -54,6 +55,7 @@ def build_app(token: str, proxy_url: str | None = None) -> Application:
 
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CallbackQueryHandler(handle_consent_callback, pattern="^pd_"))
+    app.add_handler(CallbackQueryHandler(handle_aibook_callback,  pattern="^aibook_"))
     app.add_handler(MessageHandler(filters.Regex("^📝 Зарегистрироваться$"), handle_register_button))
 
     app.add_handler(ConversationHandler(
@@ -62,6 +64,7 @@ def build_app(token: str, proxy_url: str | None = None) -> Application:
             CommandHandler("book", start_booking),
         ],
         states={
+            AWAIT_CONSENT: [CallbackQueryHandler(handle_booking_consent, pattern="^bpd_")],
             ASK_NAME:    [MessageHandler(filters.TEXT & ~filters.COMMAND, got_name)],
             ASK_PHONE:   [
                 MessageHandler(filters.CONTACT, got_phone),
@@ -69,7 +72,7 @@ def build_app(token: str, proxy_url: str | None = None) -> Application:
             ],
             ASK_DEVICE:  [MessageHandler(filters.TEXT & ~filters.COMMAND, got_device)],
             ASK_PROBLEM: [MessageHandler(filters.TEXT & ~filters.COMMAND, got_problem)],
-            CONFIRM:     [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_booking)],
+            CONFIRM:     [CallbackQueryHandler(confirm_booking, pattern="^book_")],
         },
         fallbacks=[CommandHandler("cancel", cancel_booking)],
         allow_reentry=True,

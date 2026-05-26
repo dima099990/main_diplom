@@ -16,13 +16,42 @@ import argparse
 from pathlib import Path
 
 ROOT   = Path(__file__).parent
-PYTHON = sys.executable
+PYTHON = sys.executable          # тот же Python что запустил run.py → всегда из venv
 
 
 def _stream(proc, prefix):
     for line in iter(proc.stdout.readline, b""):
         text = line.decode("utf-8", errors="replace").rstrip()
         print(f"{prefix} {text}", flush=True)
+
+
+def collect_static():
+    """
+    Собирает статику перед стартом сервера.
+    Запускается автоматически при каждом старте — быстро, т.к. пропускает неизменённые файлы.
+    Использует тот же Python что и сам run.py → никогда не будет проблемы с venv.
+    """
+    static_dir = ROOT / "staticfiles"
+    static_dir.mkdir(exist_ok=True)          # создаёт папку если её нет
+
+    print("[СТАТ] Проверка статики...", flush=True)
+    result = subprocess.run(
+        [PYTHON, "manage.py", "collectstatic", "--noinput", "-v", "0"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PYTHONUNBUFFERED": "1"},
+    )
+    if result.returncode == 0:
+        # Показываем только итоговую строку (сколько файлов скопировано)
+        summary = (result.stdout or "").strip().splitlines()
+        info = summary[-1] if summary else "готово"
+        print(f"[СТАТ] ✓ {info}", flush=True)
+    else:
+        # Если что-то пошло не так — выводим ошибку, но НЕ останавливаем сервер
+        err = (result.stderr or result.stdout or "неизвестная ошибка")[:300]
+        print(f"[СТАТ] ⚠  Ошибка collectstatic: {err}", flush=True)
+        print("[СТАТ] ⚠  Сервер запускается без обновления статики", flush=True)
 
 
 def run_site(host: str, port: str):
@@ -70,6 +99,10 @@ def main():
         print("   Бот:   работает в фоне")
     print("   Стоп:  Ctrl+C")
     print("=" * 52)
+
+    # ── Автоматически собираем статику перед запуском ──────────────────────
+    if not args.bot_only:
+        collect_static()
 
     threads = []
 

@@ -90,12 +90,14 @@ async def handle_consent_callback(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
     """Обработка inline-кнопок согласия на обработку персональных данных."""
-    from db import get_settings
+    from db import get_settings, set_pd_consent
     query = update.callback_query
     await query.answer()
+    tid = update.effective_user.id
 
     if query.data == "pd_yes":
         context.user_data["pd_consent"] = True
+        await set_pd_consent(tid)  # сохраняем в БД (если клиент существует)
         pending_flow = context.user_data.pop("pending_flow", "register")
 
         if pending_flow == "register":
@@ -104,26 +106,36 @@ async def handle_consent_callback(
                 "Теперь поделитесь номером телефона — нажмите кнопку ниже:",
                 parse_mode="Markdown",
             )
-            await query.message.reply_text(
-                "👇",
-                reply_markup=_SHARE_PHONE_KB,
-            )
+            await query.message.reply_text("👇", reply_markup=_SHARE_PHONE_KB)
 
-        elif pending_flow == "booking":
-            # После согласия — говорим продолжить запись
+        elif pending_flow == "ai_booking":
+            # Продолжаем умную запись после получения согласия
             await query.edit_message_text(
-                "✅ *Спасибо!* Согласие принято.\n\n"
-                "Теперь опишите что случилось с устройством — я оформлю запись:",
+                "✅ *Спасибо!* Согласие принято. Оформляю запись...",
                 parse_mode="Markdown",
             )
+            ai_book = context.user_data.get("ai_book", {})
+            from handlers.chat import _continue_ai_booking
+            await _continue_ai_booking(query.message, context, ai_book)
 
     elif query.data == "pd_no":
-        context.user_data.pop("pending_flow", None)
+        pending_flow = context.user_data.pop("pending_flow", "register")
         context.user_data.pop("pd_consent", None)
+        context.user_data.pop("ai_book", None)
         s = await get_settings()
         await query.edit_message_text(
-            "❌ Без согласия на обработку данных регистрация невозможна.\n\n"
-            f"Вы можете позвонить нам напрямую:\n📞 {s.phone}",
+            "❌ Без согласия на обработку персональных данных регистрация невозможна.\n\n"
+            "Если передумаете — нажмите *«Зарегистрироваться»* ещё раз.\n\n"
+            f"Также вы можете позвонить нам напрямую:\n📞 {s.phone}",
+            parse_mode="Markdown",
+        )
+        # Показываем кнопку повторной регистрации, чтобы бот не завис
+        await query.message.reply_text(
+            "Для использования бота необходима регистрация 👇",
+            reply_markup=ReplyKeyboardMarkup(
+                [[KeyboardButton("📝 Зарегистрироваться")]],
+                resize_keyboard=True,
+            ),
         )
 
 
@@ -146,11 +158,13 @@ async def handle_registration_contact(
     contact = update.message.contact
     s       = await get_settings()
 
+    pd_ok = bool(context.user_data.get("pd_consent"))
     customer, is_new = await get_or_create_customer_from_telegram(
         telegram_id=update.effective_user.id,
         first_name=contact.first_name or "",
         last_name=contact.last_name   or "",
         phone=contact.phone_number    or "",
+        pd_consent=pd_ok,
     )
 
     first = customer.name.split()[0] if customer.name else "Клиент"

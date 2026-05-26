@@ -28,11 +28,28 @@ def _get_customer_by_telegram(telegram_id: int | str) -> Customer | None:
     return Customer.objects.filter(telegram_id=str(telegram_id)).first()
 
 
+def _get_pd_consent(telegram_id: int | str) -> bool:
+    """Проверяет, дал ли клиент согласие на ПД."""
+    c = Customer.objects.filter(telegram_id=str(telegram_id)).first()
+    return bool(c and c.pd_consent)
+
+
+def _set_pd_consent(telegram_id: int | str) -> None:
+    """Сохраняет согласие на ПД для клиента."""
+    from django.utils import timezone
+    updated = Customer.objects.filter(telegram_id=str(telegram_id)).update(
+        pd_consent=True,
+        pd_consent_at=timezone.now(),
+    )
+    return updated > 0
+
+
 def _get_or_create_customer_from_telegram(
     telegram_id: int | str,
     first_name: str,
     last_name: str,
     phone: str,
+    pd_consent: bool = False,
 ) -> tuple[Customer, bool]:
     """
     Находит или создаёт клиента в общей БД по Telegram-контакту.
@@ -60,11 +77,14 @@ def _get_or_create_customer_from_telegram(
             return customer, False
 
     # 3. Создаём нового клиента
+    from django.utils import timezone
     phone_fmt = f"+{digits}" if digits and not phone.startswith("+") else phone
     customer = Customer.objects.create(
         name=full_name,
         phone=phone_fmt or phone,
         telegram_id=tid,
+        pd_consent=pd_consent,
+        pd_consent_at=timezone.now() if pd_consent else None,
     )
     return customer, True
 
@@ -140,6 +160,8 @@ def _create_appointment(
 
 get_settings = sync_to_async(_get_settings)
 get_customer_by_telegram = sync_to_async(_get_customer_by_telegram)
+get_pd_consent = sync_to_async(_get_pd_consent)
+set_pd_consent = sync_to_async(_set_pd_consent)
 get_or_create_customer_from_telegram = sync_to_async(_get_or_create_customer_from_telegram)
 search_prices = sync_to_async(_search_prices)
 get_all_prices_text = sync_to_async(_get_all_prices_text)

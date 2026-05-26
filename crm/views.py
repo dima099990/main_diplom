@@ -365,6 +365,18 @@ def repair_create(request):
                 description=f'Заказ создан. Клиент: {customer.name}, устройство: {order.phone_model}',
                 user=request.user,
             )
+
+            # Если заказ создан из записи — закрываем запись и привязываем заказ
+            appt_pk = request.POST.get('from_appointment')
+            if appt_pk:
+                try:
+                    appt_obj = Appointment.objects.get(pk=appt_pk)
+                    appt_obj.created_order = order
+                    appt_obj.status = 'completed'
+                    appt_obj.save(update_fields=['created_order', 'status'])
+                except Appointment.DoesNotExist:
+                    pass
+
             messages.success(request, f'Заказ {order.order_number} создан')
             return redirect('crm:repair_detail', order.pk)
 
@@ -373,26 +385,47 @@ def repair_create(request):
 
 def _repair_create_ctx(request):
     profile = getattr(request.user, 'profile', None)
-    # Доступные филиалы для нового заказа
     if profile and profile.role in ('admin', 'manager'):
         available_branches = Branch.objects.filter(is_active=True)
     else:
         assigned_ids = list(profile.branches.values_list('id', flat=True)) if profile else []
         available_branches = Branch.objects.filter(id__in=assigned_ids, is_active=True)
-    # Если текущий пользователь — мастер/сотрудник, подставляем его по умолчанию
-    default_assigned = (
-        request.user
-        if profile and profile.role in ('master', 'employee')
-        else None
+    # Текущий пользователь всегда подставляется как мастер по умолчанию
+    default_assigned = request.user
+
+    # Список мастеров: все с ролью master/employee + текущий пользователь (если не входит)
+    masters_qs = User.objects.filter(
+        profile__role__in=['master', 'employee'], profile__is_active=True
     )
+    if not masters_qs.filter(pk=request.user.pk).exists():
+        from django.db.models import Q
+        masters_qs = User.objects.filter(
+            Q(profile__role__in=['master', 'employee'], profile__is_active=True) |
+            Q(pk=request.user.pk)
+        ).distinct()
+
+    # Автозаполнение из записи (GET-параметры от appointment_to_order)
+    prefill_customer = None
+    customer_id = request.GET.get('customer_id') or request.POST.get('customer_id')
+    if customer_id:
+        prefill_customer = Customer.objects.filter(pk=customer_id).first()
+
+    from_appt_pk = request.GET.get('from_appointment', '')
+    prefill_complaint = request.GET.get('complaint', '')
+    prefill_name  = request.GET.get('prefill_name', '')
+    prefill_phone = request.GET.get('prefill_phone', '')
+
     return render(request, 'crm/repairs/create.html', {
         'brands': Brand.objects.filter(is_active=True).order_by('order', 'name'),
-        'masters': User.objects.filter(
-            profile__role__in=['master', 'employee'], profile__is_active=True
-        ),
+        'masters': masters_qs,
         'branches': available_branches,
         'active_branch': profile.branch if profile else None,
         'default_assigned': default_assigned,
+        'prefill_customer': prefill_customer,
+        'prefill_complaint': prefill_complaint,
+        'prefill_name':  prefill_name,
+        'prefill_phone': prefill_phone,
+        'from_appointment_pk': from_appt_pk,
     })
 
 
@@ -2126,11 +2159,12 @@ def appointment_to_order(request, pk):
     )
 
     params = urlencode({
-        'customer_id': customer.pk,
-        'complaint': appt.problem or f'Запись от {appt.created_at.strftime("%d.%m.%Y")}',
+        'customer_id':    customer.pk,
+        'complaint':      appt.problem or f'Запись от {appt.created_at.strftime("%d.%m.%Y")}',
         'from_appointment': appt.pk,
+        'prefill_name':   appt.name,
+        'prefill_phone':  appt.phone,
     })
-    messages.info(request, f'Заполните устройство и бренд для записи от {appt.name}')
     return redirect(reverse('crm:repair_create') + '?' + params)
 
 

@@ -8,27 +8,45 @@
 {% block content %}
 <form method="post" class="max-w-4xl mx-auto">
   {% csrf_token %}
+  {% if from_appointment_pk %}
+  <input type="hidden" name="from_appointment" value="{{ from_appointment_pk }}">
+  <div class="mb-4 px-4 py-3 rounded-xl text-sm bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 flex items-center gap-2">
+    📋 Заказ создаётся из записи — клиент, телефон и описание проблемы подставлены автоматически
+  </div>
+  {% endif %}
   <div class="grid md:grid-cols-2 gap-4">
 
     <!-- Customer -->
     <div class="card p-5 md:col-span-2">
       <h2 class="text-sm font-semibold text-slate-200 mb-4">Клиент</h2>
       <div class="grid md:grid-cols-3 gap-4">
-        <div>
+        <div class="relative">
           <label class="text-xs text-slate-500 mb-1 block">Поиск клиента</label>
-          <input type="text" id="customer-search" placeholder="Начните вводить имя или телефон..."
+          <input type="text" id="customer-search"
+                 value="{% if prefill_customer %}{{ prefill_customer.name }}{% endif %}"
+                 placeholder="Начните вводить имя или телефон..."
                  class="input-dark w-full px-3 py-2 text-sm" autocomplete="off">
-          <input type="hidden" name="customer_id" id="customer-id">
+          <input type="hidden" name="customer_id" id="customer-id"
+                 value="{{ prefill_customer.pk|default:'' }}">
           <div id="customer-dropdown" class="hidden absolute z-20 bg-slate-800 border border-slate-700 rounded-xl mt-1 w-80 shadow-xl max-h-48 overflow-y-auto"></div>
+          {% if prefill_customer %}
+          <div id="customer-selected" class="mt-2 p-2 bg-indigo-500/10 border border-indigo-500/20 rounded-lg text-sm text-indigo-300">
+            ✓ {{ prefill_customer.name }} — {{ prefill_customer.phone }}
+          </div>
+          {% else %}
           <div id="customer-selected" class="hidden mt-2 p-2 bg-indigo-500/10 border border-indigo-500/20 rounded-lg text-sm text-indigo-300"></div>
+          {% endif %}
         </div>
         <div>
           <label class="text-xs text-slate-500 mb-1 block">ФИО (новый клиент)</label>
-          <input type="text" name="customer_name" placeholder="Иван Иванов" class="input-dark w-full px-3 py-2 text-sm">
+          <input type="text" name="customer_name" value="{{ prefill_name }}"
+                 placeholder="Иван Иванов" class="input-dark w-full px-3 py-2 text-sm">
         </div>
         <div>
           <label class="text-xs text-slate-500 mb-1 block">Телефон *</label>
-          <input type="text" name="customer_phone" placeholder="+7 (900) 000-00-00" class="input-dark w-full px-3 py-2 text-sm" required>
+          <input type="text" name="customer_phone" value="{{ prefill_phone }}"
+                 placeholder="+7 (900) 000-00-00" class="input-dark w-full px-3 py-2 text-sm"
+                 data-phone {% if not prefill_customer %}required{% endif %}>
         </div>
       </div>
     </div>
@@ -69,7 +87,7 @@
       <div class="space-y-3">
         <div>
           <label class="text-xs text-slate-500 mb-1 block">Неисправность *</label>
-          <textarea name="complaint" rows="3" placeholder="Опишите проблему клиента..." class="input-dark w-full px-3 py-2 text-sm resize-none" required></textarea>
+          <textarea name="complaint" rows="3" placeholder="Опишите проблему клиента..." class="input-dark w-full px-3 py-2 text-sm resize-none" required>{{ prefill_complaint }}</textarea>
         </div>
         <div>
           <label class="text-xs text-slate-500 mb-1 block">Внешний вид / комплектация</label>

@@ -103,11 +103,12 @@ fi
 
 # ── 6. Миграции и статика ──────────────────────────────────────────────────
 step "Миграции..."
-python3 manage.py migrate --noinput -v 0
+"$DIR/.venv/bin/python3" manage.py migrate --noinput -v 0
 ok "Миграции применены"
 
 step "Статика..."
-python3 manage.py collectstatic --noinput -v 0
+mkdir -p staticfiles
+"$DIR/.venv/bin/python3" manage.py collectstatic --noinput -v 0
 ok "Статика собрана"
 
 deactivate
@@ -117,9 +118,7 @@ echo ""
 echo -n "  Создать администратора CRM? [y/N]  "
 read -r ANS_SU
 if [[ "$ANS_SU" =~ ^[Yy]$ ]]; then
-  source "$DIR/.venv/bin/activate"
-  python3 manage.py createsuperuser
-  deactivate
+  "$DIR/.venv/bin/python3" manage.py createsuperuser
 fi
 
 # ── 8. Скрипт kayros ───────────────────────────────────────────────────────
@@ -130,21 +129,21 @@ cat > /usr/local/bin/kayros << 'KAYEOF'
 DIR=/opt/main_diplom
 PROXY_FILE=$DIR/bot/proxies.txt
 PROXY_BAK=$DIR/bot/proxies.txt.disabled
-VENV=$(find $DIR -name "activate" -path "*/bin/activate" 2>/dev/null | head -1)
 SEP="  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+PY=$DIR/.venv/bin/python3
+
 start() {
-  [ -z "$VENV" ] && echo "❌ venv не найден" && exit 1
-  cd $DIR && source $VENV
-  echo "⚙️  Собираю статику..."
-  python3 manage.py collectstatic --noinput -v 0 && echo "✓ Статика собрана"
-  echo "🚀 Запускаю сервер..."
-  nohup python3 run.py --host 0.0.0.0 --port 8000 > /tmp/kayros_site.log 2>&1 &
+  [ ! -f "$PY" ] && echo "❌ venv не найден: $DIR/.venv" && exit 1
+  cd $DIR
+  echo "🚀 Запускаю сервер (статика собирается автоматически)..."
+  nohup $PY run.py --host 0.0.0.0 --port 8000 > /tmp/kayros_site.log 2>&1 &
   echo "✓ Сайт запущен (PID $!)"
 }
 
 stop() {
-  pkill -f "run.py --host" 2>/dev/null; pkill -f "bot/main.py" 2>/dev/null
+  pkill -f "run.py --host" 2>/dev/null || true
+  pkill -f "bot/main.py"   2>/dev/null || true
   echo "✓ Все процессы остановлены"
 }
 
@@ -237,13 +236,13 @@ cat > ~/.bashrc << 'BASHEOF'
 export PYTHONUNBUFFERED=1
 
 DIR=/opt/main_diplom
-VENV=__VENV__
-
-_py() { source $VENV && "$@"; deactivate; }
+PY=$DIR/.venv/bin/python3
 
 venv() {
+  VENV=$(find $DIR -name "activate" -path "*/bin/activate" 2>/dev/null | head -1)
   if [ -n "$VIRTUAL_ENV" ]; then deactivate && echo "✗ venv выключен"
-  else source $VENV && echo "✓ venv включён"; fi
+  elif [ -n "$VENV" ]; then source $VENV && echo "✓ venv включён"
+  else echo "❌ venv не найден в $DIR"; fi
 }
 
 # Сервис
@@ -259,12 +258,12 @@ alias proxy='bash /usr/local/bin/kayros proxy'
 alias pull='cd $DIR && git stash && git pull'
 alias deploy='cd $DIR && git stash && git pull && bash /usr/local/bin/kayros restart'
 
-# База данных
-alias db_fill='cd $DIR && _py python3 manage.py seed_data'
-alias db_prices='cd $DIR && _py python3 manage.py seed_iphone_prices'
-alias db_clear='cd $DIR && _py python3 manage.py clear_db --yes'
-alias db_clear_all='cd $DIR && _py python3 manage.py clear_db --all --yes'
-alias db_reset='cd $DIR && _py python3 manage.py reset_db --yes'
+# База данных — явный путь к Python venv
+alias db_fill='cd $DIR && $PY manage.py seed_data'
+alias db_prices='cd $DIR && $PY manage.py seed_iphone_prices'
+alias db_clear='cd $DIR && $PY manage.py clear_db --yes'
+alias db_clear_all='cd $DIR && $PY manage.py clear_db --all --yes'
+alias db_reset='cd $DIR && $PY manage.py reset_db --yes'
 
 # Система
 alias mem='free -h'
