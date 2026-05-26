@@ -60,10 +60,16 @@ img { max-width: 100%; display: block; }
 .nav-links { display: flex; align-items: center; gap: 8px; }
 .nav-links a { color: var(--text-muted); font-size: 15px; font-weight: 500; padding: 6px 12px; border-radius: 6px; transition: all var(--transition); }
 .nav-links a:hover, .nav-links a.active { color: var(--white); background: var(--dark-4); }
+/* Кнопка "Записаться" — переопределяем общие стили nav-links a */
+.nav-links a.btn { background: var(--red); color: var(--white); border: 2px solid var(--red); padding: 6px 16px; font-size: 14px; font-weight: 600; }
+.nav-links a.btn:hover { background: var(--red-dark); border-color: var(--red-dark); color: var(--white); }
 .nav-phone { color: var(--red) !important; font-weight: 700 !important; }
 .nav-phone:hover { color: var(--white) !important; }
-.burger { display: none; flex-direction: column; gap: 5px; background: none; border: none; cursor: pointer; padding: 4px; }
+.burger { display: none; flex-direction: column; gap: 5px; background: none; border: none; cursor: pointer; padding: 8px; z-index: 101; }
 .burger span { display: block; width: 24px; height: 2px; background: var(--text); border-radius: 2px; transition: all var(--transition); }
+.burger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.burger.open span:nth-child(2) { opacity: 0; }
+.burger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
 /* ===== HERO ===== */
 .hero {
@@ -260,6 +266,8 @@ section h2 { margin-bottom: 36px; }
 .footer-links a { color: var(--text-muted); font-size: 15px; }
 .footer-links a:hover { color: var(--white); }
 .footer-contacts a, .footer-contacts span { color: var(--text-muted); font-size: 15px; }
+.footer-contacts a.btn { background: var(--red); color: var(--white); border-color: var(--red); }
+.footer-contacts a.btn:hover { background: var(--red-dark); border-color: var(--red-dark); color: var(--white); }
 .footer-bottom { border-top: 1px solid var(--border); padding: 20px 24px; text-align: center; }
 .footer-bottom p { color: var(--text-muted); font-size: 13px; }
 
@@ -287,9 +295,12 @@ section h2 { margin-bottom: 36px; }
   .stat-item:nth-child(2) { border-right: none; }
 }
 @media (max-width: 640px) {
-  .nav-links { display: none; flex-direction: column; position: fixed; inset: 64px 0 0; background: #0d0d0d; padding: 24px; gap: 4px; z-index: 99; overflow-y: auto; }
+  .nav-links { display: none; flex-direction: column; position: fixed; top: 64px; left: 0; right: 0; bottom: 0; background: #0d0d0d; padding: 20px 16px; gap: 4px; z-index: 100; overflow-y: auto; }
   .nav-links.open { display: flex; }
-  .nav-links a { font-size: 17px; padding: 12px 16px; border-radius: 8px; }
+  .nav-links a { font-size: 17px; padding: 14px 16px; border-radius: 8px; width: 100%; }
+  /* Кнопка "Записаться" в мобильном меню */
+  .nav-links a.btn { background: var(--red); color: var(--white) !important; border: 2px solid var(--red); padding: 14px 16px; text-align: center; justify-content: center; margin-top: 8px; }
+  .nav-links a.btn:hover { background: var(--red-dark); border-color: var(--red-dark); }
   .burger { display: flex; }
   .hero h1 { font-size: 2.8rem; }
   .hero-actions { flex-direction: column; }

@@ -78,7 +78,7 @@
     {% else %}
 
     <!-- Заголовок бренда -->
-    <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
       <div class="flex items-center gap-3">
         <span class="text-3xl">{{ selected_brand.icon }}</span>
         <div>
@@ -92,12 +92,24 @@
         </button>
         {% endif %}
       </div>
-      {% if is_manager %}
-      <button onclick="openAddModelModal()" class="btn-primary px-3 py-2 text-sm flex items-center gap-1.5">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-        Добавить модель
-      </button>
-      {% endif %}
+      <div class="flex items-center gap-2">
+        <button onclick="collapseAll()"
+                class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-700 transition-colors flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
+          Свернуть все
+        </button>
+        <button onclick="expandAll()"
+                class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-700 transition-colors flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          Развернуть все
+        </button>
+        {% if is_manager %}
+        <button onclick="openAddModelModal()" class="btn-primary px-3 py-2 text-sm flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          Добавить модель
+        </button>
+        {% endif %}
+      </div>
     </div>
 
     {% if not phone_models %}
@@ -377,6 +389,8 @@
 {% block extra_js %}
 <script>
 // ── Раскрытие моделей ──────────────────────────────────────────────────────
+// Все секции стартуют свёрнутыми (class="hidden" в HTML), sessionStorage не используется.
+
 function toggleModel(pk) {
   const body  = document.getElementById('body-'  + pk);
   const arrow = document.getElementById('arrow-' + pk);
@@ -385,15 +399,25 @@ function toggleModel(pk) {
   arrow.style.transform = isHidden ? 'rotate(90deg)' : '';
 }
 
-document.querySelectorAll('[id^="model-"]').forEach(el => {
-  const pk  = el.id.replace('model-', '');
-  const key = 'price_open_' + pk;
-  if (sessionStorage.getItem(key) === '1') toggleModel(pk);
-  el.querySelector('[onclick^="toggleModel"]').addEventListener('click', () => {
-    const hidden = document.getElementById('body-' + pk).classList.contains('hidden');
-    sessionStorage.setItem(key, hidden ? '0' : '1');
+function expandAll() {
+  document.querySelectorAll('[id^="body-"]').forEach(body => {
+    const pk = body.id.replace('body-', '');
+    if (body.classList.contains('hidden')) {
+      body.classList.remove('hidden');
+      const arrow = document.getElementById('arrow-' + pk);
+      if (arrow) arrow.style.transform = 'rotate(90deg)';
+    }
   });
-});
+}
+
+function collapseAll() {
+  document.querySelectorAll('[id^="body-"]').forEach(body => {
+    const pk = body.id.replace('body-', '');
+    body.classList.add('hidden');
+    const arrow = document.getElementById('arrow-' + pk);
+    if (arrow) arrow.style.transform = '';
+  });
+}
 
 {% if is_manager %}
 // ── Modal: Марка ──────────────────────────────────────────────────────────

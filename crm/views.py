@@ -537,7 +537,7 @@ def repair_add_service(request, pk):
             user=request.user,
         )
     repair.recalculate_final_cost()
-    return redirect('crm:repair_detail', pk)
+    return redirect(f'/crm/repairs/{pk}/?tab=works')
 
 
 @crm_required
@@ -553,7 +553,7 @@ def repair_remove_service(request, pk, service_pk):
         description=f'Удалена услуга: {name}',
         user=request.user,
     )
-    return redirect('crm:repair_detail', pk)
+    return redirect(f'/crm/repairs/{pk}/?tab=works')
 
 
 @crm_required
@@ -567,7 +567,7 @@ def repair_add_part(request, pk):
 
     if part.quantity < qty:
         messages.error(request, f'Недостаточно запчасти "{part.name}" на складе (есть: {part.quantity})')
-        return redirect('crm:repair_detail', pk)
+        return redirect(f'/crm/repairs/{pk}/?tab=works')
 
     RepairOrderPart.objects.create(order=repair, part=part, quantity=qty, price=price)
     repair.recalculate_final_cost()
@@ -576,7 +576,7 @@ def repair_add_part(request, pk):
         description=f'Добавлена запчасть: {part.name} ×{qty} — {price * qty} ₽',
         user=request.user,
     )
-    return redirect('crm:repair_detail', pk)
+    return redirect(f'/crm/repairs/{pk}/?tab=works')
 
 
 @crm_required
@@ -592,7 +592,7 @@ def repair_remove_part(request, pk, part_pk):
         description=f'Удалена запчасть: {name}',
         user=request.user,
     )
-    return redirect('crm:repair_detail', pk)
+    return redirect(f'/crm/repairs/{pk}/?tab=works')
 
 
 @crm_required
@@ -619,7 +619,7 @@ def repair_add_accessory(request, pk):
         description=f'Добавлен аксессуар: {accessory.name} x{quantity} — {price} ₽',
         user=request.user,
     )
-    return redirect('crm:repair_detail', pk)
+    return redirect(f'/crm/repairs/{pk}/?tab=works')
 
 
 @crm_required
@@ -635,7 +635,7 @@ def repair_remove_accessory(request, pk, accessory_pk):
         description=f'Удалён аксессуар: {name}',
         user=request.user,
     )
-    return redirect('crm:repair_detail', pk)
+    return redirect(f'/crm/repairs/{pk}/?tab=works')
 
 
 @crm_required
@@ -649,7 +649,7 @@ def repair_add_comment(request, pk):
             description=comment, user=request.user,
         )
         messages.success(request, 'Комментарий добавлен')
-    return redirect('crm:repair_detail', pk)
+    return redirect(f'/crm/repairs/{pk}/?tab=comment')
 
 
 @crm_required
@@ -1969,9 +1969,14 @@ def appointment_list(request):
     if source_filter:
         appts = appts.filter(source=source_filter)
 
-    new_appointments_count = Appointment.objects.filter(
-        status='new', source__in=('website', 'telegram')
-    ).count()
+    # Счётчик новых записей — для менеджера/админа все, для сотрудника только свой филиал
+    new_appts_qs = Appointment.objects.filter(status='new', source__in=('website', 'telegram'))
+    if not is_admin_or_manager:
+        if profile and profile.branch:
+            new_appts_qs = new_appts_qs.filter(branch=profile.branch)
+        else:
+            new_appts_qs = new_appts_qs.none()
+    new_appointments_count = new_appts_qs.count()
 
     return render(request, 'crm/appointments/list.html', {
         'appointments': appts,

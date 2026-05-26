@@ -1,9 +1,32 @@
 {% extends 'crm/base.html' %}
-{% block title %}Движения склада{% endblock %}
-{% block page_title %}Движения склада{% endblock %}
+{% block title %}Движения — Склад{% endblock %}
+{% block page_title %}
+  <a href="{% url 'crm:warehouse_parts' %}" class="text-slate-500 hover:text-slate-300 mr-1">Склад</a>
+  <span class="text-slate-600 mr-1">/</span> Движения
+{% endblock %}
 
 {% block content %}
 {% include 'crm/includes/messages.html' %}
+
+<!-- Tabs -->
+<div class="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl p-1 mb-4 w-fit">
+  <a href="{% url 'crm:warehouse_parts' %}"
+     class="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">
+    🔩 Запчасти
+  </a>
+  <a href="{% url 'crm:warehouse_accessories' %}"
+     class="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">
+    📦 Аксессуары
+  </a>
+  <a href="{% url 'crm:stock_movements' %}"
+     class="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white">
+    📊 Движения
+  </a>
+  <a href="{% url 'crm:supplier_list' %}"
+     class="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">
+    🚚 Поставщики
+  </a>
+</div>
 
 <div class="card overflow-hidden">
   <table class="w-full text-sm">

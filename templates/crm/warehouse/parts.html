@@ -1,14 +1,39 @@
 {% extends 'crm/base.html' %}
-{% block title %}Склад — Запчасти{% endblock %}
-{% block page_title %}Склад — Запчасти{% endblock %}
+{% block title %}Запчасти — Склад{% endblock %}
+{% block page_title %}
+  <a href="{% url 'crm:warehouse_parts' %}" class="text-slate-500 hover:text-slate-300 mr-1">Склад</a>
+  <span class="text-slate-600 mr-1">/</span> Запчасти
+{% endblock %}
 
 {% block content %}
-<!-- Tabs -->
-<div class="flex gap-2 mb-4 overflow-x-auto pb-1">
-  <a href="{% url 'crm:warehouse_parts' %}" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white whitespace-nowrap">Запчасти</a>
-  <a href="{% url 'crm:warehouse_accessories' %}" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-800 text-slate-400 hover:text-slate-200 whitespace-nowrap">Аксессуары</a>
-  <a href="{% url 'crm:stock_movements' %}" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-800 text-slate-400 hover:text-slate-200 whitespace-nowrap">Движения</a>
-  <a href="{% url 'crm:supplier_list' %}" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-800 text-slate-400 hover:text-slate-200 whitespace-nowrap">Поставщики</a>
+{% include 'crm/includes/messages.html' %}
+
+<!-- Tabs + Add button -->
+<div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
+  <div class="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl p-1">
+    <a href="{% url 'crm:warehouse_parts' %}"
+       class="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white">
+      🔩 Запчасти
+    </a>
+    <a href="{% url 'crm:warehouse_accessories' %}"
+       class="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">
+      📦 Аксессуары
+    </a>
+    <a href="{% url 'crm:stock_movements' %}"
+       class="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">
+      📊 Движения
+    </a>
+    <a href="{% url 'crm:supplier_list' %}"
+       class="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">
+      🚚 Поставщики
+    </a>
+  </div>
+  <a href="{% url 'crm:part_create' %}" class="btn-primary px-4 py-2 text-sm flex items-center gap-1.5">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+    </svg>
+    Добавить запчасть
+  </a>
 </div>
 
 <!-- KPI -->

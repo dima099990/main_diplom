@@ -266,8 +266,6 @@ section h2 { margin-bottom: 36px; }
 .footer-links a { color: var(--text-muted); font-size: 15px; }
 .footer-links a:hover { color: var(--white); }
 .footer-contacts a, .footer-contacts span { color: var(--text-muted); font-size: 15px; }
-.footer-contacts a.btn { background: var(--red); color: var(--white); border-color: var(--red); }
-.footer-contacts a.btn:hover { background: var(--red-dark); border-color: var(--red-dark); color: var(--white); }
 .footer-bottom { border-top: 1px solid var(--border); padding: 20px 24px; text-align: center; }
 .footer-bottom p { color: var(--text-muted); font-size: 13px; }
 

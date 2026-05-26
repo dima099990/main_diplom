@@ -1,8 +1,25 @@
 // Burger menu
 const burger = document.getElementById('burger');
 const navLinks = document.getElementById('navLinks');
-if (burger) {
-  burger.addEventListener('click', () => navLinks.classList.toggle('open'));
+if (burger && navLinks) {
+  burger.addEventListener('click', () => {
+    navLinks.classList.toggle('open');
+    burger.classList.toggle('open');
+  });
+  // Закрытие при клике на ссылку внутри меню
+  navLinks.querySelectorAll('a').forEach(link => {
+    link.addEventListener('click', () => {
+      navLinks.classList.remove('open');
+      burger.classList.remove('open');
+    });
+  });
+  // Закрытие при клике вне меню
+  document.addEventListener('click', (e) => {
+    if (!burger.contains(e.target) && !navLinks.contains(e.target)) {
+      navLinks.classList.remove('open');
+      burger.classList.remove('open');
+    }
+  });
 }
 
 // Scroll animations

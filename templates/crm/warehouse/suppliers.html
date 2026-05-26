@@ -1,10 +1,31 @@
 {% extends 'crm/base.html' %}
-{% block title %}Поставщики — Kayros CRM{% endblock %}
-{% block page_title %}Поставщики{% endblock %}
+{% block title %}Поставщики — Склад{% endblock %}
+{% block page_title %}
+  <a href="{% url 'crm:warehouse_parts' %}" class="text-slate-500 hover:text-slate-300 mr-1">Склад</a>
+  <span class="text-slate-600 mr-1">/</span> Поставщики
+{% endblock %}
 
 {% block content %}
-<div class="flex justify-between items-center mb-6">
-  <p class="text-sm text-slate-400">Всего: <span class="text-slate-200 font-medium">{{ suppliers.count }}</span></p>
+<!-- Tabs + Add button -->
+<div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
+  <div class="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl p-1">
+    <a href="{% url 'crm:warehouse_parts' %}"
+       class="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">
+      🔩 Запчасти
+    </a>
+    <a href="{% url 'crm:warehouse_accessories' %}"
+       class="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">
+      📦 Аксессуары
+    </a>
+    <a href="{% url 'crm:stock_movements' %}"
+       class="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">
+      📊 Движения
+    </a>
+    <a href="{% url 'crm:supplier_list' %}"
+       class="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white">
+      🚚 Поставщики
+    </a>
+  </div>
   <button onclick="document.getElementById('modalCreate').classList.remove('hidden')"
           class="btn-primary px-4 py-2 text-sm">
     + Добавить поставщика
