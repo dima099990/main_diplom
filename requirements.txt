@@ -1,4 +1,4 @@
-py#   Web
+#   Web
 Django==6.0.5
 asgiref==3.11.1
 whitenoise==6.12.0

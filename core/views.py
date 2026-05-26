@@ -51,10 +51,6 @@ def prices(request):
     })
 
 
-def about_page(request):
-    return render(request, 'core/about.html')
-
-
 def contacts(request):
     branches = Branch.objects.filter(is_active=True)
     return render(request, 'core/contacts.html', {'branches': branches})
