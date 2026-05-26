@@ -1,4 +1,5 @@
 """Свободный чат с ИИ-ассистентом, история, запись через ИИ."""
+import asyncio
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from telegram.ext import ContextTypes
 
@@ -175,7 +176,7 @@ async def handle_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     # Определение намерения записаться
     # ══════════════════════════════════════════════════════════════════════
     if _is_booking_intent(user_text) and s.bot_deepseek_key:
-        info    = extract_booking_info(user_text, s.bot_deepseek_key)
+        info    = await asyncio.to_thread(extract_booking_info, user_text, s.bot_deepseek_key)
         device  = info.get("device", "")
         problem = info.get("problem", "")
 
@@ -233,12 +234,13 @@ async def handle_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         prices_text = await get_all_prices_text()
         history     = context.user_data.get("chat_history", [])
 
-        answer = get_ai_response(
-            user_message=user_text,
-            system_prompt=s.bot_prompt,
-            api_key=s.bot_deepseek_key,
-            prices_context=prices_text,
-            history=history,
+        answer = await asyncio.to_thread(
+            get_ai_response,
+            user_text,
+            s.bot_prompt,
+            s.bot_deepseek_key,
+            prices_text,
+            history,
         )
 
         _add_history(context, "user",      user_text)

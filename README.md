@@ -116,6 +116,8 @@ cat > /usr/local/bin/kayros << 'EOF'
 #!/bin/bash
 DIR=/opt/main_diplom
 VENV=$DIR/.venv/bin/activate
+PROXY_FILE=$DIR/bot/proxies.txt
+PROXY_BAK=$DIR/bot/proxies.txt.disabled
 
 start() {
   echo "Запускаю сайт..."
@@ -126,16 +128,78 @@ start() {
 }
 
 stop() {
-  pkill -f "manage.py runserver" 2>/dev/null
   pkill -f "run.py --host" 2>/dev/null
   pkill -f "bot/main.py" 2>/dev/null
   echo "✓ Все процессы остановлены"
 }
 
 status() {
-  echo "=== Статус процессов ==="
-  pgrep -fa "manage.py runserver" || echo "  сайт: не запущен"
-  pgrep -fa "bot/main.py"         || echo "  бот:  не запущен"
+  # Сайт
+  SITE_PID=$(pgrep -f "run.py --host" 2>/dev/null | head -1)
+  if [ -n "$SITE_PID" ]; then
+    SITE_INFO="✅ работает   (PID $SITE_PID)"
+  else
+    SITE_INFO="❌ не запущен"
+  fi
+
+  # Бот
+  BOT_PID=$(pgrep -f "bot/main.py" 2>/dev/null | head -1)
+  if [ -n "$BOT_PID" ]; then
+    BOT_INFO="✅ работает   (PID $BOT_PID)"
+  else
+    BOT_INFO="❌ не запущен"
+  fi
+
+  # Прокси
+  if [ -f "$PROXY_FILE" ]; then
+    CNT=$(grep -c "socks5" "$PROXY_FILE" 2>/dev/null || echo 0)
+    PROXY_INFO="✅ включён    ($CNT шт.)"
+  elif [ -f "$PROXY_BAK" ]; then
+    PROXY_INFO="⛔ выключен   (файл скрыт)"
+  else
+    PROXY_INFO="⚠️  файл не найден"
+  fi
+
+  # VPN
+  VPN_IF=$(ip link show 2>/dev/null | grep -oE "(tun|wg|ppp)[0-9]+" | head -1)
+  if [ -n "$VPN_IF" ]; then
+    VPN_IP=$(ip addr show "$VPN_IF" 2>/dev/null | grep "inet " | awk '{print $2}' | cut -d/ -f1)
+    VPN_INFO="✅ подключён  ($VPN_IF $VPN_IP)"
+  else
+    VPN_INFO="⛔ не подключен"
+  fi
+
+  # Память и диск
+  MEM=$(free -h | awk '/^Mem:/ {print $3" / "$2}')
+  DISK=$(df -h / | awk 'NR==2 {print $3" / "$2"  ("$5")"}')
+
+  echo ""
+  echo "╔══════════════════════════════════════════════╗"
+  echo "║           KAYROS CRM — Статус               ║"
+  echo "╠══════════════════════════════════════════════╣"
+  printf "║  Сайт    %-36s║\n" "$SITE_INFO"
+  printf "║  Бот     %-36s║\n" "$BOT_INFO"
+  printf "║  Прокси  %-36s║\n" "$PROXY_INFO"
+  printf "║  VPN     %-36s║\n" "$VPN_INFO"
+  echo "╠══════════════════════════════════════════════╣"
+  printf "║  Память  %-36s║\n" "$MEM"
+  printf "║  Диск    %-36s║\n" "$DISK"
+  echo "╚══════════════════════════════════════════════╝"
+  echo ""
+}
+
+proxy_toggle() {
+  if [ -f "$PROXY_FILE" ]; then
+    mv "$PROXY_FILE" "$PROXY_BAK"
+    echo "⛔ Прокси выключен — proxies.txt скрыт"
+    echo "   Перезапустите бот: restart"
+  elif [ -f "$PROXY_BAK" ]; then
+    mv "$PROXY_BAK" "$PROXY_FILE"
+    echo "✅ Прокси включён — proxies.txt восстановлен"
+    echo "   Перезапустите бот: restart"
+  else
+    echo "⚠️  Файл proxies.txt не найден — нечего переключать"
+  fi
 }
 
 logs() {
@@ -143,20 +207,20 @@ logs() {
 }
 
 kill_all() {
-  pkill -9 -f "manage.py runserver" 2>/dev/null
   pkill -9 -f "run.py --host" 2>/dev/null
   pkill -9 -f "bot/main.py" 2>/dev/null
   echo "✓ Принудительно остановлено"
 }
 
 case "$1" in
-  start)   start   ;;
-  stop)    stop    ;;
+  start)   start         ;;
+  stop)    stop          ;;
   restart) stop; sleep 1; start ;;
-  status)  status  ;;
-  logs)    logs    ;;
-  kill)    kill_all ;;
-  *) echo "Использование: kayros {start|stop|restart|status|logs|kill}" ;;
+  status)  status        ;;
+  proxy)   proxy_toggle  ;;
+  logs)    logs          ;;
+  kill)    kill_all      ;;
+  *) echo "Использование: kayros {start|stop|restart|status|proxy|logs|kill}" ;;
 esac
 EOF
 
@@ -199,6 +263,7 @@ alias restart='bash /usr/local/bin/kayros restart'
 alias status='bash /usr/local/bin/kayros status'
 alias kill_all='bash /usr/local/bin/kayros kill'
 alias logs='bash /usr/local/bin/kayros logs'
+alias proxy='bash /usr/local/bin/kayros proxy'
 
 # Git / Деплой
 alias pull='cd \$DIR && git stash && git pull'
@@ -222,16 +287,19 @@ alias list='echo "
 ║    start         — запустить всё               ║
 ║    stop          — остановить всё              ║
 ║    restart       — перезапустить               ║
-║    status        — статус процессов            ║
+║    status        — статус: сайт/бот/прокси/vpn ║
 ║    kill_all      — принудительно убить         ║
 ║    logs          — логи сервера                ║
+╠════════════════════════════════════════════════╣
+║  СЕТЬ                                          ║
+║    proxy         — вкл/выкл прокси (SOCKS5)   ║
 ╠════════════════════════════════════════════════╣
 ║  GIT / ДЕПЛОЙ                                  ║
 ║    pull          — stash + git pull            ║
 ║    deploy        — pull + static + restart     ║
 ╠════════════════════════════════════════════════╣
 ║  БАЗА ДАННЫХ                                   ║
-║    db_fill       — заполнить рандомными данными║
+║    db_fill       — заполнить тестовыми данными ║
 ║    db_prices     — загрузить прайс iPhone      ║
 ║    db_clear      — очистить данные (без юзеров)║
 ║    db_clear_all  — очистить всё + юзеры        ║
@@ -239,8 +307,8 @@ alias list='echo "
 ╠════════════════════════════════════════════════╣
 ║  УТИЛИТЫ                                       ║
 ║    venv          — включить/выключить venv     ║
-║    mem           — память                      ║
-║    disk          — диск                        ║
+║    mem           — использование памяти        ║
+║    disk          — использование диска         ║
 ║    list          — это меню                    ║
 ╚════════════════════════════════════════════════╝"'
 
