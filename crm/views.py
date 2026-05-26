@@ -336,6 +336,11 @@ def repair_create(request):
 
             branch_id = request.POST.get('branch') or None
             assigned_id = request.POST.get('assigned_to') or None
+            # Если мастер/сотрудник создаёт заказ и не выбрал мастера — назначаем себя
+            if not assigned_id:
+                profile = getattr(request.user, 'profile', None)
+                if profile and profile.role in ('master', 'employee'):
+                    assigned_id = request.user.pk
             deadline_str = request.POST.get('deadline') or None
             deadline = date.fromisoformat(deadline_str) if deadline_str else None
 
@@ -374,6 +379,12 @@ def _repair_create_ctx(request):
     else:
         assigned_ids = list(profile.branches.values_list('id', flat=True)) if profile else []
         available_branches = Branch.objects.filter(id__in=assigned_ids, is_active=True)
+    # Если текущий пользователь — мастер/сотрудник, подставляем его по умолчанию
+    default_assigned = (
+        request.user
+        if profile and profile.role in ('master', 'employee')
+        else None
+    )
     return render(request, 'crm/repairs/create.html', {
         'brands': Brand.objects.filter(is_active=True).order_by('order', 'name'),
         'masters': User.objects.filter(
@@ -381,6 +392,7 @@ def _repair_create_ctx(request):
         ),
         'branches': available_branches,
         'active_branch': profile.branch if profile else None,
+        'default_assigned': default_assigned,
     })
 
 
