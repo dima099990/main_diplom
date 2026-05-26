@@ -1868,7 +1868,10 @@ def settings_company(request):
                       'warranty_days', 'bot_token', 'bot_deepseek_key', 'bot_prompt']:
             if hasattr(settings_obj, field):
                 setattr(settings_obj, field, request.POST.get(field, ''))
-        if 'logo' in request.FILES:
+        if request.POST.get('delete_logo') == 'on' and settings_obj.logo:
+            settings_obj.logo.delete(save=False)
+            settings_obj.logo = None
+        elif 'logo' in request.FILES:
             settings_obj.logo = request.FILES['logo']
         if 'stamp' in request.FILES:
             settings_obj.stamp = request.FILES['stamp']

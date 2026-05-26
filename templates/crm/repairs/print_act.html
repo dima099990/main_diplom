@@ -73,6 +73,8 @@ h1 { font-size: 15pt; text-align: center; margin-bottom: 4px; }
 {# ── Общая шапка компании (на всех документах) ────────────────────────── #}
 {% with s=site_settings %}
 <div class="company-header">
+  <div style="display:flex;align-items:flex-start;gap:12px">
+    {% if s.logo %}<img src="{{ s.logo.url }}" alt="Логотип" style="height:48px;width:auto;object-fit:contain;flex-shrink:0">{% endif %}
   <div>
     <div class="company-name">{{ s.company_name }}</div>
     {% if s.actual_address or s.address %}
@@ -84,6 +86,7 @@ h1 { font-size: 15pt; text-align: center; margin-bottom: 4px; }
     {% if s.working_hours %}
     <div style="font-size:10pt;color:#444">🕐 {{ s.working_hours }}</div>
     {% endif %}
+  </div>
   </div>
   <div class="company-meta">
     {% if s.inn %}ИНН: {{ s.inn }}<br>{% endif %}
