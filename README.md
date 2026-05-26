@@ -22,7 +22,7 @@ CRM-система для сервисного центра по ремонту 
 
 ```bash
 # 1. Клонировать
-git clone <url> && cd diplom
+git clone https://github.com/dima099990/main_diplom && cd diplom
 
 # 2. Виртуальное окружение
 python -m venv .venv
@@ -57,7 +57,7 @@ python run.py
 Скачать файл на сервер и запустить:
 
 ```bash
-wget https://raw.githubusercontent.com/<user>/<repo>/main/setup.sh
+wget https://raw.githubusercontent.com/dima099990/main_diplom/main/setup.sh
 sudo bash setup.sh
 ```
 
@@ -107,7 +107,7 @@ start
 ```bash
 # 1. Клонировать
 cd /opt
-git clone <url> main_diplom
+git clone https://github.com/dima099990/main_diplom main_diplom
 cd main_diplom
 
 # 2. Виртуальное окружение
