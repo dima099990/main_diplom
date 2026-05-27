@@ -392,9 +392,17 @@ async def handle_chat(message: Message, uid: int, text: str) -> None:
         pass
 
     # ── Умная запись: распознаём намерение ────────────────────────────────────
-    if _is_booking_intent(text) and s.bot_deepseek_key:
-        raw    = await asyncio.to_thread(extract_booking_info, text, s.bot_deepseek_key)
-        fields = _validate_ai_extract(raw, customer)
+    if _is_booking_intent(text):
+        # Пытаемся извлечь данные через ИИ (если ключ есть)
+        if s.bot_deepseek_key:
+            try:
+                raw = await asyncio.to_thread(extract_booking_info, text, s.bot_deepseek_key)
+                fields = _validate_ai_extract(raw, customer)
+            except Exception:
+                fields = _validate_ai_extract({}, customer)
+        else:
+            # Нет ключа Groq — просто берём имя/телефон из профиля
+            fields = _validate_ai_extract({}, customer)
 
         known = []
         if fields.get("ai_device"):  known.append(f"📱 {fields['ai_device']}")
@@ -405,14 +413,12 @@ async def handle_chat(message: Message, uid: int, text: str) -> None:
         if fields.get("ai_phone"):   known.append(f"📞 {fields['ai_phone']}")
 
         if known:
-            await message.answer(
-                "📋 Записываю! Уже понял:\n" + "  ".join(known),
-            )
+            await message.answer("📋 Записываю! Уже понял:\n" + "  ".join(known))
         else:
-            await message.answer("📅 Отлично, оформляю запись!")
+            await message.answer("📅 Отлично, оформляю запись на ремонт!")
 
-        ud.set_state(uid, None)
         ud.update(uid, **fields)
+        ud.update(uid, **{"_state": None})   # сброс перед выбором следующего шага
         next_s = _next_aibook_step(ud.get(uid))
         await _ask_aibook_step(message, uid, next_s)
         return

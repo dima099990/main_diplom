@@ -127,10 +127,7 @@ step "Скрипт /usr/local/bin/kayros..."
 cat > /usr/local/bin/kayros << 'KAYEOF'
 #!/bin/bash
 DIR=/opt/main_diplom
-PROXY_FILE=$DIR/bot/proxies.txt
-PROXY_BAK=$DIR/bot/proxies.txt.disabled
 SEP="  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
 PY=$DIR/.venv/bin/python3
 
 start() {
@@ -138,22 +135,13 @@ start() {
   cd $DIR
   echo "🚀 Запускаю сервер (статика собирается автоматически)..."
   nohup $PY run.py --host 0.0.0.0 --port 8000 > /tmp/kayros_site.log 2>&1 &
-  echo "✓ Сайт запущен (PID $!)"
+  echo "✓ Сайт + VK-бот запущены (PID $!)"
 }
 
 stop() {
   pkill -f "run.py --host" 2>/dev/null || true
   pkill -f "bot/main.py"   2>/dev/null || true
   echo "✓ Все процессы остановлены"
-}
-
-_detect_vpn() {
-  VPN=$(ip -o link show up 2>/dev/null | awk '{print $2}' | tr -d ':' \
-    | grep -E "^(tun|tap|wg|ppp|nordlynx|proton|vpn|warp|ovpn|pia|mullvad)" | head -1)
-  [ -z "$VPN" ] && VPN=$(ip -o link show up 2>/dev/null | awk '{print $2}' | tr -d ':' \
-    | grep -vE "^(lo$|eth[0-9]|ens[0-9]|enp[0-9]|eno[0-9]|em[0-9]|bond|br[-0-9]|veth|docker|lxc|lxd|virbr|dummy)" \
-    | head -1)
-  echo "$VPN"
 }
 
 status() {
@@ -163,47 +151,16 @@ status() {
   BOT_PID=$(pgrep -f "bot/main.py" 2>/dev/null | head -1)
   [ -n "$BOT_PID" ] && B="✅ работает  (PID $BOT_PID)" || B="❌ не запущен"
 
-  if [ -f "$PROXY_FILE" ]; then
-    CNT=$(grep -c "socks5" "$PROXY_FILE" 2>/dev/null || echo 0)
-    P="✅ включён   ($CNT прокси)"
-  elif [ -f "$PROXY_BAK" ]; then
-    P="⛔ выключен  (файл скрыт)"
-  else
-    P="⚠️  файл не найден"
-  fi
-
-  VPN_IF=$(_detect_vpn)
-  if [ -n "$VPN_IF" ]; then
-    VPN_IP=$(ip addr show "$VPN_IF" 2>/dev/null | grep "inet " | awk '{print $2}' | cut -d/ -f1)
-    V="✅ подключён ($VPN_IF · $VPN_IP)"
-  else
-    V="⛔ не подключен"
-  fi
-
   MEM=$(free -h  | awk '/^Mem:/ {print $3" / "$2}')
   DISK=$(df -h / | awk 'NR==2  {print $3" / "$2" ("$5")"}')
 
   echo ""; echo "$SEP"; echo "         KAYROS CRM — Статус"; echo "$SEP"
   echo "  Сайт    :  $S"
-  echo "  Бот     :  $B"
-  echo "  Прокси  :  $P"
-  echo "  VPN     :  $V"
+  echo "  VK-бот  :  $B"
   echo "$SEP"
   echo "  Память  :  $MEM"
   echo "  Диск    :  $DISK"
   echo "$SEP"; echo ""
-}
-
-proxy_toggle() {
-  if [ -f "$PROXY_FILE" ]; then
-    mv "$PROXY_FILE" "$PROXY_BAK"
-    echo "⛔ Прокси выключен — proxies.txt скрыт"; echo "   Перезапустите: restart"
-  elif [ -f "$PROXY_BAK" ]; then
-    mv "$PROXY_BAK" "$PROXY_FILE"
-    echo "✅ Прокси включён — proxies.txt восстановлен"; echo "   Перезапустите: restart"
-  else
-    echo "⚠️  Файл proxies.txt не найден"
-  fi
 }
 
 logs()       { tail -f /tmp/kayros_site.log; }
@@ -217,10 +174,9 @@ case "$1" in
   stop)    stop         ;;
   restart) stop; sleep 1; start ;;
   status)  status       ;;
-  proxy)   proxy_toggle ;;
   logs)    logs         ;;
   kill)    force_kill   ;;
-  *) echo "Использование: kayros {start|stop|restart|status|proxy|logs|kill}" ;;
+  *) echo "Использование: kayros {start|stop|restart|status|logs|kill}" ;;
 esac
 KAYEOF
 
@@ -229,8 +185,6 @@ ok "Скрипт kayros установлен"
 
 # ── 9. Алиасы .bashrc ─────────────────────────────────────────────────────
 step "Настройка команд ~/.bashrc..."
-
-VENV_PATH=$(find "$DIR" -name "activate" -path "*/bin/activate" 2>/dev/null | head -1)
 
 cat > ~/.bashrc << 'BASHEOF'
 export PYTHONUNBUFFERED=1
@@ -252,7 +206,6 @@ alias restart='bash /usr/local/bin/kayros restart'
 alias status='bash /usr/local/bin/kayros status'
 alias kill='bash /usr/local/bin/kayros kill'
 alias logs='bash /usr/local/bin/kayros logs'
-alias proxy='bash /usr/local/bin/kayros proxy'
 
 # Git / Деплой
 alias pull='cd $DIR && git stash && git pull'
@@ -276,12 +229,9 @@ alias list='echo "
 ║    start        — запустить всё                ║
 ║    stop         — остановить всё               ║
 ║    restart      — перезапустить                ║
-║    status       — сайт / бот / прокси / vpn   ║
+║    status       — сайт / VK-бот / память       ║
 ║    kill         — принудительно убить всё      ║
 ║    logs         — логи сервера (tail -f)       ║
-╠════════════════════════════════════════════════╣
-║  СЕТЬ                                          ║
-║    proxy        — вкл / выкл прокси SOCKS5    ║
 ╠════════════════════════════════════════════════╣
 ║  GIT / ДЕПЛОЙ                                  ║
 ║    pull         — stash + git pull             ║
@@ -303,8 +253,6 @@ alias list='echo "
 
 BASHEOF
 
-sed -i "s|__VENV__|$VENV_PATH|g" ~/.bashrc
-# shellcheck source=/dev/null
 source ~/.bashrc 2>/dev/null || true
 ok "Команды настроены"
 
@@ -334,6 +282,6 @@ echo "  ╠═══════════════════════
 echo "  ║  Следующие шаги:                                 ║"
 echo "  ║    1. source ~/.bashrc                           ║"
 echo "  ║    2. list          — все команды                ║"
-echo "  ║    3. CRM → Настройки → токен бота + Groq ключ  ║"
+echo "  ║    3. CRM → Настройки → токен VK-бота + Groq    ║"
 echo "  ╚══════════════════════════════════════════════════╝"
 echo ""

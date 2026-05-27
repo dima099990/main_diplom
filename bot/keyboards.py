@@ -53,6 +53,28 @@ CANCEL_KB = (
 
 # ── Динамические клавиатуры ───────────────────────────────────────────────────
 
+def name_kb(name: str) -> str:
+    """Клавиатура с кнопкой подтверждения имени из профиля + отмена."""
+    return (
+        Keyboard(one_time=True)
+        .add(Text(f"✅ {name}"), color=KeyboardButtonColor.POSITIVE)
+        .row()
+        .add(Text("❌ Отмена"), color=KeyboardButtonColor.NEGATIVE)
+        .get_json()
+    )
+
+
+def phone_kb(phone: str) -> str:
+    """Клавиатура с кнопкой подтверждения телефона из профиля + отмена."""
+    return (
+        Keyboard(one_time=True)
+        .add(Text(f"📱 {phone}"), color=KeyboardButtonColor.POSITIVE)
+        .row()
+        .add(Text("❌ Отмена"), color=KeyboardButtonColor.NEGATIVE)
+        .get_json()
+    )
+
+
 def date_kb() -> str:
     today    = date.today()
     tomorrow = today + timedelta(days=1)

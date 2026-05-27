@@ -3,7 +3,7 @@ import logging
 from vkbottle.bot import Message
 
 import user_data as ud
-from keyboards import MAIN_MENU, UNREGISTERED_MENU, CONFIRM_KB, CANCEL_KB
+from keyboards import MAIN_MENU, UNREGISTERED_MENU, CONFIRM_KB, CANCEL_KB, name_kb, phone_kb
 
 logger = logging.getLogger(__name__)
 
@@ -28,16 +28,26 @@ async def booking_start(message: Message, uid: int) -> None:
         )
         return
 
-    ud.set_state(uid, STATE_BOOK_NAME,
-                 _customer_name=customer.name or "",
-                 _customer_phone=customer.phone or "")
+    cust_name  = customer.name  or ""
+    cust_phone = customer.phone or ""
 
-    hint = f"\n(или нажмите Enter, чтобы использовать: {customer.name})" if customer.name else ""
-    await message.answer(
-        f"📅 Запись на ремонт\n\n"
-        f"Шаг 1 из 4 — Как вас зовут?{hint}",
-        keyboard=CANCEL_KB,
-    )
+    ud.set_state(uid, STATE_BOOK_NAME,
+                 _customer_name=cust_name,
+                 _customer_phone=cust_phone)
+
+    if cust_name:
+        kb  = name_kb(cust_name)
+        msg = (
+            f"📅 Запись на ремонт\n\n"
+            f"Шаг 1 из 4 — Как вас зовут?\n"
+            f"Нажмите кнопку ниже, чтобы использовать имя из профиля, "
+            f"или введите другое:"
+        )
+    else:
+        kb  = CANCEL_KB
+        msg = "📅 Запись на ремонт\n\nШаг 1 из 4 — Как вас зовут?"
+
+    await message.answer(msg, keyboard=kb)
 
 
 async def booking_got_name(message: Message, uid: int, text: str) -> None:
@@ -47,15 +57,29 @@ async def booking_got_name(message: Message, uid: int, text: str) -> None:
         return
 
     data = ud.get(uid)
-    name = data.get("_customer_name", "") if text in ("-", ".", "") else text
-    if not name:
-        name = text
+    stored_name = data.get("_customer_name", "")
 
-    ud.set_state(uid, STATE_BOOK_PHONE, name=name)
-    await message.answer(
-        "Шаг 2 из 4 — Укажите номер телефона:",
-        keyboard=CANCEL_KB,
-    )
+    # Кнопка «✅ Имя» из профиля → убираем префикс
+    if text.startswith("✅ "):
+        name = text[2:].strip() or stored_name
+    else:
+        name = text.strip() or stored_name
+
+    cust_phone = data.get("_customer_phone", "")
+    ud.set_state(uid, STATE_BOOK_PHONE, name=name, _customer_phone=cust_phone)
+
+    if cust_phone:
+        kb  = phone_kb(cust_phone)
+        msg = (
+            f"Шаг 2 из 4 — Укажите номер телефона:\n"
+            f"Нажмите кнопку ниже, чтобы использовать номер из профиля, "
+            f"или введите другой:"
+        )
+    else:
+        kb  = CANCEL_KB
+        msg = "Шаг 2 из 4 — Укажите номер телефона:"
+
+    await message.answer(msg, keyboard=kb)
 
 
 async def booking_got_phone(message: Message, uid: int, text: str) -> None:
@@ -68,15 +92,18 @@ async def booking_got_phone(message: Message, uid: int, text: str) -> None:
 
     data = ud.get(uid)
 
-    # Принимаем кнопку с сохранённым телефоном клиента
-    if text == "📱 Мой номер" and data.get("_customer_phone"):
-        phone = data["_customer_phone"]
+    cust_phone = data.get("_customer_phone", "")
+
+    # Кнопка «📱 +7...» из профиля
+    if text.startswith("📱 ") and cust_phone:
+        phone = cust_phone
     else:
         digits = re.sub(r"\D", "", text)
         if len(digits) < 10:
+            kb = phone_kb(cust_phone) if cust_phone else CANCEL_KB
             await message.answer(
                 "Похоже, это не номер телефона. Введите ещё раз:",
-                keyboard=CANCEL_KB,
+                keyboard=kb,
             )
             return
         phone = text
