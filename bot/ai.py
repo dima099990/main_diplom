@@ -43,8 +43,8 @@ def _groq_request(
     )
     if resp.status_code == 429:
         raise _RateLimitError(resp.text)
-    if resp.status_code == 401:
-        raise _AuthError(resp.text)
+    if resp.status_code in (401, 403):
+        raise _AuthError(f"HTTP {resp.status_code}: {resp.text}")
     resp.raise_for_status()
     return resp.json()["choices"][0]["message"]["content"] or ""
 
@@ -111,8 +111,11 @@ def get_ai_response(
             "Позвоните нам напрямую, мы всё расскажем! 📞"
         )
     except _AuthError as e:
-        logger.error(f"Groq AuthError: {e}")
-        return "❌ Неверный Groq API ключ. Проверьте настройки в CRM."
+        logger.error(f"Groq AuthError (401/403): {e}")
+        return (
+            "⚠️ ИИ-ассистент временно недоступен.\n\n"
+            "Позвоните нам — ответим на все вопросы! 📞"
+        )
     except httpx.ConnectError as e:
         logger.error(f"Groq ConnectError: {e}")
         return "🔌 Нет соединения с сервером ИИ. Позвоните нам напрямую!"
