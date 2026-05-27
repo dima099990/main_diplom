@@ -10,7 +10,7 @@ MAIN_MENU = (
     .add(Text("📅 Записаться"),    color=KeyboardButtonColor.POSITIVE)
     .row()
     .add(Text("📞 Контакты"),      color=KeyboardButtonColor.SECONDARY)
-    .add(Text("💬 Задать вопрос"), color=KeyboardButtonColor.SECONDARY)
+    .add(Text("📦 Выкуп"),         color=KeyboardButtonColor.SECONDARY)
     .get_json()
 )
 
@@ -47,6 +47,68 @@ SKIP_KB = (
 CANCEL_KB = (
     Keyboard(one_time=True)
     .add(Text("❌ Отмена"), color=KeyboardButtonColor.NEGATIVE)
+    .get_json()
+)
+
+# ── Клавиатуры выкупа устройств ───────────────────────────────────────────────
+
+MEMORY_KB = (
+    Keyboard(one_time=True)
+    .add(Text("64 ГБ"),  color=KeyboardButtonColor.SECONDARY)
+    .add(Text("128 ГБ"), color=KeyboardButtonColor.SECONDARY)
+    .row()
+    .add(Text("256 ГБ"), color=KeyboardButtonColor.SECONDARY)
+    .add(Text("512 ГБ"), color=KeyboardButtonColor.SECONDARY)
+    .row()
+    .add(Text("1 ТБ"),   color=KeyboardButtonColor.SECONDARY)
+    .add(Text("Другой"), color=KeyboardButtonColor.SECONDARY)
+    .row()
+    .add(Text("❌ Отмена"), color=KeyboardButtonColor.NEGATIVE)
+    .get_json()
+)
+
+SCREEN_KB = (
+    Keyboard(one_time=True)
+    .add(Text("✨ Отличное"),          color=KeyboardButtonColor.POSITIVE)
+    .add(Text("👍 Хорошее"),           color=KeyboardButtonColor.POSITIVE)
+    .row()
+    .add(Text("😐 Удовлетворительное"), color=KeyboardButtonColor.SECONDARY)
+    .add(Text("💔 Повреждён"),          color=KeyboardButtonColor.NEGATIVE)
+    .row()
+    .add(Text("❌ Отмена"), color=KeyboardButtonColor.NEGATIVE)
+    .get_json()
+)
+
+BATTERY_KB = (
+    Keyboard(one_time=True)
+    .add(Text("🔋 90–100%"), color=KeyboardButtonColor.POSITIVE)
+    .add(Text("🔋 80–89%"),  color=KeyboardButtonColor.POSITIVE)
+    .row()
+    .add(Text("🔋 70–79%"),  color=KeyboardButtonColor.SECONDARY)
+    .add(Text("🪫 Ниже 70%"), color=KeyboardButtonColor.NEGATIVE)
+    .row()
+    .add(Text("❓ Не знаю"), color=KeyboardButtonColor.SECONDARY)
+    .add(Text("❌ Отмена"),  color=KeyboardButtonColor.NEGATIVE)
+    .get_json()
+)
+
+BODY_KB = (
+    Keyboard(one_time=True)
+    .add(Text("✨ Отличное"),          color=KeyboardButtonColor.POSITIVE)
+    .add(Text("👍 Хорошее"),           color=KeyboardButtonColor.POSITIVE)
+    .row()
+    .add(Text("😐 Удовлетворительное"), color=KeyboardButtonColor.SECONDARY)
+    .add(Text("💔 Повреждён"),          color=KeyboardButtonColor.NEGATIVE)
+    .row()
+    .add(Text("❌ Отмена"), color=KeyboardButtonColor.NEGATIVE)
+    .get_json()
+)
+
+BUYOUT_OFFER_KB = (
+    Keyboard(one_time=True)
+    .add(Text("✅ Записаться на выкуп"), color=KeyboardButtonColor.POSITIVE)
+    .row()
+    .add(Text("❌ Нет, спасибо"),        color=KeyboardButtonColor.NEGATIVE)
     .get_json()
 )
 

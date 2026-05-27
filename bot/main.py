@@ -62,6 +62,16 @@ from handlers.chat import (
     ST_AIBOOK_DEVICE, ST_AIBOOK_PROBLEM, ST_AIBOOK_DATE,
     ST_AIBOOK_TIME, ST_AIBOOK_NAME, ST_AIBOOK_PHONE, ST_AIBOOK_CONFIRM,
 )
+from handlers.buyout import (
+    buyout_start,
+    buyout_got_device, buyout_got_memory, buyout_got_screen,
+    buyout_got_battery, buyout_got_body,
+    buyout_got_offer,
+    buyout_book_got_name, buyout_book_got_phone,
+    STATE_BUYOUT_DEVICE, STATE_BUYOUT_MEMORY, STATE_BUYOUT_SCREEN,
+    STATE_BUYOUT_BATTERY, STATE_BUYOUT_BODY,
+    STATE_BUYOUT_OFFER, STATE_BUYOUT_BOOK_NAME, STATE_BUYOUT_BOOK_PHONE,
+)
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
@@ -72,6 +82,12 @@ logger = logging.getLogger(__name__)
 _AIBOOK_STATES = {
     ST_AIBOOK_DEVICE, ST_AIBOOK_PROBLEM, ST_AIBOOK_DATE,
     ST_AIBOOK_TIME, ST_AIBOOK_NAME, ST_AIBOOK_PHONE, ST_AIBOOK_CONFIRM,
+}
+
+_BUYOUT_STATES = {
+    STATE_BUYOUT_DEVICE, STATE_BUYOUT_MEMORY, STATE_BUYOUT_SCREEN,
+    STATE_BUYOUT_BATTERY, STATE_BUYOUT_BODY,
+    STATE_BUYOUT_OFFER, STATE_BUYOUT_BOOK_NAME, STATE_BUYOUT_BOOK_PHONE,
 }
 
 
@@ -107,6 +123,22 @@ def build_bot(token: str) -> Bot:
                 await prices_got_query(message, uid, text);    return
             if s in _AIBOOK_STATES:
                 await handle_chat_state(message, uid, text, s); return
+            if s == STATE_BUYOUT_DEVICE:
+                await buyout_got_device(message, uid, text);     return
+            if s == STATE_BUYOUT_MEMORY:
+                await buyout_got_memory(message, uid, text);     return
+            if s == STATE_BUYOUT_SCREEN:
+                await buyout_got_screen(message, uid, text);     return
+            if s == STATE_BUYOUT_BATTERY:
+                await buyout_got_battery(message, uid, text);    return
+            if s == STATE_BUYOUT_BODY:
+                await buyout_got_body(message, uid, text);       return
+            if s == STATE_BUYOUT_OFFER:
+                await buyout_got_offer(message, uid, text);      return
+            if s == STATE_BUYOUT_BOOK_NAME:
+                await buyout_book_got_name(message, uid, text);  return
+            if s == STATE_BUYOUT_BOOK_PHONE:
+                await buyout_book_got_phone(message, uid, text); return
 
         # ─── Кнопки меню (без состояния) ──────────────────────────────────
         tl = text.lower()
@@ -121,8 +153,8 @@ def build_bot(token: str) -> Bot:
             await handle_contacts(message, uid);        return
         if text == "📝 Зарегистрироваться":
             await reg_ask_phone(message, uid);          return
-        if text == "💬 Задать вопрос":
-            await handle_chat(message, uid, text);      return
+        if text == "📦 Выкуп":
+            await buyout_start(message, uid);           return
 
         # ─── Свободный текст → ИИ-чат ──────────────────────────────────────
         await handle_chat(message, uid, text)
