@@ -2035,7 +2035,7 @@ def appointment_list(request):
         appts = appts.filter(source=source_filter)
 
     # Счётчик новых записей — для менеджера/админа все, для сотрудника только свой филиал
-    new_appts_qs = Appointment.objects.filter(status='new', source__in=('website', 'telegram'))
+    new_appts_qs = Appointment.objects.filter(status='new', source__in=('website', 'telegram', 'vk'))
     if not is_admin_or_manager:
         if profile and profile.branch:
             new_appts_qs = new_appts_qs.filter(branch=profile.branch)

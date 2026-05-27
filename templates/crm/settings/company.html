@@ -61,8 +61,8 @@
               <input type="url" name="website" value="{{ settings.website }}" class="input-dark w-full px-3 py-2 text-sm" placeholder="https://...">
             </div>
             <div>
-              <label class="text-xs text-slate-400 mb-1 block">Telegram</label>
-              <input type="text" name="telegram" value="{{ settings.telegram }}" class="input-dark w-full px-3 py-2 text-sm" placeholder="@username">
+              <label class="text-xs text-slate-400 mb-1 block">ВКонтакте</label>
+              <input type="text" name="telegram" value="{{ settings.telegram }}" class="input-dark w-full px-3 py-2 text-sm" placeholder="vk.com/yourgroup">
             </div>
             <div>
               <label class="text-xs text-slate-400 mb-1 block">WhatsApp</label>
@@ -113,10 +113,10 @@
           </div>
         </div>
 
-        <!-- Telegram Bot -->
+        <!-- VK Bot -->
         {% if request.user.profile.is_admin %}
         <div>
-          <h3 class="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-4 pb-2 border-b border-slate-800">🤖 Telegram-бот</h3>
+          <h3 class="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-4 pb-2 border-b border-slate-800">🤖 VK-бот</h3>
           <div class="space-y-4">
 
             <div class="grid md:grid-cols-2 gap-4">
@@ -124,7 +124,7 @@
               <!-- Токен бота -->
               <div>
                 <label class="text-xs text-slate-400 mb-1 flex items-center gap-2">
-                  Токен бота (от @BotFather)
+                  Токен VK-бота (от vk.com/dev)
                   {% if settings.bot_token %}
                   <span class="text-emerald-400 font-medium">✓ установлен</span>
                   {% else %}
@@ -145,7 +145,7 @@
                 {% endif %}
                 <input type="password" name="bot_token" autocomplete="new-password"
                        class="input-dark w-full px-3 py-2 text-sm font-mono"
-                       placeholder="{% if settings.bot_token %}Новый токен (оставьте пустым чтобы не менять){% else %}1234567890:AAF...{% endif %}">
+                       placeholder="{% if settings.bot_token %}Новый токен (оставьте пустым чтобы не менять){% else %}vk1.a.XXXXXX...{% endif %}">
               </div>
 
               <!-- Groq API Key -->

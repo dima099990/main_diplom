@@ -74,7 +74,7 @@ class Command(BaseCommand):
         settings_obj.director_name = 'Иванов Иван Иванович'
         settings_obj.email = 'info@kayros-service.ru'
         settings_obj.website = 'https://kayros-service.ru'
-        settings_obj.telegram = '@kayros_service'
+        settings_obj.telegram = 'vk.com/kayros_service'
         settings_obj.legal_address = 'г. Москва, ул. Примерная, д. 1, оф. 5'
         settings_obj.actual_address = 'г. Москва, ул. Примерная, д. 1'
         settings_obj.bank_name = 'ПАО Сбербанк'

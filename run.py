@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Запуск сайта + Telegram-бота одновременно.
+Запуск сайта + VK-бота одновременно.
 
 Использование:
     python run.py                              # сайт + бот
@@ -68,7 +68,7 @@ def run_site(host: str, port: str):
 
 
 def run_bot():
-    print("[БОТ]  Запуск Telegram-бота ...", flush=True)
+    print("[БОТ]  Запуск VK-бота ...", flush=True)
     proc = subprocess.Popen(
         [PYTHON, "-u", "bot/main.py"],
         cwd=ROOT,

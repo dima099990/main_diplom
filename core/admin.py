@@ -6,7 +6,7 @@ from .models import SiteSettings, Brand, PhoneModel, RepairService, Review, Call
 class SiteSettingsAdmin(admin.ModelAdmin):
     fieldsets = (
         ('Основное', {'fields': ('company_name', 'tagline', 'phone', 'working_hours')}),
-        ('Контакты', {'fields': ('address', 'telegram_bot_link', 'telegram_channel')}),
+        ('Контакты', {'fields': ('address', 'telegram_bot_link', 'telegram_channel', 'telegram')}),
         ('О компании', {'fields': ('about_text', 'about_full_text', 'warranty_days')}),
         ('Карты', {'fields': ('yandex_map_embed', 'google_map_embed'), 'classes': ('collapse',)}),
     )

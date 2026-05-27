@@ -13,17 +13,11 @@ python-decouple==3.8
 #   Images
 Pillow==12.2.0
 
-#   HTTP client
+#   HTTP client (используется и сайтом, и ботом для запросов к Groq)
 httpx==0.28.1
 
-#   Telegram bot
-python-telegram-bot==22.7
-
-#   AI (Groq API)
-openai==2.38.0
-
-#   Proxy (SOCKS5 for Telegram on blocked servers)
-socksio==1.0.0
+#   VK bot
+vkbottle==4.8.2
 
 #   Utils
 sqlparse==0.5.5

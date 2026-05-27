@@ -1,62 +1,70 @@
-"""Поиск цен по прайс-листу из БД."""
-from telegram import Update
-from telegram.ext import ContextTypes, ConversationHandler
+"""Поиск цен по прайс-листу."""
+import logging
+from vkbottle.bot import Message
 
-from handlers.start import MAIN_MENU
+import user_data as ud
+from keyboards import MAIN_MENU, UNREGISTERED_MENU, CANCEL_KB
 
-# Состояние диалога (диапазон 30)
-WAITING_PRICE_QUERY = 30
+logger = logging.getLogger(__name__)
+
+STATE_PRICES_QUERY = "prices_query"
 
 
-async def ask_price_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.message.reply_text(
+async def prices_start(message: Message, uid: int) -> None:
+    """Запускает диалог поиска цен (доступен всем)."""
+    ud.set_state(uid, STATE_PRICES_QUERY)
+    await message.answer(
         "🔍 Напишите модель телефона или тип ремонта.\n\n"
-        "Примеры: *iPhone 15 Pro*, *Samsung S24*, *экран*, *батарея*",
-        parse_mode="Markdown",
+        "Примеры: iPhone 15 Pro, Samsung S24, экран, батарея",
+        keyboard=CANCEL_KB,
     )
-    return WAITING_PRICE_QUERY
 
 
-async def show_prices(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    from db import search_prices, get_all_prices_text, get_settings
+async def prices_got_query(message: Message, uid: int, text: str) -> None:
+    """Пользователь ввёл поисковый запрос."""
+    from db import search_prices, get_all_prices_text, get_settings, get_customer_by_vk
     from ai import get_ai_response
 
-    query   = update.message.text.strip()
-    results = await search_prices(query)
+    if text == "❌ Отмена":
+        ud.clear(uid)
+        customer = await get_customer_by_vk(uid)
+        kb = MAIN_MENU if customer else UNREGISTERED_MENU
+        await message.answer("Отменено.", keyboard=kb)
+        return
+
+    ud.clear(uid)
+    customer = await get_customer_by_vk(uid)
+    kb = MAIN_MENU if customer else UNREGISTERED_MENU
+
+    results = await search_prices(text)
 
     if results:
-        lines = [f"💰 *Цены по запросу «{query}»:*\n"]
+        lines = [f"💰 Цены по запросу «{text}»:\n"]
         for r in results[:15]:
             duration = f" · ⏱ {r['duration']}" if r["duration"] else ""
             lines.append(
-                f"📱 *{r['brand']} {r['model']}*\n"
-                f"   {r['service']}: *{r['price']}*{duration}"
+                f"📱 {r['brand']} {r['model']}\n"
+                f"   {r['service']}: {r['price']}{duration}"
             )
-        lines.append("\n_Точная стоимость уточняется после диагностики._")
-        await update.message.reply_text(
-            "\n".join(lines), parse_mode="Markdown", reply_markup=MAIN_MENU
-        )
+        lines.append("\nТочная стоимость уточняется после диагностики.")
+        await message.answer("\n".join(lines), keyboard=kb)
     else:
         s = await get_settings()
         if s.bot_deepseek_key:
-            await context.bot.send_chat_action(
-                chat_id=update.effective_chat.id, action="typing"
-            )
+            import asyncio
             prices_text = await get_all_prices_text()
-            answer = get_ai_response(
-                user_message=f"Сколько стоит: {query}?",
-                system_prompt=s.bot_prompt,
-                api_key=s.bot_deepseek_key,
-                prices_context=prices_text,
+            answer = await asyncio.to_thread(
+                get_ai_response,
+                f"Сколько стоит: {text}?",
+                s.bot_prompt,
+                s.bot_deepseek_key,
+                prices_text,
             )
-            await update.message.reply_text(answer, reply_markup=MAIN_MENU)
+            await message.answer(answer, keyboard=kb)
         else:
-            await update.message.reply_text(
-                f"По запросу *«{query}»* цену не нашли в базе.\n\n"
+            await message.answer(
+                f"По запросу «{text}» цену не нашли в базе.\n\n"
                 f"Позвоните — назовём точную стоимость!\n"
                 f"☎️ {s.phone}",
-                parse_mode="Markdown",
-                reply_markup=MAIN_MENU,
+                keyboard=kb,
             )
-
-    return ConversationHandler.END

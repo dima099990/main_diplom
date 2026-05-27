@@ -111,7 +111,7 @@ CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:
 CORS_ALLOW_CREDENTIALS = True
 
 # App settings
-TELEGRAM_BOT_LINK = config('TELEGRAM_BOT_LINK', default='https://t.me/your_bot')
+VK_BOT_LINK = config('VK_BOT_LINK', default='https://vk.com/im?sel=-your_group_id')
 WARRANTY_DAYS_DEFAULT = 90
 
 # Logging — только консоль, файловый лог не нужен

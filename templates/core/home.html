@@ -16,8 +16,8 @@
       <p class="hero-sub">Гарантия <strong>{{ site.warranty_days }} дней</strong> на все виды работ.<br>{{ site.working_hours }}</p>
       <div class="hero-actions">
         <a href="{{ site.telegram_bot_link }}" target="_blank" class="btn btn-lg">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248l-2.018 9.51c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.337 14.53l-2.948-.924c-.64-.203-.654-.64.136-.948l11.527-4.445c.533-.194 1 .13.51 2.035z"/></svg>
-          Написать в Telegram
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.917 6.5l-1.698 8c-.13.578-.48.72-.97.447l-2.68-1.976-1.293 1.246c-.143.143-.263.263-.54.263l.19-2.72 4.955-4.477c.216-.19-.048-.297-.334-.107L7.558 13.83l-2.632-.824c-.572-.18-.584-.572.12-.847l10.286-3.967c.476-.173.894.116.585 1.308z"/></svg>
+          Написать в ВКонтакте
         </a>
         <a href="tel:{{ site.phone }}" class="btn btn-outline btn-lg">{{ site.phone }}</a>
       </div>
@@ -29,7 +29,7 @@
       <form action="{% url 'contact_request' %}" method="post" class="contact-form" id="heroForm">
         {% csrf_token %}
         <input type="text" name="name" placeholder="Ваше имя" required>
-        <input type="text" name="phone" placeholder="Телефон или Telegram" required>
+        <input type="text" name="phone" placeholder="Телефон или ВКонтакте" required>
         <input type="text" name="device" placeholder="Устройство (напр. iPhone 14)">
         <textarea name="message" placeholder="Опишите проблему" rows="2"></textarea>
         {% if branches %}
@@ -155,7 +155,7 @@
       <p>Напишите нам — диагностика бесплатная</p>
     </div>
     <div class="cta-actions">
-      <a href="{{ site.telegram_bot_link }}" target="_blank" class="btn btn-lg">Написать в Telegram</a>
+      <a href="{{ site.telegram_bot_link }}" target="_blank" class="btn btn-lg">Написать в ВКонтакте</a>
       <a href="tel:{{ site.phone }}" class="btn btn-outline btn-lg">{{ site.phone }}</a>
     </div>
   </div>

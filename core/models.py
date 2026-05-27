@@ -7,8 +7,8 @@ class SiteSettings(models.Model):
     phone = models.CharField("Телефон", max_length=30, default="+7 (999) 000-00-00")
     address = models.CharField("Адрес", max_length=300, default="г. Москва, ул. Примерная, д. 1")
     working_hours = models.CharField("Часы работы", max_length=100, default="Пн–Вс: 09:00 – 21:00")
-    telegram_bot_link = models.URLField("Ссылка на Telegram-бот", default="https://t.me/your_bot")
-    telegram_channel = models.URLField("Telegram-канал", blank=True)
+    telegram_bot_link = models.URLField("Ссылка на VK-бот / сообщество", default="https://vk.com/im?sel=-your_group_id")
+    telegram_channel = models.URLField("VK-сообщество", blank=True)
     about_text = models.TextField("О нас (краткое)", default="Мы занимаемся ремонтом телефонов с 2015 года.")
     about_full_text = models.TextField("О нас (полное)", blank=True)
     yandex_map_embed = models.TextField("Код встраивания Яндекс.Карты", blank=True)
@@ -21,7 +21,7 @@ class SiteSettings(models.Model):
     director_name = models.CharField("ФИО директора", max_length=200, blank=True)
     email = models.EmailField("Email", blank=True)
     website = models.URLField("Сайт", blank=True)
-    telegram = models.CharField("Telegram", max_length=100, blank=True)
+    telegram = models.CharField("ВКонтакте", max_length=100, blank=True)
     whatsapp = models.CharField("WhatsApp", max_length=50, blank=True)
     legal_address = models.TextField("Юридический адрес", blank=True)
     actual_address = models.TextField("Фактический адрес", blank=True)
@@ -33,8 +33,8 @@ class SiteSettings(models.Model):
     # Branding
     logo = models.ImageField("Логотип", upload_to='settings/', blank=True, null=True)
     stamp = models.ImageField("Печать", upload_to='settings/', blank=True, null=True)
-    # Telegram bot
-    bot_token = models.CharField("Токен Telegram-бота", max_length=200, blank=True)
+    # VK bot
+    bot_token = models.CharField("Токен VK-бота", max_length=200, blank=True)
     bot_deepseek_key = models.CharField("Groq API Key", max_length=200, blank=True)
     bot_prompt = models.TextField(
         "Системный промпт бота",
@@ -140,7 +140,7 @@ class Review(models.Model):
 class CallRequest(models.Model):
     """Заявки на обзвон клиентов (с публичной формы)"""
     name = models.CharField("Имя", max_length=100)
-    phone = models.CharField("Телефон / Telegram", max_length=100)
+    phone = models.CharField("Телефон / ВКонтакте", max_length=100)
     message = models.TextField("Сообщение", blank=True)
     created_at = models.DateTimeField("Дата заявки", auto_now_add=True)
     is_processed = models.BooleanField("Обработана", default=False)

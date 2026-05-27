@@ -44,14 +44,14 @@ def crm_context(request):
         user=request.user, is_read=False
     ).count()
 
-    # Новые записи (с сайта + из Telegram) для значка в сайдбаре
+    # Новые записи (с сайта + из ВКонтакте) для значка в сайдбаре
     if role in ('admin', 'manager'):
         new_appointments_count = Appointment.objects.filter(
-            status='new', source__in=('website', 'telegram')
+            status='new', source__in=('website', 'telegram', 'vk')
         ).count()
     elif active_branch:
         new_appointments_count = Appointment.objects.filter(
-            status='new', source__in=('website', 'telegram'),
+            status='new', source__in=('website', 'telegram', 'vk'),
             branch=active_branch,
         ).count()
     else:

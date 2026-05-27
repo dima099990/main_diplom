@@ -36,7 +36,7 @@ class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     role = models.CharField("Роль", max_length=20, choices=ROLES, default='employee')
     phone    = models.CharField("Телефон", max_length=30, blank=True)
-    telegram = models.CharField("Telegram", max_length=100, blank=True)
+    telegram = models.CharField("ВКонтакте", max_length=100, blank=True)
     notes    = models.TextField("Заметки (только для админа)", blank=True)
     branch   = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True,
                                  related_name='active_employees', verbose_name="Активный филиал сегодня")
@@ -75,7 +75,7 @@ class Customer(models.Model):
     phone = models.CharField("Телефон", max_length=30)
     email = models.EmailField("Email", blank=True)
     notes = models.TextField("Примечания", blank=True)
-    telegram_id = models.CharField("Telegram ID", max_length=50, blank=True, db_index=True)
+    telegram_id = models.CharField("VK ID", max_length=50, blank=True, db_index=True)
     pd_consent = models.BooleanField("Согласие на ПД", default=False)
     pd_consent_at = models.DateTimeField("Дата согласия на ПД", null=True, blank=True)
     branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True,
@@ -675,6 +675,7 @@ class Appointment(models.Model):
     SOURCE_CHOICES = [
         ('crm', 'CRM'),
         ('telegram', 'Telegram'),
+        ('vk', 'ВКонтакте'),
         ('website', 'Сайт'),
     ]
 
@@ -688,7 +689,7 @@ class Appointment(models.Model):
     source = models.CharField("Источник", max_length=20, choices=SOURCE_CHOICES, default='crm')
     branch = models.ForeignKey('Branch', on_delete=models.SET_NULL, null=True, blank=True,
                                verbose_name="Филиал", related_name='appointments')
-    telegram_chat_id = models.CharField("Telegram chat ID", max_length=50, blank=True)
+    telegram_chat_id = models.CharField("VK user ID", max_length=50, blank=True)
     notes = models.TextField("Примечания (внутренние)", blank=True)
     created_order = models.ForeignKey(
         'RepairOrder', null=True, blank=True,

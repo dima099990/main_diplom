@@ -1,12 +1,8 @@
 """
-Слой доступа к данным для бота.
+Слой доступа к данным для VK-бота.
 
 Использует Django ORM и ОБЩУЮ базу данных проекта.
-Это НЕ отдельная БД бота — это набор функций-хелперов
-для работы с теми же таблицами, что использует сайт.
-
-Все async-функции (с префиксом a) используются в async-хендлерах бота.
-Sync-функции оставлены для удобства отладки.
+VK user ID хранится в поле telegram_id модели Customer (без миграций).
 """
 import django_setup  # noqa — must be first
 
@@ -17,54 +13,39 @@ from crm.models import Appointment, Customer
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# SYNC-функции (работа с БД — синхронный Django ORM)
+# SYNC-функции
 # ══════════════════════════════════════════════════════════════════════════
 
 def _get_settings() -> SiteSettings:
     return SiteSettings.get()
 
 
-def _get_customer_by_telegram(telegram_id: int | str) -> Customer | None:
-    return Customer.objects.filter(telegram_id=str(telegram_id)).first()
+def _get_customer_by_vk(vk_id: int | str) -> Customer | None:
+    return Customer.objects.filter(telegram_id=str(vk_id)).first()
 
 
-def _get_pd_consent(telegram_id: int | str) -> bool:
-    """Проверяет, дал ли клиент согласие на ПД."""
-    c = Customer.objects.filter(telegram_id=str(telegram_id)).first()
-    return bool(c and c.pd_consent)
-
-
-def _set_pd_consent(telegram_id: int | str) -> None:
-    """Сохраняет согласие на ПД для клиента."""
-    from django.utils import timezone
-    updated = Customer.objects.filter(telegram_id=str(telegram_id)).update(
-        pd_consent=True,
-        pd_consent_at=timezone.now(),
-    )
-    return updated > 0
-
-
-def _get_or_create_customer_from_telegram(
-    telegram_id: int | str,
-    first_name: str,
-    last_name: str,
+def _get_or_create_customer_from_vk(
+    vk_id: int | str,
+    name: str,
     phone: str,
     pd_consent: bool = False,
 ) -> tuple[Customer, bool]:
     """
-    Находит или создаёт клиента в общей БД по Telegram-контакту.
-    Порядок поиска: telegram_id → номер телефона → создать нового.
-    Возвращает (customer, is_new).
+    Находит или создаёт клиента по VK user ID.
+    VK ID хранится в поле telegram_id.
+    Порядок поиска: vk_id → номер телефона → создать нового.
     """
-    tid = str(telegram_id)
-    full_name = " ".join(p for p in [first_name, last_name] if p).strip() or "Клиент"
+    from django.utils import timezone
 
-    # 1. Ищем по telegram_id
+    tid = str(vk_id)
+    full_name = name.strip() or "Клиент"
+
+    # 1. Ищем по VK ID
     customer = Customer.objects.filter(telegram_id=tid).first()
     if customer:
         return customer, False
 
-    # 2. Нормализуем телефон, ищем по последним 10 цифрам
+    # 2. Ищем по последним 10 цифрам телефона
     digits = "".join(c for c in phone if c.isdigit())
     last10 = digits[-10:] if len(digits) >= 10 else digits
     if last10:
@@ -77,7 +58,6 @@ def _get_or_create_customer_from_telegram(
             return customer, False
 
     # 3. Создаём нового клиента
-    from django.utils import timezone
     phone_fmt = f"+{digits}" if digits and not phone.startswith("+") else phone
     customer = Customer.objects.create(
         name=full_name,
@@ -105,10 +85,10 @@ def _search_prices(query: str) -> list[dict]:
         if svc.price_to and svc.price_to != svc.price_from:
             price_str = f"{svc.price_from}–{svc.price_to} ₽"
         results.append({
-            "service": svc.name,
-            "model":   svc.phone_model.name if svc.phone_model else "—",
-            "brand":   svc.phone_model.brand.name if svc.phone_model and svc.phone_model.brand else "—",
-            "price":   price_str,
+            "service":  svc.name,
+            "model":    svc.phone_model.name if svc.phone_model else "—",
+            "brand":    svc.phone_model.brand.name if svc.phone_model and svc.phone_model.brand else "—",
+            "price":    price_str,
             "duration": svc.duration or "",
         })
     return results
@@ -117,7 +97,7 @@ def _search_prices(query: str) -> list[dict]:
 def _get_all_prices_text() -> str:
     lines = []
     for brand in Brand.objects.filter(is_active=True).prefetch_related(
-        "phone_models__services"          # правильные related_name из models.py
+        "phone_models__services"
     ):
         for model in brand.phone_models.filter(is_active=True):
             services = model.services.filter(is_active=True)
@@ -137,7 +117,7 @@ def _create_appointment(
     phone: str,
     device: str,
     problem: str,
-    telegram_chat_id: str | int,
+    vk_user_id: int | str,
     preferred_date=None,
     preferred_time=None,
 ) -> Appointment:
@@ -146,8 +126,8 @@ def _create_appointment(
         phone=phone,
         device=device,
         problem=problem,
-        source="telegram",
-        telegram_chat_id=str(telegram_chat_id),
+        source="vk",
+        telegram_chat_id=str(vk_user_id),
         status="new",
         preferred_date=preferred_date,
         preferred_time=preferred_time,
@@ -155,14 +135,12 @@ def _create_appointment(
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# ASYNC-обёртки для использования в async-хендлерах бота
+# ASYNC-обёртки
 # ══════════════════════════════════════════════════════════════════════════
 
-get_settings = sync_to_async(_get_settings)
-get_customer_by_telegram = sync_to_async(_get_customer_by_telegram)
-get_pd_consent = sync_to_async(_get_pd_consent)
-set_pd_consent = sync_to_async(_set_pd_consent)
-get_or_create_customer_from_telegram = sync_to_async(_get_or_create_customer_from_telegram)
-search_prices = sync_to_async(_search_prices)
-get_all_prices_text = sync_to_async(_get_all_prices_text)
-create_appointment = sync_to_async(_create_appointment)
+get_settings                  = sync_to_async(_get_settings)
+get_customer_by_vk            = sync_to_async(_get_customer_by_vk)
+get_or_create_customer_from_vk = sync_to_async(_get_or_create_customer_from_vk)
+search_prices                 = sync_to_async(_search_prices)
+get_all_prices_text           = sync_to_async(_get_all_prices_text)
+create_appointment            = sync_to_async(_create_appointment)

@@ -39,11 +39,11 @@
               {% else %}bg-slate-800 text-slate-400 border-slate-700 hover:text-white{% endif %}">
       🌐 Сайт
     </a>
-    <a href="?source=telegram{% if status_filter %}&status={{ status_filter }}{% endif %}"
+    <a href="?source=vk{% if status_filter %}&status={{ status_filter }}{% endif %}"
        class="px-3 py-1.5 rounded-lg text-sm border transition-all
-              {% if source_filter == 'telegram' %}bg-blue-700 text-white border-blue-600
+              {% if source_filter == 'vk' %}bg-blue-700 text-white border-blue-600
               {% else %}bg-slate-800 text-slate-400 border-slate-700 hover:text-white{% endif %}">
-      ✈ Telegram
+      💙 ВКонтакте
     </a>
     <a href="?source=crm{% if status_filter %}&status={{ status_filter }}{% endif %}"
        class="px-3 py-1.5 rounded-lg text-sm border transition-all
@@ -137,8 +137,10 @@
 
         <!-- Источник -->
         <td class="px-4 py-3 text-xs hidden lg:table-cell">
-          {% if appt.source == 'telegram' %}
-          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-900/40 text-blue-400 border border-blue-800/50">✈ Telegram</span>
+          {% if appt.source == 'vk' %}
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-900/40 text-blue-400 border border-blue-800/50">💙 ВКонтакте</span>
+          {% elif appt.source == 'telegram' %}
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-900/40 text-blue-400 border border-blue-800/50">💙 ВКонтакте</span>
           {% elif appt.source == 'website' %}
           <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 border border-emerald-800/50">🌐 Сайт</span>
           {% else %}
@@ -212,7 +214,7 @@
       {% empty %}
       <tr>
         <td colspan="6">
-          {% include 'crm/includes/empty_state.html' with icon="📅" title="Записей нет" subtitle="Создайте первую запись или дождитесь заявок из Telegram" %}
+          {% include 'crm/includes/empty_state.html' with icon="📅" title="Записей нет" subtitle="Создайте первую запись или дождитесь заявок из ВКонтакте" %}
         </td>
       </tr>
       {% endfor %}

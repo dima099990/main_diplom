@@ -1,18 +1,29 @@
-"""Свободный чат с ИИ-ассистентом, история, умная запись через ИИ."""
+"""Свободный чат с ИИ-ассистентом и умная запись через ИИ."""
 from __future__ import annotations
 import asyncio
+import logging
 import re
 from datetime import date, time, timedelta
 
-from telegram import (
-    Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove,
-    InlineKeyboardMarkup, InlineKeyboardButton, Message,
+from vkbottle.bot import Message
+
+import user_data as ud
+from keyboards import (
+    MAIN_MENU, UNREGISTERED_MENU, CONFIRM_KB, SKIP_KB, CANCEL_KB, date_kb,
 )
-from telegram.ext import ContextTypes
 
-from handlers.start import MAIN_MENU
+logger = logging.getLogger(__name__)
 
-# ── Ключевые слова для определения намерения записаться ──────────────────────
+# ── Состояния умной записи ────────────────────────────────────────────────────
+ST_AIBOOK_DEVICE  = "aibook_device"
+ST_AIBOOK_PROBLEM = "aibook_problem"
+ST_AIBOOK_DATE    = "aibook_date"
+ST_AIBOOK_TIME    = "aibook_time"
+ST_AIBOOK_NAME    = "aibook_name"
+ST_AIBOOK_PHONE   = "aibook_phone"
+ST_AIBOOK_CONFIRM = "aibook_confirm"
+
+# ── Ключевые слова намерения записаться ───────────────────────────────────────
 _BOOKING_KEYWORDS = [
     "записаться", "записать меня", "запиши меня", "запиши",
     "хочу записаться", "хочу записать", "хочу запись",
@@ -20,46 +31,8 @@ _BOOKING_KEYWORDS = [
     "запись на ремонт", "хочу на ремонт", "запись на сервис",
 ]
 
-# Inline-кнопка подтверждения (крепится к сообщению, не к низу экрана)
-_CONFIRM_IKB = InlineKeyboardMarkup([
-    [
-        InlineKeyboardButton("✅ Подтвердить", callback_data="aibook_confirm"),
-        InlineKeyboardButton("❌ Отмена",      callback_data="aibook_cancel"),
-    ]
-])
-
-_PHONE_KB = ReplyKeyboardMarkup(
-    [[KeyboardButton("📱 Поделиться номером", request_contact=True)]],
-    resize_keyboard=True,
-    one_time_keyboard=True,
-)
-
-_SKIP_KB = ReplyKeyboardMarkup(
-    [["⏭ Пропустить"]],
-    resize_keyboard=True,
-    one_time_keyboard=True,
-)
-
 _MONTHS_RU = ["янв", "фев", "мар", "апр", "май", "июн",
                "июл", "авг", "сен", "окт", "ноя", "дек"]
-
-
-def _date_kb() -> ReplyKeyboardMarkup:
-    today    = date.today()
-    tomorrow = today + timedelta(days=1)
-    day2     = today + timedelta(days=2)
-    return ReplyKeyboardMarkup(
-        [
-            [
-                f"Сегодня ({today.strftime('%d.%m')})",
-                f"Завтра ({tomorrow.strftime('%d.%m')})",
-                f"{day2.strftime('%d.%m')}",
-            ],
-            ["⏭ Пропустить"],
-        ],
-        resize_keyboard=True,
-        one_time_keyboard=True,
-    )
 
 
 # ── Парсеры даты и времени ────────────────────────────────────────────────────
@@ -91,8 +64,7 @@ def _parse_date(text: str) -> date | None:
                 ahead += 7
             return today + timedelta(days=ahead)
 
-    # dd.mm, dd.mm.yyyy, dd/mm, dd/mm/yyyy
-    m = re.search(r'(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?', t)
+    m = re.search(r"(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?", t)
     if m:
         try:
             d, mo = int(m.group(1)), int(m.group(2))
@@ -106,8 +78,7 @@ def _parse_date(text: str) -> date | None:
         except ValueError:
             pass
 
-    # YYYY-MM-DD
-    m = re.search(r'(\d{4})-(\d{2})-(\d{2})', t)
+    m = re.search(r"(\d{4})-(\d{2})-(\d{2})", t)
     if m:
         try:
             return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
@@ -119,21 +90,16 @@ def _parse_date(text: str) -> date | None:
 
 def _parse_time(text: str) -> time | None:
     t = text.strip().lower()
-
-    # HH:MM или HH.MM
-    m = re.search(r'\b(\d{1,2})[:\.](\d{2})\b', t)
+    m = re.search(r"\b(\d{1,2})[:\.](\d{2})\b", t)
     if m:
         h, mi = int(m.group(1)), int(m.group(2))
         if 0 <= h <= 23 and 0 <= mi <= 59:
             return time(h, mi)
-
-    # просто "16", "в 16 часов"
-    m = re.search(r'\b(\d{1,2})\b', t)
+    m = re.search(r"\b(\d{1,2})\b", t)
     if m:
         h = int(m.group(1))
         if 0 <= h <= 23:
             return time(h, 0)
-
     return None
 
 
@@ -156,198 +122,205 @@ def _fmt_time(val: str) -> str:
     return "—" if not val or val == "skip" else val
 
 
-# ── Машина состояний ─────────────────────────────────────────────────────────
-
-def _next_step(ai_book: dict) -> str:
-    """Возвращает название следующего незаполненного шага."""
-    if not ai_book.get("device"):  return "ask_device"
-    if not ai_book.get("problem"): return "ask_problem"
-    if not ai_book.get("date"):    return "ask_date"
-    if not ai_book.get("time"):    return "ask_time"
-    if not ai_book.get("name"):    return "ask_name"
-    if not ai_book.get("phone"):   return "ask_phone"
-    return "confirm"
+def _next_aibook_step(data: dict) -> str:
+    if not data.get("ai_device"):  return ST_AIBOOK_DEVICE
+    if not data.get("ai_problem"): return ST_AIBOOK_PROBLEM
+    if not data.get("ai_date"):    return ST_AIBOOK_DATE
+    if not data.get("ai_time"):    return ST_AIBOOK_TIME
+    if not data.get("ai_name"):    return ST_AIBOOK_NAME
+    if not data.get("ai_phone"):   return ST_AIBOOK_PHONE
+    return ST_AIBOOK_CONFIRM
 
 
-async def _ask_step(update: Update, ai_book: dict, step: str) -> None:
-    """Задаёт вопрос для нужного шага и обновляет step в ai_book."""
-    ai_book["step"] = step
-
-    if step == "ask_device":
-        await update.message.reply_text(
-            "📱 Какое устройство нужно отремонтировать?\n"
-            "_Например: iPhone 15 Pro, Samsung Galaxy S24_",
-            parse_mode="Markdown",
-            reply_markup=ReplyKeyboardRemove(),
-        )
-
-    elif step == "ask_problem":
-        await update.message.reply_text(
-            f"📱 Устройство: *{ai_book.get('device')}*\n\n"
-            "🔧 Опишите проблему или вид работы:",
-            parse_mode="Markdown",
-            reply_markup=ReplyKeyboardRemove(),
-        )
-
-    elif step == "ask_date":
-        await update.message.reply_text(
-            "📅 На какую дату записать?\nВыберите или введите вручную:",
-            reply_markup=_date_kb(),
-        )
-
-    elif step == "ask_time":
-        await update.message.reply_text(
-            "⏰ В какое время удобно?\n"
-            "_Например: 14:00 или 16:30_",
-            parse_mode="Markdown",
-            reply_markup=_SKIP_KB,
-        )
-
-    elif step == "ask_name":
-        await update.message.reply_text(
-            "👤 Как вас зовут?",
-            reply_markup=ReplyKeyboardRemove(),
-        )
-
-    elif step == "ask_phone":
-        await update.message.reply_text(
-            "📞 Укажите номер телефона или поделитесь контактом:",
-            reply_markup=_PHONE_KB,
-        )
-
-    elif step == "confirm":
-        await _show_confirm(update, ai_book)
+def _is_booking_intent(text: str) -> bool:
+    t = text.lower()
+    return any(kw in t for kw in _BOOKING_KEYWORDS)
 
 
-async def _show_confirm(update: Update, ai_book: dict) -> None:
-    """Показывает итоговые данные записи для подтверждения (inline-кнопки)."""
-    ai_book["step"] = "confirm"
-    await update.message.reply_text(
-        f"📋 *Проверьте данные записи:*\n\n"
-        f"👤 Имя:        {ai_book.get('name') or '—'}\n"
-        f"📞 Телефон:    {ai_book.get('phone') or '—'}\n"
-        f"📱 Устройство: {ai_book.get('device') or '—'}\n"
-        f"🔧 Проблема:   {ai_book.get('problem') or '—'}\n"
-        f"📅 Дата:       {_fmt_date(ai_book.get('date', ''))}\n"
-        f"⏰ Время:      {_fmt_time(ai_book.get('time', ''))}\n\n"
-        "Всё верно?",
-        parse_mode="Markdown",
-        reply_markup=_CONFIRM_IKB,
-    )
-
-
-async def _show_confirm_from_msg(message: Message, ai_book: dict) -> None:
-    """То же, но принимает Message напрямую (для вызова из callback-хендлеров)."""
-    ai_book["step"] = "confirm"
-    await message.reply_text(
-        f"📋 *Проверьте данные записи:*\n\n"
-        f"👤 Имя:        {ai_book.get('name') or '—'}\n"
-        f"📞 Телефон:    {ai_book.get('phone') or '—'}\n"
-        f"📱 Устройство: {ai_book.get('device') or '—'}\n"
-        f"🔧 Проблема:   {ai_book.get('problem') or '—'}\n"
-        f"📅 Дата:       {_fmt_date(ai_book.get('date', ''))}\n"
-        f"⏰ Время:      {_fmt_time(ai_book.get('time', ''))}\n\n"
-        "Всё верно?",
-        parse_mode="Markdown",
-        reply_markup=_CONFIRM_IKB,
-    )
-
-
-def _validate_ai_extract(info: dict) -> dict:
-    """Валидирует и нормализует поля, извлечённые ИИ."""
-    result = {}
-
-    result["device"]  = info.get("device",  "").strip()
-    result["problem"] = info.get("problem", "").strip()
-    result["name"]    = info.get("name",    "").strip()
-
-    # Телефон — минимум 10 цифр
+def _validate_ai_extract(info: dict, customer=None) -> dict:
+    result = {
+        "ai_device":  info.get("device",  "").strip(),
+        "ai_problem": info.get("problem", "").strip(),
+        "ai_name":    info.get("name",    "").strip(),
+    }
     raw_phone = info.get("phone", "").strip()
-    digits = re.sub(r'\D', '', raw_phone)
-    result["phone"] = raw_phone if len(digits) >= 10 else ""
+    digits = re.sub(r"\D", "", raw_phone)
+    result["ai_phone"] = raw_phone if len(digits) >= 10 else ""
 
-    # Дата — YYYY-MM-DD или парсим текст
     ai_date = info.get("date", "").strip()
     if ai_date:
         try:
-            date.fromisoformat(ai_date)   # уже в нужном формате
-            result["date"] = ai_date
+            date.fromisoformat(ai_date)
+            result["ai_date"] = ai_date
         except ValueError:
             parsed = _parse_date(ai_date)
-            result["date"] = parsed.isoformat() if parsed else ""
+            result["ai_date"] = parsed.isoformat() if parsed else ""
     else:
-        result["date"] = ""
+        result["ai_date"] = ""
 
-    # Время — HH:MM
     ai_time = info.get("time", "").strip()
     if ai_time:
         parsed_t = _parse_time(ai_time)
-        result["time"] = parsed_t.strftime("%H:%M") if parsed_t else ""
+        result["ai_time"] = parsed_t.strftime("%H:%M") if parsed_t else ""
     else:
-        result["time"] = ""
+        result["ai_time"] = ""
+
+    # Подтягиваем из профиля клиента если пусто
+    if customer:
+        if not result["ai_name"]:
+            result["ai_name"] = customer.name or ""
+        if not result["ai_phone"]:
+            result["ai_phone"] = customer.phone or ""
 
     return result
 
 
-# ── Хелпер для обработки контакта в ai_book-потоке ───────────────────────────
-async def _finish_ai_book_phone(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
-    """Вызывается из start.py когда ai_book ждёт номер телефона."""
-    ai_book = context.user_data.get("ai_book", {})
-    contact = update.message.contact
-    ai_book["phone"] = contact.phone_number or ""
-    context.user_data["ai_book"] = ai_book
-    await _show_confirm(update, ai_book)
+# ── Шаги умной записи ─────────────────────────────────────────────────────────
+
+async def _show_confirm(message: Message, uid: int) -> None:
+    data = ud.get(uid)
+    ud.set_state(uid, ST_AIBOOK_CONFIRM)
+    await message.answer(
+        f"📋 Проверьте данные записи:\n\n"
+        f"👤 Имя:        {data.get('ai_name') or '—'}\n"
+        f"📞 Телефон:    {data.get('ai_phone') or '—'}\n"
+        f"📱 Устройство: {data.get('ai_device') or '—'}\n"
+        f"🔧 Проблема:   {data.get('ai_problem') or '—'}\n"
+        f"📅 Дата:       {_fmt_date(data.get('ai_date', ''))}\n"
+        f"⏰ Время:      {_fmt_time(data.get('ai_time', ''))}\n\n"
+        f"Всё верно?",
+        keyboard=CONFIRM_KB,
+    )
 
 
-async def _continue_ai_booking(
-    message: Message, context: ContextTypes.DEFAULT_TYPE, ai_book: dict
-) -> None:
-    """Продолжает умную запись после получения согласия на ПД."""
-    next_s = _next_step(ai_book)
-    context.user_data["ai_book"] = ai_book
+async def _ask_aibook_step(message: Message, uid: int, step: str) -> None:
+    ud.update(uid, **{"_state": step})
 
-    if next_s == "confirm":
-        await _show_confirm_from_msg(message, ai_book)
-    else:
-        # Имитируем update.message для _ask_step через временный объект
-        class _FakeUpdate:
-            class message:
-                pass
+    if step == ST_AIBOOK_DEVICE:
+        await message.answer(
+            "📱 Какое устройство нужно отремонтировать?\n"
+            "Например: iPhone 15 Pro, Samsung Galaxy S24",
+            keyboard=CANCEL_KB,
+        )
+    elif step == ST_AIBOOK_PROBLEM:
+        data = ud.get(uid)
+        await message.answer(
+            f"📱 Устройство: {data.get('ai_device')}\n\n"
+            "🔧 Опишите проблему или вид работы:",
+            keyboard=CANCEL_KB,
+        )
+    elif step == ST_AIBOOK_DATE:
+        await message.answer(
+            "📅 На какую дату записать? Выберите или введите вручную:",
+            keyboard=date_kb(),
+        )
+    elif step == ST_AIBOOK_TIME:
+        await message.answer(
+            "⏰ В какое время удобно?\nНапример: 14:00 или 16:30",
+            keyboard=SKIP_KB,
+        )
+    elif step == ST_AIBOOK_NAME:
+        await message.answer("👤 Как вас зовут?", keyboard=CANCEL_KB)
+    elif step == ST_AIBOOK_PHONE:
+        await message.answer(
+            "📞 Укажите номер телефона для связи:",
+            keyboard=CANCEL_KB,
+        )
+    elif step == ST_AIBOOK_CONFIRM:
+        await _show_confirm(message, uid)
 
-        _FakeUpdate.message = message
-        await _ask_step(_FakeUpdate, ai_book, next_s)
 
+# ── Обработчик состояний умной записи ────────────────────────────────────────
 
-# ── CallbackQuery: подтверждение/отмена умной записи ─────────────────────────
-async def handle_aibook_callback(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
-    """Обрабатывает inline-кнопки ✅ Подтвердить / ❌ Отмена в ai_book-потоке."""
-    from db import get_settings, create_appointment
-    query = update.callback_query
-    await query.answer()
-
-    if query.data == "aibook_cancel":
-        context.user_data.pop("ai_book", None)
-        await query.edit_message_text("❌ Запись отменена.")
-        await query.message.reply_text("Чем ещё могу помочь?", reply_markup=MAIN_MENU)
+async def handle_chat_state(message: Message, uid: int, text: str, state: str) -> None:
+    """Роутинг состояний умной записи (aibook_*)."""
+    if text == "❌ Отмена":
+        ud.clear(uid)
+        await message.answer("Запись отменена.", keyboard=MAIN_MENU)
         return
 
-    # aibook_confirm
-    ai_book = context.user_data.get("ai_book")
-    if not ai_book:
-        await query.edit_message_text("Сессия записи устарела. Начните заново.")
-        return
+    data = ud.get(uid)
 
-    tid = update.effective_user.id
+    if state == ST_AIBOOK_DEVICE:
+        ud.update(uid, ai_device=text)
+        next_s = _next_aibook_step(ud.get(uid))
+        await _ask_aibook_step(message, uid, next_s)
+
+    elif state == ST_AIBOOK_PROBLEM:
+        ud.update(uid, ai_problem=text)
+        next_s = _next_aibook_step(ud.get(uid))
+        await _ask_aibook_step(message, uid, next_s)
+
+    elif state == ST_AIBOOK_DATE:
+        if _is_skip(text):
+            ud.update(uid, ai_date="skip")
+        else:
+            parsed = _parse_date(text)
+            if parsed:
+                ud.update(uid, ai_date=parsed.isoformat())
+            else:
+                await message.answer(
+                    "Не понял дату. Попробуйте ещё раз:\n"
+                    "Например: завтра, 20.07, пятница",
+                    keyboard=date_kb(),
+                )
+                return
+        next_s = _next_aibook_step(ud.get(uid))
+        await _ask_aibook_step(message, uid, next_s)
+
+    elif state == ST_AIBOOK_TIME:
+        if _is_skip(text):
+            ud.update(uid, ai_time="skip")
+        else:
+            parsed = _parse_time(text)
+            if parsed:
+                ud.update(uid, ai_time=parsed.strftime("%H:%M"))
+            else:
+                await message.answer(
+                    "Не понял время. Введите, например: 16:00 или 14:30",
+                    keyboard=SKIP_KB,
+                )
+                return
+        next_s = _next_aibook_step(ud.get(uid))
+        await _ask_aibook_step(message, uid, next_s)
+
+    elif state == ST_AIBOOK_NAME:
+        ud.update(uid, ai_name=text)
+        next_s = _next_aibook_step(ud.get(uid))
+        await _ask_aibook_step(message, uid, next_s)
+
+    elif state == ST_AIBOOK_PHONE:
+        digits = re.sub(r"\D", "", text)
+        if len(digits) < 10:
+            await message.answer(
+                "Похоже, это не номер телефона. Введите ещё раз:",
+                keyboard=CANCEL_KB,
+            )
+            return
+        ud.update(uid, ai_phone=text)
+        await _show_confirm(message, uid)
+
+    elif state == ST_AIBOOK_CONFIRM:
+        if text == "✅ Подтвердить":
+            await _finish_aibook(message, uid)
+        else:
+            await message.answer(
+                "Пожалуйста, нажмите одну из кнопок ниже:",
+                keyboard=CONFIRM_KB,
+            )
+
+
+async def _finish_aibook(message: Message, uid: int) -> None:
+    """Создаём запись после подтверждения."""
+    from db import create_appointment, get_settings
+
+    data = ud.get(uid)
     s = await get_settings()
 
     pref_date = None
     pref_time = None
-    d_val = ai_book.get("date", "")
-    t_val = ai_book.get("time", "")
+    d_val = data.get("ai_date", "")
+    t_val = data.get("ai_time", "")
     if d_val and d_val != "skip":
         try:
             pref_date = date.fromisoformat(d_val)
@@ -357,15 +330,15 @@ async def handle_aibook_callback(
         pref_time = _parse_time(t_val)
 
     appt = await create_appointment(
-        name=ai_book["name"],
-        phone=ai_book["phone"],
-        device=ai_book["device"],
-        problem=ai_book["problem"],
-        telegram_chat_id=tid,
+        name=data.get("ai_name", ""),
+        phone=data.get("ai_phone", ""),
+        device=data.get("ai_device", ""),
+        problem=data.get("ai_problem", ""),
+        vk_user_id=uid,
         preferred_date=pref_date,
         preferred_time=pref_time,
     )
-    context.user_data.pop("ai_book", None)
+    ud.clear(uid)
 
     dt_line = ""
     if pref_date:
@@ -373,223 +346,92 @@ async def handle_aibook_callback(
     if pref_time:
         dt_line += f" в {pref_time.strftime('%H:%M')}"
 
-    await query.edit_message_text(
-        f"📋 *Данные записи:*\n\n"
-        f"👤 {ai_book.get('name') or '—'}\n"
-        f"📞 {ai_book.get('phone') or '—'}\n"
-        f"📱 {ai_book.get('device') or '—'}\n"
-        f"🔧 {ai_book.get('problem') or '—'}",
-        parse_mode="Markdown",
-    )
-    await query.message.reply_text(
-        f"✅ *Заявка #{appt.pk} принята!*\n\n"
+    await message.answer(
+        f"✅ Заявка #{appt.pk} принята!\n\n"
         f"Мы свяжемся с вами в ближайшее время.{dt_line}\n\n"
         f"📞 {s.phone}\n"
         f"⏰ {s.working_hours}",
-        parse_mode="Markdown",
-        reply_markup=MAIN_MENU,
+        keyboard=MAIN_MENU,
     )
 
 
 # ── История чата ──────────────────────────────────────────────────────────────
-def _add_history(context, role: str, content: str) -> None:
-    history = context.user_data.setdefault("chat_history", [])
+
+def _add_history(uid: int, role: str, content: str) -> None:
+    data = ud.get(uid)
+    history = data.setdefault("chat_history", [])
     history.append({"role": role, "content": content})
     if len(history) > 10:
-        context.user_data["chat_history"] = history[-10:]
+        data["chat_history"] = history[-10:]
 
 
-def _is_booking_intent(text: str) -> bool:
-    t = text.lower()
-    return any(kw in t for kw in _BOOKING_KEYWORDS)
+# ── Основной хендлер чата ─────────────────────────────────────────────────────
 
-
-# ── Основной хендлер ─────────────────────────────────────────────────────────
-async def handle_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    from db import (get_settings, get_all_prices_text,
-                    get_customer_by_telegram, create_appointment)
+async def handle_chat(message: Message, uid: int, text: str) -> None:
+    from db import get_settings, get_all_prices_text, get_customer_by_vk
     from ai import get_ai_response, extract_booking_info
-    from handlers.start import UNREGISTERED_MENU
 
-    user_text = update.message.text.strip()
-    s   = await get_settings()
-    tid = update.effective_user.id
+    if not text:
+        return
 
-    # Проверяем регистрацию — незарегистрированные видят только цены
-    customer = await get_customer_by_telegram(tid)
+    s        = await get_settings()
+    customer = await get_customer_by_vk(uid)
+
     if not customer:
-        await update.message.reply_text(
+        await message.answer(
             "Для чата и записи на ремонт необходима регистрация.\n\n"
-            "Нажмите *«Поделиться контактом»* 👇",
-            parse_mode="Markdown",
-            reply_markup=UNREGISTERED_MENU,
+            "Нажмите «Зарегистрироваться» 👇",
+            keyboard=UNREGISTERED_MENU,
         )
         return
 
-    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+    # Показываем "печатает..."
+    try:
+        await message.ctx_api.messages.set_activity(peer_id=message.peer_id, type="typing")
+    except Exception:
+        pass
 
-    # ══════════════════════════════════════════════════════════════════════
-    # Машина состояний ai_book
-    # ══════════════════════════════════════════════════════════════════════
-    ai_book = context.user_data.get("ai_book")
+    # ── Умная запись: распознаём намерение ────────────────────────────────────
+    if _is_booking_intent(text) and s.bot_deepseek_key:
+        raw    = await asyncio.to_thread(extract_booking_info, text, s.bot_deepseek_key)
+        fields = _validate_ai_extract(raw, customer)
 
-    if ai_book:
-        step = ai_book.get("step")
-
-        # ── Устройство ───────────────────────────────────────────────────
-        if step == "ask_device":
-            ai_book["device"] = user_text
-            next_s = _next_step(ai_book)
-            context.user_data["ai_book"] = ai_book
-            await _ask_step(update, ai_book, next_s)
-            return
-
-        # ── Проблема ─────────────────────────────────────────────────────
-        if step == "ask_problem":
-            ai_book["problem"] = user_text
-            next_s = _next_step(ai_book)
-            context.user_data["ai_book"] = ai_book
-            await _ask_step(update, ai_book, next_s)
-            return
-
-        # ── Дата ─────────────────────────────────────────────────────────
-        if step == "ask_date":
-            if _is_skip(user_text):
-                ai_book["date"] = "skip"
-            else:
-                parsed = _parse_date(user_text)
-                if parsed:
-                    ai_book["date"] = parsed.isoformat()
-                else:
-                    await update.message.reply_text(
-                        "Не понял дату 🤔 Попробуйте ещё раз:\n"
-                        "_Например: завтра, 20.07, пятница_",
-                        parse_mode="Markdown",
-                        reply_markup=_date_kb(),
-                    )
-                    return
-            next_s = _next_step(ai_book)
-            context.user_data["ai_book"] = ai_book
-            await _ask_step(update, ai_book, next_s)
-            return
-
-        # ── Время ────────────────────────────────────────────────────────
-        if step == "ask_time":
-            if _is_skip(user_text):
-                ai_book["time"] = "skip"
-            else:
-                parsed = _parse_time(user_text)
-                if parsed:
-                    ai_book["time"] = parsed.strftime("%H:%M")
-                else:
-                    await update.message.reply_text(
-                        "Не понял время 🤔 Введите, например: *16:00* или *14:30*",
-                        parse_mode="Markdown",
-                        reply_markup=_SKIP_KB,
-                    )
-                    return
-            next_s = _next_step(ai_book)
-            context.user_data["ai_book"] = ai_book
-            await _ask_step(update, ai_book, next_s)
-            return
-
-        # ── Имя ──────────────────────────────────────────────────────────
-        if step == "ask_name":
-            ai_book["name"] = user_text
-            next_s = _next_step(ai_book)
-            context.user_data["ai_book"] = ai_book
-            await _ask_step(update, ai_book, next_s)
-            return
-
-        # ── Телефон текстом (контакт — в start.py) ───────────────────────
-        if step == "ask_phone":
-            digits = re.sub(r'\D', '', user_text)
-            if len(digits) < 10:
-                await update.message.reply_text(
-                    "Похоже, это не номер телефона. Введите ещё раз или поделитесь контактом:",
-                    reply_markup=_PHONE_KB,
-                )
-                return
-            ai_book["phone"] = user_text
-            context.user_data["ai_book"] = ai_book
-            await _show_confirm(update, ai_book)
-            return
-
-        # ── Подтверждение — обрабатывается через inline callback ─────────
-        if step == "confirm":
-            # Пользователь написал текст вместо нажатия кнопки
-            if "отмена" in user_text.lower() or "❌" in user_text:
-                context.user_data.pop("ai_book", None)
-                await update.message.reply_text("Запись отменена.", reply_markup=MAIN_MENU)
-            else:
-                await update.message.reply_text(
-                    "Пожалуйста, используйте кнопки ✅ / ❌ под сообщением.",
-                    reply_markup=ReplyKeyboardRemove(),
-                )
-            return
-
-    # ══════════════════════════════════════════════════════════════════════
-    # Определение намерения записаться → умный парсинг всего сообщения
-    # ══════════════════════════════════════════════════════════════════════
-    if _is_booking_intent(user_text) and s.bot_deepseek_key:
-        raw = await asyncio.to_thread(extract_booking_info, user_text, s.bot_deepseek_key)
-        ai_book = _validate_ai_extract(raw)
-
-        # Подтягиваем имя и телефон из профиля клиента
-        if not ai_book["name"]:
-            ai_book["name"] = customer.name
-        if not ai_book["phone"]:
-            ai_book["phone"] = customer.phone
-
-        # ── Продолжаем запись ─────────────────────────────────────────
         known = []
-        if ai_book.get("device"):  known.append(f"📱 {ai_book['device']}")
-        if ai_book.get("problem"): known.append(f"🔧 {ai_book['problem']}")
-        if ai_book.get("date"):    known.append(f"📅 {_fmt_date(ai_book['date'])}")
-        if ai_book.get("time"):    known.append(f"⏰ {ai_book['time']}")
-        if ai_book.get("name"):    known.append(f"👤 {ai_book['name']}")
-        if ai_book.get("phone"):   known.append(f"📞 {ai_book['phone']}")
+        if fields.get("ai_device"):  known.append(f"📱 {fields['ai_device']}")
+        if fields.get("ai_problem"): known.append(f"🔧 {fields['ai_problem']}")
+        if fields.get("ai_date"):    known.append(f"📅 {_fmt_date(fields['ai_date'])}")
+        if fields.get("ai_time"):    known.append(f"⏰ {fields['ai_time']}")
+        if fields.get("ai_name"):    known.append(f"👤 {fields['ai_name']}")
+        if fields.get("ai_phone"):   known.append(f"📞 {fields['ai_phone']}")
 
         if known:
-            await update.message.reply_text(
+            await message.answer(
                 "📋 Записываю! Уже понял:\n" + "  ".join(known),
-                parse_mode="Markdown",
-                reply_markup=ReplyKeyboardRemove(),
             )
         else:
-            await update.message.reply_text(
-                "📅 Отлично, оформляю запись!",
-                parse_mode="Markdown",
-                reply_markup=ReplyKeyboardRemove(),
-            )
+            await message.answer("📅 Отлично, оформляю запись!")
 
-        next_s = _next_step(ai_book)
-        context.user_data["ai_book"] = ai_book
-
-        if next_s == "confirm":
-            await _show_confirm(update, ai_book)
-        else:
-            await _ask_step(update, ai_book, next_s)
+        ud.set_state(uid, None)
+        ud.update(uid, **fields)
+        next_s = _next_aibook_step(ud.get(uid))
+        await _ask_aibook_step(message, uid, next_s)
         return
 
-    # ══════════════════════════════════════════════════════════════════════
-    # Обычный чат с ИИ (с историей)
-    # ══════════════════════════════════════════════════════════════════════
+    # ── Обычный чат с ИИ ──────────────────────────────────────────────────────
     if s.bot_deepseek_key:
         prices_text = await get_all_prices_text()
-        history     = context.user_data.get("chat_history", [])
+        history     = ud.get(uid).get("chat_history", [])
 
         answer = await asyncio.to_thread(
             get_ai_response,
-            user_text,
+            text,
             s.bot_prompt,
             s.bot_deepseek_key,
             prices_text,
             history,
         )
-
-        _add_history(context, "user",      user_text)
-        _add_history(context, "assistant", answer)
+        _add_history(uid, "user",      text)
+        _add_history(uid, "assistant", answer)
     else:
         answer = (
             f"Задайте вопрос или позвоните нам напрямую:\n"
@@ -597,21 +439,20 @@ async def handle_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             f"⏰ {s.working_hours}"
         )
 
-    await update.message.reply_text(answer, reply_markup=MAIN_MENU)
+    await message.answer(answer, keyboard=MAIN_MENU)
 
 
-async def handle_contacts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    from db import get_settings, get_customer_by_telegram
-    from handlers.start import UNREGISTERED_MENU
-    s = await get_settings()
-    tid = update.effective_user.id
-    customer = await get_customer_by_telegram(tid)
-    menu = MAIN_MENU if customer else UNREGISTERED_MENU
-    await update.message.reply_text(
-        f"📍 *{s.company_name}*\n\n"
+async def handle_contacts(message: Message, uid: int) -> None:
+    from db import get_settings, get_customer_by_vk
+
+    s        = await get_settings()
+    customer = await get_customer_by_vk(uid)
+    kb       = MAIN_MENU if customer else UNREGISTERED_MENU
+
+    await message.answer(
+        f"📍 {s.company_name}\n\n"
         f"📞 {s.phone}\n"
         f"⏰ {s.working_hours}\n"
         f"📍 {s.address}",
-        parse_mode="Markdown",
-        reply_markup=menu,
+        keyboard=kb,
     )

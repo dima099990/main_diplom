@@ -1,3 +1,4 @@
+"""VK-бот сервисного центра."""
 import sys
 import logging
 from pathlib import Path
@@ -5,30 +6,62 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 import django_setup  # noqa
 
-from telegram import Update
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    CallbackQueryHandler,
-    ConversationHandler,
-    ContextTypes,
-    filters,
-)
+from contextlib import asynccontextmanager
+from collections.abc import AsyncGenerator
+from typing import Any
 
+import aiohttp
+from vkbottle.api import API
+from vkbottle.bot import Bot, Message
+from vkbottle.http import AiohttpClient
+
+
+class _NoSSLClient(AiohttpClient):
+    """AiohttpClient с отключённой проверкой SSL.
+
+    На Windows антивирус / корпоративный прокси подменяет сертификат
+    api.vk.ru — стандартная проверка падает с SSLCertVerificationError.
+    Создаём TCPConnector(ssl=False) внутри async-метода request, где
+    уже гарантированно запущен event loop (иначе aiohttp бросает
+    RuntimeError: no running event loop).
+    """
+
+    @asynccontextmanager
+    async def request(
+        self,
+        url: str,
+        method: str = "GET",
+        data: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> AsyncGenerator[aiohttp.ClientResponse, None]:
+        if not self.session:
+            connector = aiohttp.TCPConnector(ssl=False)
+            self.session = aiohttp.ClientSession(
+                connector=connector,
+                json_serialize=self.json_processing_module.dumps,
+                **self._session_params,
+            )
+        async with self.session.request(url=url, method=method, data=data, **kwargs) as resp:
+            yield resp
+
+import user_data as ud
 from db import _get_settings as get_settings_sync
-from proxy import find_working_proxy
 from handlers.start import (
-    cmd_start, handle_registration_contact,
-    handle_consent_callback,
+    cmd_start, reg_ask_phone, reg_got_phone, reg_got_consent,
+    STATE_REG_PHONE, STATE_REG_CONSENT,
 )
-from handlers.prices import ask_price_query, show_prices, WAITING_PRICE_QUERY
+from handlers.prices import prices_start, prices_got_query, STATE_PRICES_QUERY
 from handlers.booking import (
-    start_booking, got_name, got_phone, got_device,
-    got_problem, confirm_booking, cancel_booking,
-    ASK_NAME, ASK_PHONE, ASK_DEVICE, ASK_PROBLEM, CONFIRM,
+    booking_start, booking_got_name, booking_got_phone,
+    booking_got_device, booking_got_problem, booking_got_confirm,
+    STATE_BOOK_NAME, STATE_BOOK_PHONE, STATE_BOOK_DEVICE,
+    STATE_BOOK_PROBLEM, STATE_BOOK_CONFIRM,
 )
-from handlers.chat import handle_chat, handle_contacts, handle_aibook_callback
+from handlers.chat import (
+    handle_chat, handle_contacts, handle_chat_state,
+    ST_AIBOOK_DEVICE, ST_AIBOOK_PROBLEM, ST_AIBOOK_DATE,
+    ST_AIBOOK_TIME, ST_AIBOOK_NAME, ST_AIBOOK_PHONE, ST_AIBOOK_CONFIRM,
+)
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
@@ -36,80 +69,75 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    logger.error("Исключение при обработке обновления:", exc_info=context.error)
-    if isinstance(update, Update) and update.effective_message:
-        await update.effective_message.reply_text(
-            "⚠️ Произошла ошибка. Попробуйте ещё раз или напишите /start"
-        )
+_AIBOOK_STATES = {
+    ST_AIBOOK_DEVICE, ST_AIBOOK_PROBLEM, ST_AIBOOK_DATE,
+    ST_AIBOOK_TIME, ST_AIBOOK_NAME, ST_AIBOOK_PHONE, ST_AIBOOK_CONFIRM,
+}
 
 
-def build_app(token: str, proxy_url: str | None = None) -> Application:
-    builder = Application.builder().token(token)
-    if proxy_url:
-        builder = builder.proxy(proxy_url).get_updates_proxy(proxy_url)
-    app = builder.build()
-    app.add_error_handler(error_handler)
+def build_bot(token: str) -> Bot:
+    api = API(token=token, http_client=_NoSSLClient())
+    bot = Bot(api=api)
 
-    # Базовые команды и регистрация
-    app.add_handler(CommandHandler("start", cmd_start))
-    app.add_handler(CallbackQueryHandler(handle_consent_callback, pattern="^pd_"))
-    app.add_handler(CallbackQueryHandler(handle_aibook_callback,  pattern="^aibook_"))
+    @bot.on.message()
+    async def router(message: Message) -> None:
+        uid  = message.from_id
+        text = (message.text or "").strip()
+        s    = ud.state(uid)
 
-    # Контакт (кнопка «Поделиться контактом» — для регистрации и ai_book-потока)
-    app.add_handler(MessageHandler(filters.CONTACT, handle_registration_contact))
+        logger.info(f"VK uid={uid} state={s!r} text={text!r}")
 
-    # Запись на ремонт (пошаговый диалог)
-    app.add_handler(ConversationHandler(
-        entry_points=[
-            MessageHandler(filters.Regex("^📅 Записаться$"), start_booking),
-            CommandHandler("book", start_booking),
-        ],
-        states={
-            ASK_NAME:    [MessageHandler(filters.TEXT & ~filters.COMMAND, got_name)],
-            ASK_PHONE:   [
-                MessageHandler(filters.CONTACT, got_phone),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, got_phone),
-            ],
-            ASK_DEVICE:  [MessageHandler(filters.TEXT & ~filters.COMMAND, got_device)],
-            ASK_PROBLEM: [MessageHandler(filters.TEXT & ~filters.COMMAND, got_problem)],
-            CONFIRM:     [CallbackQueryHandler(confirm_booking, pattern="^book_")],
-        },
-        fallbacks=[CommandHandler("cancel", cancel_booking)],
-        allow_reentry=True,
-    ))
+        # ─── Активное состояние ────────────────────────────────────────────
+        if s:
+            if s == STATE_REG_PHONE:
+                await reg_got_phone(message, uid, text);    return
+            if s == STATE_REG_CONSENT:
+                await reg_got_consent(message, uid, text);  return
+            if s == STATE_BOOK_NAME:
+                await booking_got_name(message, uid, text);    return
+            if s == STATE_BOOK_PHONE:
+                await booking_got_phone(message, uid, text);   return
+            if s == STATE_BOOK_DEVICE:
+                await booking_got_device(message, uid, text);  return
+            if s == STATE_BOOK_PROBLEM:
+                await booking_got_problem(message, uid, text); return
+            if s == STATE_BOOK_CONFIRM:
+                await booking_got_confirm(message, uid, text); return
+            if s == STATE_PRICES_QUERY:
+                await prices_got_query(message, uid, text);    return
+            if s in _AIBOOK_STATES:
+                await handle_chat_state(message, uid, text, s); return
 
-    # Цены (пошаговый диалог, доступен всем)
-    app.add_handler(ConversationHandler(
-        entry_points=[
-            MessageHandler(filters.Regex("^💰 Узнать цены$"), ask_price_query),
-            CommandHandler("prices", ask_price_query),
-        ],
-        states={
-            WAITING_PRICE_QUERY: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, show_prices)
-            ],
-        },
-        fallbacks=[CommandHandler("cancel", cancel_booking)],
-        allow_reentry=True,
-    ))
+        # ─── Кнопки меню (без состояния) ──────────────────────────────────
+        tl = text.lower()
 
-    # Контакты и свободный чат
-    app.add_handler(MessageHandler(filters.Regex("^📞 Контакты$"), handle_contacts))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_chat))
+        if tl in ("начать", "start", "/start") or not text:
+            await cmd_start(message, uid);              return
+        if text == "💰 Узнать цены":
+            await prices_start(message, uid);           return
+        if text == "📅 Записаться":
+            await booking_start(message, uid);          return
+        if text == "📞 Контакты":
+            await handle_contacts(message, uid);        return
+        if text == "📝 Зарегистрироваться":
+            await reg_ask_phone(message, uid);          return
+        if text == "💬 Задать вопрос":
+            await handle_chat(message, uid, text);      return
 
-    return app
+        # ─── Свободный текст → ИИ-чат ──────────────────────────────────────
+        await handle_chat(message, uid, text)
+
+    return bot
 
 
 def main() -> None:
     s = get_settings_sync()
     if not s.bot_token:
-        logger.error("Токен бота не задан! CRM → Настройки → Telegram-бот")
+        logger.error("Токен VK-бота не задан! CRM → Настройки компании → VK Бот")
         sys.exit(1)
-    logger.info(f"Запуск бота для '{s.company_name}'...")
-    proxy_url = find_working_proxy()
-    build_app(s.bot_token, proxy_url).run_polling(drop_pending_updates=True)
+    logger.info(f"Запуск VK-бота для '{s.company_name}'...")
+    bot = build_bot(s.bot_token)
+    bot.run_forever()
 
 
 if __name__ == "__main__":
