@@ -1,9 +1,6 @@
 from functools import wraps
 from django.shortcuts import redirect
 from django.http import HttpResponseForbidden
-from django.contrib.auth.decorators import login_required
-
-
 def get_role(user):
     if user.is_superuser:
         return 'admin'

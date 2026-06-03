@@ -8,7 +8,7 @@ from vkbottle.bot import Message
 
 import user_data as ud
 from keyboards import (
-    MAIN_MENU, CANCEL_KB,
+    MAIN_MENU, CANCEL_KB, UNREGISTERED_MENU,
     MEMORY_KB, SCREEN_KB, BATTERY_KB, BODY_KB,
     BUYOUT_OFFER_KB,
     name_kb, phone_kb,
@@ -207,7 +207,6 @@ async def buyout_got_offer(message: Message, uid: int, text: str) -> None:
 
     # Проверяем регистрацию и подтягиваем имя/телефон из профиля
     from db import get_customer_by_vk
-    from keyboards import UNREGISTERED_MENU
 
     customer = await get_customer_by_vk(uid)
     if not customer:

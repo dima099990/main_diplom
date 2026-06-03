@@ -398,7 +398,6 @@ def _repair_create_ctx(request):
         profile__role__in=['master', 'employee'], profile__is_active=True
     )
     if not masters_qs.filter(pk=request.user.pk).exists():
-        from django.db.models import Q
         masters_qs = User.objects.filter(
             Q(profile__role__in=['master', 'employee'], profile__is_active=True) |
             Q(pk=request.user.pk)
@@ -1259,7 +1258,6 @@ def finance(request):
         ).aggregate(t=Sum('amount'))['t'] or Decimal('0'),
     }
 
-    from crm.decorators import get_role
     current_role = get_role(request.user)
 
     # ── Зарплата: динамический расчёт за ТЕКУЩИЙ месяц по актуальным % ──────
@@ -1329,7 +1327,6 @@ def expense_create(request):
 
 @crm_required
 def payroll_my(request):
-    from datetime import date
     now = timezone.now()
     year  = int(request.GET.get('year',  now.year))
     month = int(request.GET.get('month', now.month))
@@ -2168,22 +2165,17 @@ def appointment_to_order(request, pk):
     return redirect(reverse('crm:repair_create') + '?' + params)
 
 
-# ─── LEGACY ALIASES (keep old URL names working) ──────────────────────────────
-
-part_list = warehouse_parts
 user_list = employee_list
 user_create = employee_create
 user_edit = employee_edit
-repair_update_status = repair_update_status
-repair_update_assigned = repair_update_assigned
 
 
 # ─── API ──────────────────────────────────────────────────────────────────────
 
 def api_prices(request):
-    services = RepairService.objects.filter(is_active=True).select_related('phone_model__brand').values(
-        'id', 'name', 'price_from', 'price_to', 'phone_model__name', 'phone_model__brand__name'
-    )
+    services = RepairService.objects.filter(is_active=True).select_related(
+        'phone_model__brand'
+    ).values('id', 'name', 'price_from', 'price_to', 'phone_model__name', 'phone_model__brand__name')
     return JsonResponse(list(services), safe=False)
 
 

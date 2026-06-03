@@ -31,3 +31,10 @@ storage/*
 .DS_Store
 Thumbs.db
 
+# Ruflo / AI агенты
+.swarm/
+.claude-flow/
+ruvector.db
+graphify-out/
+/graphs/
+/CLAUDE.md
